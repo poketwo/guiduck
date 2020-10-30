@@ -8,13 +8,16 @@ import config
 
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs, command_prefix="?", intents=discord.Intents.all())
+        super().__init__(
+            **kwargs, command_prefix=config.PREFIX, intents=discord.Intents.all()
+        )
 
         self.config = config
 
         self.load_extension("jishaku")
-        for i in cogs.default:
-            self.load_extension(f"cogs.{i}")
+        for i in dir(cogs):
+            if not i.startswith("_"):
+                self.load_extension(f"cogs.{i}")
 
     @property
     def db(self):
