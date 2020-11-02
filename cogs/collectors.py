@@ -44,7 +44,7 @@ class Collectors(commands.Cog):
         pages = menus.MenuPages(
             source=AsyncListPageSource(
                 self.doc_to_species(result or {}),
-                title=str(ctx.author),
+                title=str(member),
                 format_item=lambda x: x.name,
             )
         )
@@ -82,6 +82,13 @@ class Collectors(commands.Cog):
             return await ctx.send(f"Removed **{species}** from your collecting list.")
         else:
             return await ctx.send(f"**{species}** is not on your collecting list!")
+
+    @collect.command()
+    async def clear(self, ctx):
+        """Clear your collecting list."""
+
+        await self.bot.db.collector.delete_one({"_id": ctx.author.id})
+        await ctx.send("Cleared your collecting list.")
 
     @collect.command()
     async def search(self, ctx, *, species: SpeciesConverter):
