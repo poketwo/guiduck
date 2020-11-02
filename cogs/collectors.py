@@ -33,7 +33,7 @@ class Collectors(commands.Cog):
     async def collect(self, ctx, *, member: discord.Member = None):
         """Allows members to keep track of the collectors for a pokémon species.
 
-        If no subcommand is called, this will list the pokémon collected by you or someone else.
+        If no subcommand is called, lists the pokémon collected by you or someone else.
         """
 
         if member is None:

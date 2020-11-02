@@ -92,7 +92,7 @@ class Tags(commands.Cog):
     async def tag(self, ctx, *, name):
         """Allows you to save text into tags for easy access.
 
-        If no subcommand is called, this will search for the requested tag.
+        If no subcommand is called, searches for the requested tag.
         """
 
         tag = await self.get_tag(name, original=True)
