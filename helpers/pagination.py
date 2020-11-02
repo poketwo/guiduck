@@ -1,6 +1,26 @@
 import asyncio
 
-from discord.ext import commands
+import discord
+from discord.ext import commands, menus
+
+
+class AsyncListPageSource(menus.AsyncIteratorPageSource):
+    def __init__(self, data, title=None, show_index=False, format_item=str):
+        super().__init__(data, per_page=20)
+        self.title = title
+        self.show_index = show_index
+        self.format_item = format_item
+
+    async def format_page(self, menu, entries):
+        lines = (
+            f"{i+1}. {self.format_item(x)}" if self.show_index else self.format_item(x)
+            for i, x in enumerate(entries, start=menu.current_page * self.per_page)
+        )
+        return discord.Embed(
+            title=self.title,
+            color=discord.Color.blurple(),
+            description=f"\n".join(lines),
+        )
 
 
 class Paginator:

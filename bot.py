@@ -1,23 +1,34 @@
 import discord
-from discord import Intents
 from discord.ext import commands
 
-import cogs
 import config
+
+COGS = [
+    "bot",
+    "collectors",
+    "data",
+    "help",
+    "logging",
+    "mongo",
+    "pricecheck",
+    "tags",
+]
 
 
 class Bot(commands.Bot):
     def __init__(self, **kwargs):
         super().__init__(
-            **kwargs, command_prefix=config.PREFIX, intents=discord.Intents.all()
+            **kwargs,
+            command_prefix=config.PREFIX,
+            intents=discord.Intents.all(),
+            allowed_mentions=discord.AllowedMentions(everyone=False, roles=False),
         )
 
         self.config = config
 
         self.load_extension("jishaku")
-        for i in dir(cogs):
-            if not i.startswith("_"):
-                self.load_extension(f"cogs.{i}")
+        for i in COGS:
+            self.load_extension(f"cogs.{i}")
 
     @property
     def db(self):
@@ -26,6 +37,10 @@ class Bot(commands.Bot):
     @property
     def log(self):
         return self.get_cog("Logging").log
+
+    @property
+    def data(self):
+        return self.get_cog("Data").instance
 
     async def on_ready(self):
         self.log.info(f"Ready called.")
