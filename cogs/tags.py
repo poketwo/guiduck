@@ -217,6 +217,19 @@ class Tags(commands.Cog):
         await self.bot.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully deleted.")
 
+    @commands.has_permissions(administrator=True)
+    @tag.command()
+    async def forcedelete(self, ctx, name):
+        """Removes a tag by force."""
+
+        tag = await self.get_tag(name)
+        if tag is None:
+            return await ctx.send("Tag not found.")
+
+        await self.bot.db.tag.delete_one({"_id": tag.id})
+        await self.bot.db.tag.delete_many({"original": tag.name})
+        await ctx.send(f"Tag and corresponding aliases successfully force deleted.")
+
 
 def setup(bot):
     bot.add_cog(Tags(bot))
