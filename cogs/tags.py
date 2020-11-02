@@ -4,6 +4,7 @@ import discord
 import pymongo
 from bson.objectid import ObjectId
 from discord.ext import commands, menus
+from helpers.pagination import AsyncListPageSource
 
 
 @dataclass
@@ -32,20 +33,6 @@ class Tag:
         else:
             base["content"] = self.content
         return base
-
-
-class TagsPageSource(menus.AsyncIteratorPageSource):
-    def __init__(self, tags):
-        super().__init__(tags, per_page=10)
-
-    async def format_page(self, menu, entries):
-        return discord.Embed(
-            color=discord.Color.blurple(),
-            description=f"\n".join(
-                f"{i}. {v.name}"
-                for i, v in enumerate(entries, start=menu.current_page * self.per_page)
-            ),
-        )
 
 
 class FakeUser(discord.Object):
@@ -86,7 +73,13 @@ class Tags(commands.Cog):
             yield Tag(**tag_data)
 
     async def send_tags(self, ctx, tags):
-        pages = menus.MenuPages(source=TagsPageSource(tags))
+        pages = menus.MenuPages(
+            source=AsyncListPageSource(
+                tags,
+                show_index=True,
+                format_item=lambda x: x.name,
+            )
+        )
 
         try:
             await pages.start(ctx)
@@ -97,10 +90,9 @@ class Tags(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     async def tag(self, ctx, *, name):
-        """Allows you to tag text for later retrieval.
+        """Allows you to save text into tags for easy access.
 
-        If a subcommand is not called, then this will search the tag database
-        for the tag requested.
+        If no subcommand is called, this will search for the requested tag.
         """
 
         tag = await self.get_tag(name, original=True)
