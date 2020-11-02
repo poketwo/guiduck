@@ -9,7 +9,7 @@ class SpeciesConverter(commands.Converter):
             arg = arg[1:]
 
         if arg.isdigit():
-            species = ctx.bot.data.species_by_number(arg)
+            species = ctx.bot.data.species_by_number(int(arg))
         else:
             species = ctx.bot.data.species_by_name(arg)
 
