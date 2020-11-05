@@ -36,18 +36,18 @@ class Paginator:
         if self.num_pages <= 1:
             return
 
-        await self.message.add_reaction("⏮️")
-        await self.message.add_reaction("◀")
-        await self.message.add_reaction("▶")
-        await self.message.add_reaction("⏭️")
-        await self.message.add_reaction("🔢")
-        await self.message.add_reaction("⏹")
+        await message.add_reaction("⏮️")
+        await message.add_reaction("◀")
+        await message.add_reaction("▶")
+        await message.add_reaction("⏭️")
+        await message.add_reaction("🔢")
+        await message.add_reaction("⏹")
 
         try:
             while True:
                 reaction, user = await ctx.bot.wait_for(
                     "reaction_add",
-                    check=lambda r, u: r.message.id == self.message.id
+                    check=lambda r, u: r.message.id == message.id
                     and u.id == self.author.id,
                     timeout=120,
                 )
@@ -57,7 +57,7 @@ class Paginator:
                     pass
 
                 if reaction.emoji == "⏹":
-                    await self.message.delete()
+                    await message.delete()
                     return
 
                 elif reaction.emoji == "🔢":
@@ -86,7 +86,7 @@ class Paginator:
                     }[reaction.emoji] % self.num_pages
 
                 embed = await self.get_page(pidx)
-                await self.message.edit(embed=embed)
+                await message.edit(embed=embed)
 
         except asyncio.TimeoutError:
-            await self.message.add_reaction("❌")
+            await message.add_reaction("❌")

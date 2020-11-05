@@ -27,10 +27,11 @@ class CustomHelpCommand(commands.HelpCommand):
             signature = (
                 self.clean_prefix + command.qualified_name + " " + command.signature
             )
+            help = command.help or "No help found..."
 
             embed.add_field(
                 name=signature,
-                value=command.help or "No help found...",
+                value=help.splitlines()[0],
                 inline=False,
             )
 
