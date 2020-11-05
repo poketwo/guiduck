@@ -106,6 +106,21 @@ version = "7.1.2"
 
 [[package]]
 category = "main"
+description = "Custom events derived from events dispatched by Discord."
+name = "discord-ext-events"
+optional = false
+python-versions = ">=3.5.3"
+version = "0.1.0a0"
+
+[package.dependencies]
+"discord.py" = ">=1.3.4"
+
+[package.source]
+reference = "3c748575e46ce79961623e8caebcfe8bc54c088d"
+type = "git"
+url = "https://github.com/Ext-Creators/discord-ext-events.git"
+[[package]]
+category = "main"
 description = ""
 name = "discord-ext-menus"
 optional = false
@@ -320,7 +335,7 @@ idna = ">=2.0"
 multidict = ">=4.0"
 
 [metadata]
-content-hash = "c988749c72974bc826dfba72bc564b2fb0ede04455a23ee1ab6885747a802e62"
+content-hash = "6ae410905fac3810b5665e720868a0ebb5153138f78104099485fe800e305d33"
 lock-version = "1.1"
 python-versions = "^3.8"
 
@@ -372,6 +387,7 @@ click = [
     {file = "click-7.1.2-py2.py3-none-any.whl", hash = "sha256:dacca89f4bfadd5de3d7489b7c8a566eee0d3676333fbb50030263894c38c0dc"},
     {file = "click-7.1.2.tar.gz", hash = "sha256:d2b5255c7c6349bc1bd1e59e08cd12acbbd63ce649f2588755783aa94dfb6b1a"},
 ]
+discord-ext-events = []
 discord-ext-menus = []
 "discord.py" = [
     {file = "discord.py-1.5.1-py3-none-any.whl", hash = "sha256:2367359e31f6527f8a936751fc20b09d7495dd6a76b28c8fb13d4ca6c55b7563"},

@@ -1,5 +1,6 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, events
+from discord.ext.events import member_kick
 
 import config
 
@@ -9,13 +10,14 @@ COGS = [
     "data",
     "help",
     "logging",
+    "moderation",
     "mongo",
     "pricecheck",
     "tags",
 ]
 
 
-class Bot(commands.Bot):
+class Bot(commands.Bot, events.EventsMixin):
     def __init__(self, **kwargs):
         super().__init__(
             **kwargs,

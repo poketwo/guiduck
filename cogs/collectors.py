@@ -14,7 +14,7 @@ class SpeciesConverter(commands.Converter):
             species = ctx.bot.data.species_by_name(arg)
 
         if species is None:
-            raise ValueError(f"Could not find a pokémon matching `{arg}`.")
+            raise commands.BadArgument(f"Could not find a pokémon matching `{arg}`.")
         return species
 
 
