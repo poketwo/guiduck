@@ -188,7 +188,9 @@ class TradingMute(Action):
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Trading Muted")
+        role2 = discord.utils.get(ctx.guild.roles, name="Trading")
         await self.target.add_roles(role, reason=reason)
+        await self.target.remove_roles(role2, reason=reason)
 
 
 class TradingUnmute(Action):
