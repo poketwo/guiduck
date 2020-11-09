@@ -164,27 +164,27 @@ class Unmute(Action):
         await self.target.remove_roles(role, reason=reason)
 
 
-class TradeMute(Action):
-    type = "trade_mute"
-    past_tense = "trade muted"
+class TradingMute(Action):
+    type = "trading_mute"
+    past_tense = "muted in trading"
     emoji = "\N{SPEAKER WITH CANCELLATION STROKE}"
     color = discord.Color.blue()
 
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
-        role = discord.utils.get(ctx.guild.roles, name="Trade Muted")
+        role = discord.utils.get(ctx.guild.roles, name="Trading Muted")
         await self.target.add_roles(role, reason=reason)
 
 
-class TradeUnmute(Action):
-    type = "trade_unmute"
-    past_tense = "trade unmuted"
+class TradingUnmute(Action):
+    type = "trading_unmute"
+    past_tense = "unmuted in trading"
     emoji = "\N{SPEAKER}"
     color = discord.Color.green()
 
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
-        role = discord.utils.get(ctx.guild.roles, name="Trade Muted")
+        role = discord.utils.get(ctx.guild.roles, name="Trading Muted")
         await self.target.remove_roles(role, reason=reason)
 
 
@@ -433,13 +433,13 @@ class Moderation(commands.Cog):
         await ctx.send(f"Unmuted **{target}**.")
         self.bot.dispatch("action_perform", action)
 
-    @commands.command()
+    @commands.command(aliases=("tmute",))
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def trademute(
+    async def tradingmute(
         self, ctx, target: discord.Member, duration: TimeDelta = None, *, reason=None
     ):
-        """Trade mutes a member in the server.
+        """Mutes a member in trading channels.
 
         You must have Kick Members permission to use this.
         """
@@ -454,7 +454,7 @@ class Moderation(commands.Cog):
         if duration is not None:
             expires_at = created_at + duration
 
-        action = TradeMute(
+        action = TradingMute(
             target=target,
             user=ctx.author,
             reason=reason,
@@ -464,25 +464,25 @@ class Moderation(commands.Cog):
         await action.notify()
         await action.execute(ctx)
         if action.duration is None:
-            await ctx.send(f"Trade muted **{target}**.")
+            await ctx.send(f"Muted **{target}** in trading channels.")
         else:
             await ctx.send(
-                f"Trade muted **{target}** for **{time.strfdelta(duration)}**."
+                f"Muted **{target}** in trading channels for **{time.strfdelta(duration)}**."
             )
         self.bot.dispatch("action_perform", action)
 
-    @commands.command()
+    @commands.command(aliases=("tunmute",))
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def tradeunmute(self, ctx, target: discord.Member, *, reason=None):
-        """Trade unmutes a member in the server.
+    async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
+        """Unmutes a member in trading channels.
 
         You must have Kick Members permission to use this.
         """
 
-        action = TradeUnmute(target=target, user=ctx.author, reason=reason)
+        action = TradingUnmute(target=target, user=ctx.author, reason=reason)
         await action.execute(ctx)
-        await ctx.send(f"Trade unmuted **{target}**.")
+        await ctx.send(f"Unmuted **{target}** in trading channels.")
         self.bot.dispatch("action_perform", action)
 
     async def reverse_raw_action(self, raw_action):
