@@ -31,8 +31,8 @@ class Bot(commands.Cog):
             await ctx.send_help(ctx.command)
         elif isinstance(error, commands.CheckFailure):
             await ctx.send(error)
-        elif isinstance(error, commands.ConversionError):
-            await ctx.send(error.original)
+        elif isinstance(error, commands.UserInputError):
+            await ctx.send(error)
         elif isinstance(error, commands.CommandNotFound):
             return
         else:

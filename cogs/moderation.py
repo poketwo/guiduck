@@ -4,13 +4,13 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 
-from discord import colour
-
 import config
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands, menus, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from helpers import time
+from helpers.pagination import AsyncFieldsPageSource
+from helpers.utils import FakeUser
 
 LOG_CHANNEL = 720552022754983999
 STAFF_ROLE = 721825360827777043
@@ -33,6 +33,21 @@ class Action(abc.ABC):
             self.created_at = datetime.utcnow()
         if self.expires_at is not None:
             self.resolved = False
+
+    @classmethod
+    def build_from_mongo(cls, bot, x):
+        user = bot.get_user(x["user_id"]) or FakeUser(x["user_id"])
+        target = bot.get_user(x["target_id"]) or FakeUser(x["target_id"])
+        kwargs = {
+            "target": target,
+            "user": user,
+            "reason": x["reason"],
+            "created_at": x["created_at"],
+        }
+        if "expires_at" in x:
+            kwargs["expires_at"] = x["expires_at"]
+            kwargs["resolved"] = x["resolved"]
+        return cls_dict[x["type"]](**kwargs)
 
     @property
     def duration(self):
@@ -186,6 +201,12 @@ class TradingUnmute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Trading Muted")
         await self.target.remove_roles(role, reason=reason)
+
+
+cls_dict = {
+    x.type: x
+    for x in (Kick, Ban, Unban, Warn, Mute, Unmute, TradingMute, TradingUnmute)
+}
 
 
 @dataclass
@@ -528,6 +549,45 @@ class Moderation(commands.Cog):
 
         async for action in self.bot.db.action.find(query):
             self.bot.loop.create_task(self.reverse_raw_action(action))
+
+    @commands.command(aliases=("warnings",))
+    @commands.guild_only()
+    @commands.has_permissions(kick_members=True)
+    async def history(self, ctx, *, target: discord.Member):
+        """Views a member's punishment history.
+
+        You must have Kick Members permission to use this.
+        """
+
+        query = {"target_id": target.id}
+
+        async def get_actions():
+            async for x in self.bot.db.action.find(query).sort("_id", 1):
+                yield Action.build_from_mongo(self.bot, x)
+
+        def format_item(i, x):
+            name = f"{i+1}. {x.emoji} {x.past_tense.title()} by {x.user}"
+            reason = x.reason or "No reason provided"
+            lines = [
+                f"– **Reason:** {reason}",
+                f"– at {x.created_at:%m-%d-%y %I:%M %p}",
+            ]
+            if x.duration is not None:
+                lines.insert(1, f"– **Duration:** {time.strfdelta(x.duration)}")
+            return {"name": name, "value": "\n".join(lines), "inline": False}
+
+        pages = menus.MenuPages(
+            source=AsyncFieldsPageSource(
+                get_actions(),
+                title=f"Punishment History • {target}",
+                format_item=format_item,
+            )
+        )
+
+        try:
+            await pages.start(ctx)
+        except IndexError:
+            await ctx.send("No punishment history found.")
 
     def cog_unload(self):
         self.check_actions.cancel()

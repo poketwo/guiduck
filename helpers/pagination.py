@@ -23,6 +23,22 @@ class AsyncListPageSource(menus.AsyncIteratorPageSource):
         )
 
 
+class AsyncFieldsPageSource(menus.AsyncIteratorPageSource):
+    def __init__(self, data, title=None, format_item=lambda i, x: (i, x)):
+        super().__init__(data, per_page=5)
+        self.title = title
+        self.format_item = format_item
+
+    async def format_page(self, menu, entries):
+        embed = discord.Embed(
+            title=self.title,
+            color=discord.Color.blurple(),
+        )
+        for i, x in enumerate(entries, start=menu.current_page * self.per_page):
+            embed.add_field(**self.format_item(i, x))
+        return embed
+
+
 class Paginator:
     def __init__(self, get_page, num_pages):
         self.num_pages = num_pages
