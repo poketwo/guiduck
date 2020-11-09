@@ -515,6 +515,10 @@ class Moderation(commands.Cog):
         await action.notify()
         self.bot.dispatch("action_perform", action)
 
+        await self.bot.db.action.update_one(
+            {"_id": raw_action["_id"]}, {"$set": {"resolved": True}}
+        )
+
     @tasks.loop(seconds=30)
     async def check_actions(self):
         await self.bot.wait_until_ready()
@@ -522,10 +526,6 @@ class Moderation(commands.Cog):
 
         async for action in self.bot.db.action.find(query):
             self.bot.loop.create_task(self.reverse_raw_action(action))
-
-        await self.bot.db.action.update_many(
-            {"resolved": False}, {"$set": {"resolved": True}}
-        )
 
     def cog_unload(self):
         self.check_actions.cancel()
