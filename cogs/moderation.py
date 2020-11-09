@@ -498,6 +498,9 @@ class Moderation(commands.Cog):
         elif raw_action["type"] == "mute":
             action_type = Unmute
             target = guild.get_member(raw_action["target_id"])
+        elif raw_action["type"] == "trading_mute":
+            action_type = TradingUnmute
+            target = guild.get_member(raw_action["target_id"])
         else:
             return
 
