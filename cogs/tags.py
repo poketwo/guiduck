@@ -22,12 +22,12 @@ class Tag:
         return self._id
 
     def to_dict(self):
-        base = dict(
-            name=self.name,
-            owner_id=self.owner_id,
-            alias=self.alias,
-            uses=self.uses,
-        )
+        base = {
+            "name": self.name,
+            "owner_id": self.owner_id,
+            "alias": self.alias,
+            "uses": self.uses,
+        }
         if self.alias:
             base["original"] = self.original
         else:
