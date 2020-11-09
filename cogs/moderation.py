@@ -312,8 +312,8 @@ class Moderation(commands.Cog):
             return await ctx.send("You can't punish staff members!")
 
         action = Warn(target=target, user=ctx.author, reason=reason)
-        await action.notify()
         await action.execute(ctx)
+        await action.notify()
         await ctx.send(f"Warned **{target}**.")
         self.bot.dispatch("action_perform", action)
 
@@ -411,8 +411,8 @@ class Moderation(commands.Cog):
             created_at=created_at,
             expires_at=expires_at,
         )
-        await action.notify()
         await action.execute(ctx)
+        await action.notify()
         if action.duration is None:
             await ctx.send(f"Muted **{target}**.")
         else:
@@ -430,6 +430,7 @@ class Moderation(commands.Cog):
 
         action = Unmute(target=target, user=ctx.author, reason=reason)
         await action.execute(ctx)
+        await action.notify()
         await ctx.send(f"Unmuted **{target}**.")
         self.bot.dispatch("action_perform", action)
 
@@ -461,8 +462,8 @@ class Moderation(commands.Cog):
             created_at=created_at,
             expires_at=expires_at,
         )
-        await action.notify()
         await action.execute(ctx)
+        await action.notify()
         if action.duration is None:
             await ctx.send(f"Muted **{target}** in trading channels.")
         else:
@@ -482,6 +483,7 @@ class Moderation(commands.Cog):
 
         action = TradingUnmute(target=target, user=ctx.author, reason=reason)
         await action.execute(ctx)
+        await action.notify()
         await ctx.send(f"Unmuted **{target}** in trading channels.")
         self.bot.dispatch("action_perform", action)
 
