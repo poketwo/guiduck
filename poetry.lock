@@ -119,6 +119,7 @@ version = "0.1.0a0"
 reference = "3c748575e46ce79961623e8caebcfe8bc54c088d"
 type = "git"
 url = "https://github.com/Ext-Creators/discord-ext-events.git"
+
 [[package]]
 category = "main"
 description = ""
@@ -164,6 +165,14 @@ dnssec = ["cryptography (>=2.6)"]
 doh = ["requests", "requests-toolbelt"]
 idna = ["idna (>=2.1)"]
 trio = ["trio (>=0.14.0)", "sniffio (>=1.1)"]
+
+[[package]]
+category = "main"
+description = "A python durations parsing library."
+name = "durations-nlp"
+optional = false
+python-versions = ">=3.6,<4.0"
+version = "1.0.1"
 
 [[package]]
 category = "main"
@@ -335,7 +344,7 @@ idna = ">=2.0"
 multidict = ">=4.0"
 
 [metadata]
-content-hash = "6ae410905fac3810b5665e720868a0ebb5153138f78104099485fe800e305d33"
+content-hash = "da0db28835f81fa686e1334df301d882f8173f73eaf4af061a551605ac847ffd"
 lock-version = "1.1"
 python-versions = "^3.8"
 
@@ -396,6 +405,10 @@ discord-ext-menus = []
 dnspython = [
     {file = "dnspython-2.0.0-py3-none-any.whl", hash = "sha256:40bb3c24b9d4ec12500f0124288a65df232a3aa749bb0c39734b782873a2544d"},
     {file = "dnspython-2.0.0.zip", hash = "sha256:044af09374469c3a39eeea1a146e8cac27daec951f1f1f157b1962fc7cb9d1b7"},
+]
+durations-nlp = [
+    {file = "durations_nlp-1.0.1-py3-none-any.whl", hash = "sha256:91b411a2d92986c63c125c81b91181aed9ba70f5c9efded9401387783631f022"},
+    {file = "durations_nlp-1.0.1.tar.gz", hash = "sha256:25a87a372ddabf5fb45ed1da8fc711a53a0236c2954dc9c51590cee35dbf3136"},
 ]
 humanize = [
     {file = "humanize-3.1.0-py3-none-any.whl", hash = "sha256:6790d9ba139ce09761ae901be9b22bd32a131fa65ecc82cdfc4d86f377f7395d"},
