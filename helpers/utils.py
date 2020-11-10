@@ -19,3 +19,9 @@ class FakeUser(discord.Object):
 
     async def send(self, *args, **kwargs):
         pass
+
+    async def add_roles(self, *args, **kwargs):
+        pass
+
+    async def remove_roles(self, *args, **kwargs):
+        pass

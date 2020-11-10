@@ -225,6 +225,7 @@ cls_dict = {
 
 @dataclass
 class FakeContext:
+    bot: commands.Bot
     guild: discord.Guild
 
 
@@ -273,11 +274,11 @@ class Moderation(commands.Cog):
         data = await self.bot.db.member.find_one({"_id": member.id})
         if data is None:
             return
-        ctx = FakeContext(member.guild)
+        ctx = FakeContext(self.bot, member.guild)
         kwargs = dict(target=member, user=self.bot.user, reason="User rejoined guild")
-        if data["muted"]:
+        if data.get("muted", False):
             await Mute(**kwargs).execute(ctx)
-        if data["trading_muted"]:
+        if data.get("trading_muted", False):
             await TradingMute(**kwargs).execute(ctx)
 
     @commands.Cog.listener()
@@ -553,21 +554,22 @@ class Moderation(commands.Cog):
         self.bot.dispatch("action_perform", action)
 
     async def reverse_raw_action(self, raw_action):
-        guild = self.bot.get_guild(GUILD_ID)
+        action = Action.build_from_mongo(self.bot, raw_action)
 
-        if raw_action["type"] == "ban":
+        guild = self.bot.get_guild(GUILD_ID)
+        target = action.target
+
+        if action.type == "ban":
             action_type = Unban
             try:
                 ban = await guild.fetch_ban(discord.Object(id=raw_action["target_id"]))
             except (ValueError, discord.NotFound):
                 return
             target = ban.user
-        elif raw_action["type"] == "mute":
+        elif action.type == "mute":
             action_type = Unmute
-            target = guild.get_member(raw_action["target_id"])
-        elif raw_action["type"] == "trading_mute":
+        elif action.type == "trading_mute":
             action_type = TradingUnmute
-            target = guild.get_member(raw_action["target_id"])
         else:
             return
 
@@ -578,7 +580,7 @@ class Moderation(commands.Cog):
             created_at=datetime.utcnow(),
         )
 
-        await action.execute(FakeContext(guild))
+        await action.execute(FakeContext(self.bot, guild))
         await action.notify()
         self.bot.dispatch("action_perform", action)
 
