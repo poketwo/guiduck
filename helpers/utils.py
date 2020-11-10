@@ -10,5 +10,12 @@ class FakeUser(discord.Object):
     def mention(self):
         return "<@{0.id}>".format(self)
 
+    @property
+    def roles(self):
+        return []
+
     def __str__(self):
         return str(self.id)
+
+    async def send(self, *args, **kwargs):
+        pass

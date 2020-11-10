@@ -232,6 +232,19 @@ class BanConverter(commands.Converter):
         return ban
 
 
+class MemberOrIdConverter(commands.Converter):
+    async def convert(self, ctx, arg):
+        try:
+            return await commands.MemberConverter().convert(ctx, arg)
+        except commands.MemberNotFound:
+            pass
+
+        try:
+            return FakeUser(int(arg))
+        except ValueError:
+            raise commands.MemberNotFound(arg)
+
+
 class Moderation(commands.Cog):
     """For moderation."""
 
@@ -362,7 +375,12 @@ class Moderation(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     async def ban(
-        self, ctx, target: discord.Member, duration: TimeDelta = None, *, reason=None
+        self,
+        ctx,
+        target: MemberOrIdConverter,
+        duration: TimeDelta = None,
+        *,
+        reason=None,
     ):
         """Bans a member from the server.
 
