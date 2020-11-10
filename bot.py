@@ -24,6 +24,7 @@ class Bot(commands.Bot, events.EventsMixin):
             command_prefix=config.PREFIX,
             intents=discord.Intents.all(),
             allowed_mentions=discord.AllowedMentions(everyone=False, roles=False),
+            case_insensitive=True,
         )
 
         self.config = config
