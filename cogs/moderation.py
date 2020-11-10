@@ -37,16 +37,8 @@ class Action(abc.ABC):
     @classmethod
     def build_from_mongo(cls, bot, x):
         guild = bot.get_guild(GUILD_ID)
-        user = (
-            guild.get_member(x["user_id"])
-            or bot.get_user(x["user_id"])
-            or FakeUser(x["user_id"])
-        )
-        target = (
-            guild.get_member(x["target_id"])
-            or bot.get_user(x["user_id"])
-            or FakeUser(x["target_id"])
-        )
+        user = guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
+        target = guild.get_member(x["target_id"]) or FakeUser(x["target_id"])
         kwargs = {
             "target": target,
             "user": user,
