@@ -165,6 +165,9 @@ class Mute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Muted")
         await self.target.add_roles(role, reason=reason)
+        await ctx.bot.db.member.update_one(
+            {"_id": self.target.id}, {"$set": {"muted": True}}, upsert=True
+        )
 
 
 class Unmute(Action):
@@ -177,6 +180,9 @@ class Unmute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Muted")
         await self.target.remove_roles(role, reason=reason)
+        await ctx.bot.db.member.update_one(
+            {"_id": self.target.id}, {"$set": {"muted": False}}, upsert=True
+        )
 
 
 class TradingMute(Action):
@@ -191,6 +197,9 @@ class TradingMute(Action):
         role2 = discord.utils.get(ctx.guild.roles, name="Trading")
         await self.target.add_roles(role, reason=reason)
         await self.target.remove_roles(role2, reason=reason)
+        await ctx.bot.db.member.update_one(
+            {"_id": self.target.id}, {"$set": {"trading_muted": True}}, upsert=True
+        )
 
 
 class TradingUnmute(Action):
@@ -203,6 +212,9 @@ class TradingUnmute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Trading Muted")
         await self.target.remove_roles(role, reason=reason)
+        await ctx.bot.db.member.update_one(
+            {"_id": self.target.id}, {"$set": {"trading_muted": False}}, upsert=True
+        )
 
 
 cls_dict = {
@@ -255,6 +267,18 @@ class Moderation(commands.Cog):
     async def send_log_message(self, *args, **kwargs):
         channel = self.bot.get_channel(LOG_CHANNEL)
         await channel.send(*args, **kwargs)
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        data = await self.bot.db.member.find_one({"_id": member.id})
+        if data is None:
+            return
+        ctx = FakeContext(member.guild)
+        kwargs = dict(target=member, user=self.bot.user, reason="User rejoined guild")
+        if data["muted"]:
+            await Mute(**kwargs).execute(ctx)
+        if data["trading_muted"]:
+            await TradingMute(**kwargs).execute(ctx)
 
     @commands.Cog.listener()
     async def on_action_perform(self, action):
