@@ -64,7 +64,7 @@ class Paginator:
                 reaction, user = await ctx.bot.wait_for(
                     "reaction_add",
                     check=lambda r, u: r.message.id == message.id
-                    and u.id == self.author.id,
+                    and u.id == ctx.author.id,
                     timeout=120,
                 )
                 try:
@@ -80,7 +80,7 @@ class Paginator:
                     ask_message = await ctx.send("What page would you like to go to?")
                     message = await ctx.bot.wait_for(
                         "message",
-                        check=lambda m: m.author == self.author
+                        check=lambda m: m.author == ctx.author
                         and m.channel == ctx.channel,
                         timeout=30,
                     )
