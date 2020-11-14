@@ -34,8 +34,8 @@ class Bot(commands.Bot, events.EventsMixin):
             self.load_extension(f"cogs.{i}")
 
     @property
-    def db(self):
-        return self.get_cog("Mongo").db
+    def mongo(self):
+        return self.get_cog("Mongo")
 
     @property
     def log(self):

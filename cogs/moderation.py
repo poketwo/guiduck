@@ -166,7 +166,7 @@ class Mute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Muted")
         await self.target.add_roles(role, reason=reason)
-        await ctx.bot.db.member.update_one(
+        await ctx.bot.mongo.db.member.update_one(
             {"_id": self.target.id}, {"$set": {"muted": True}}, upsert=True
         )
 
@@ -181,7 +181,7 @@ class Unmute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Muted")
         await self.target.remove_roles(role, reason=reason)
-        await ctx.bot.db.member.update_one(
+        await ctx.bot.mongo.db.member.update_one(
             {"_id": self.target.id}, {"$set": {"muted": False}}, upsert=True
         )
 
@@ -198,7 +198,7 @@ class TradingMute(Action):
         role2 = discord.utils.get(ctx.guild.roles, name="Trading")
         await self.target.add_roles(role, reason=reason)
         await self.target.remove_roles(role2, reason=reason)
-        await ctx.bot.db.member.update_one(
+        await ctx.bot.mongo.db.member.update_one(
             {"_id": self.target.id}, {"$set": {"trading_muted": True}}, upsert=True
         )
 
@@ -213,7 +213,7 @@ class TradingUnmute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Trading Muted")
         await self.target.remove_roles(role, reason=reason)
-        await ctx.bot.db.member.update_one(
+        await ctx.bot.mongo.db.member.update_one(
             {"_id": self.target.id}, {"$set": {"trading_muted": False}}, upsert=True
         )
 
@@ -272,7 +272,7 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        data = await self.bot.db.member.find_one({"_id": member.id})
+        data = await self.bot.mongo.db.member.find_one({"_id": member.id})
         if data is None:
             return
         ctx = FakeContext(self.bot, member.guild)
@@ -284,11 +284,12 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_action_perform(self, action):
-        await self.bot.db.action.update_many(
+        await self.bot.mongo.db.action.update_many(
             {"target_id": action.target.id, "type": action.type, "resolved": False},
             {"$set": {"resolved": True}},
         )
-        await self.bot.db.action.insert_one(action.to_dict())
+        id = await self.bot.mongo.reserve_id("action")
+        await self.bot.mongo.db.action.insert_one({"_id": id, **action.to_dict()})
         await self.send_log_message(embed=action.to_log_embed())
 
     @commands.Cog.listener()
@@ -585,7 +586,7 @@ class Moderation(commands.Cog):
         await action.notify()
         self.bot.dispatch("action_perform", action)
 
-        await self.bot.db.action.update_one(
+        await self.bot.mongo.db.action.update_one(
             {"_id": raw_action["_id"]}, {"$set": {"resolved": True}}
         )
 
@@ -594,7 +595,7 @@ class Moderation(commands.Cog):
         await self.bot.wait_until_ready()
         query = {"resolved": False, "expires_at": {"$lt": datetime.utcnow()}}
 
-        async for action in self.bot.db.action.find(query):
+        async for action in self.bot.mongo.db.action.find(query):
             self.bot.loop.create_task(self.reverse_raw_action(action))
 
     @commands.command(aliases=("warnings",))
@@ -609,7 +610,7 @@ class Moderation(commands.Cog):
         query = {"target_id": target.id}
 
         async def get_actions():
-            async for x in self.bot.db.action.find(query).sort("_id", 1):
+            async for x in self.bot.mongo.db.action.find(query).sort("_id", 1):
                 yield Action.build_from_mongo(self.bot, x)
 
         def format_item(i, x):

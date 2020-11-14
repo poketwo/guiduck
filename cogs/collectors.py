@@ -39,7 +39,7 @@ class Collectors(commands.Cog):
         if member is None:
             member = ctx.author
 
-        result = await self.bot.db.collector.find_one({"_id": member.id})
+        result = await self.bot.mongo.db.collector.find_one({"_id": member.id})
 
         pages = menus.MenuPages(
             source=AsyncListPageSource(
@@ -58,7 +58,7 @@ class Collectors(commands.Cog):
     async def add(self, ctx, *, species: SpeciesConverter):
         """Adds a pokémon species to your collecting list."""
 
-        result = await self.bot.db.collector.update_one(
+        result = await self.bot.mongo.db.collector.update_one(
             {"_id": ctx.author.id},
             {"$set": {str(species.id): True}},
             upsert=True,
@@ -73,7 +73,7 @@ class Collectors(commands.Cog):
     async def remove(self, ctx, *, species: SpeciesConverter):
         """Remove a pokémon species from your collecting list."""
 
-        result = await self.bot.db.collector.update_one(
+        result = await self.bot.mongo.db.collector.update_one(
             {"_id": ctx.author.id},
             {"$unset": {str(species.id): 1}},
         )
@@ -87,14 +87,14 @@ class Collectors(commands.Cog):
     async def clear(self, ctx):
         """Clear your collecting list."""
 
-        await self.bot.db.collector.delete_one({"_id": ctx.author.id})
+        await self.bot.mongo.db.collector.delete_one({"_id": ctx.author.id})
         await ctx.send("Cleared your collecting list.")
 
     @collect.command()
     async def search(self, ctx, *, species: SpeciesConverter):
         """Lists the collectors of a pokémon species."""
 
-        users = self.bot.db.collector.find({str(species.id): True})
+        users = self.bot.mongo.db.collector.find({str(species.id): True})
         pages = menus.MenuPages(
             source=AsyncListPageSource(
                 users,

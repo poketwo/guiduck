@@ -43,7 +43,7 @@ class Tags(commands.Cog):
         self.bot = bot
 
     async def get_tag(self, name, original=False):
-        tag_data = await self.bot.db.tag.find_one({"name": name})
+        tag_data = await self.bot.mongo.db.tag.find_one({"name": name})
         if tag_data is None:
             return None
         tag = Tag(**tag_data)
@@ -54,7 +54,7 @@ class Tags(commands.Cog):
         return tag
 
     async def query_tags(self, query, sort=True):
-        tags = self.bot.db.tag.find(query)
+        tags = self.bot.mongo.db.tag.find(query)
         if sort:
             tags = tags.sort("name", 1)
         async for tag_data in tags:
@@ -88,7 +88,7 @@ class Tags(commands.Cog):
             return await ctx.send("Tag not found.")
 
         await ctx.send(tag.content)
-        await self.bot.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
+        await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
 
     @tag.command()
     async def info(self, ctx, *, name):
@@ -152,7 +152,7 @@ class Tags(commands.Cog):
 
         tag = Tag(name=name, owner_id=ctx.author.id, alias=False, content=content)
         try:
-            await self.bot.db.tag.insert_one(tag.to_dict())
+            await self.bot.mongo.db.tag.insert_one(tag.to_dict())
             await ctx.send(f'Tag "{tag.name}" successfully created.')
         except pymongo.errors.DuplicateKeyError:
             await ctx.send(f'A tag with the name "{tag.name}" already exists.')
@@ -167,7 +167,7 @@ class Tags(commands.Cog):
 
         tag = Tag(name=name, owner_id=ctx.author.id, alias=True, original=original.name)
         try:
-            await self.bot.db.tag.insert_one(tag.to_dict())
+            await self.bot.mongo.db.tag.insert_one(tag.to_dict())
             await ctx.send(
                 f'Tag alias "{tag.name}" pointing to "{original.name}" successfully created.'
             )
@@ -186,7 +186,7 @@ class Tags(commands.Cog):
         if tag.alias:
             return await ctx.send("You cannot edit an alias.")
 
-        await self.bot.db.tag.update_one(
+        await self.bot.mongo.db.tag.update_one(
             {"_id": tag.id}, {"$set": {"content": content}}
         )
         await ctx.send(f"Successfully edited tag.")
@@ -201,8 +201,8 @@ class Tags(commands.Cog):
         if tag.owner_id != ctx.author.id:
             return await ctx.send("You do not own that tag.")
 
-        await self.bot.db.tag.delete_one({"_id": tag.id})
-        await self.bot.db.tag.delete_many({"original": tag.name})
+        await self.bot.mongo.db.tag.delete_one({"_id": tag.id})
+        await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully deleted.")
 
     @commands.has_permissions(administrator=True)
@@ -214,8 +214,8 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
 
-        await self.bot.db.tag.delete_one({"_id": tag.id})
-        await self.bot.db.tag.delete_many({"original": tag.name})
+        await self.bot.mongo.db.tag.delete_one({"_id": tag.id})
+        await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully force deleted.")
 
 
