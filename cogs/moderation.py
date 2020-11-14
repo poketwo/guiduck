@@ -27,6 +27,7 @@ class Action(abc.ABC):
     created_at: datetime = None
     expires_at: datetime = None
     resolved: bool = None
+    _id: int = None
 
     def __post_init__(self):
         if self.created_at is None:
@@ -40,6 +41,7 @@ class Action(abc.ABC):
         user = guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
         target = guild.get_member(x["target_id"]) or FakeUser(x["target_id"])
         kwargs = {
+            "_id": x["_id"],
             "target": target,
             "user": user,
             "reason": x["reason"],
@@ -598,7 +600,7 @@ class Moderation(commands.Cog):
         async for action in self.bot.mongo.db.action.find(query):
             self.bot.loop.create_task(self.reverse_raw_action(action))
 
-    @commands.command(aliases=("warnings",))
+    @commands.group(invoke_without_command=True)
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def history(self, ctx, *, target: discord.Member):
@@ -608,13 +610,14 @@ class Moderation(commands.Cog):
         """
 
         query = {"target_id": target.id}
+        count = await self.bot.mongo.db.action.count_documents(query)
 
         async def get_actions():
-            async for x in self.bot.mongo.db.action.find(query).sort("_id", 1):
+            async for x in self.bot.mongo.db.action.find(query).sort("created_at", -1):
                 yield Action.build_from_mongo(self.bot, x)
 
         def format_item(i, x):
-            name = f"{i+1}. {x.emoji} {x.past_tense.title()} by {x.user}"
+            name = f"{x._id}. {x.emoji} {x.past_tense.title()} by {x.user}"
             reason = x.reason or "No reason provided"
             lines = [
                 f"– **Reason:** {reason}",
@@ -629,6 +632,7 @@ class Moderation(commands.Cog):
                 get_actions(),
                 title=f"Punishment History • {target}",
                 format_item=format_item,
+                count=count,
             )
         )
 
@@ -636,6 +640,19 @@ class Moderation(commands.Cog):
             await pages.start(ctx)
         except IndexError:
             await ctx.send("No punishment history found.")
+
+    @history.command(aliases=("del",))
+    @commands.guild_only()
+    @commands.has_permissions(kick_members=True)
+    async def delete(self, ctx, ids: commands.Greedy[int]):
+        """Deletes one or more entries from punishment history.
+
+        You must have Kick Members permission to use this.
+        """
+
+        result = await self.bot.mongo.db.action.delete_many({"_id": {"$in": ids}})
+        word = "entry" if result.deleted_count == 1 else "entries"
+        await ctx.send(f"Successfully deleted {result.deleted_count} {word}.")
 
     def cog_unload(self):
         self.check_actions.cancel()

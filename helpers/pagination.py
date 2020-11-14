@@ -24,18 +24,25 @@ class AsyncListPageSource(menus.AsyncIteratorPageSource):
 
 
 class AsyncFieldsPageSource(menus.AsyncIteratorPageSource):
-    def __init__(self, data, title=None, format_item=lambda i, x: (i, x)):
+    def __init__(self, data, title=None, count=None, format_item=lambda i, x: (i, x)):
         super().__init__(data, per_page=5)
         self.title = title
         self.format_item = format_item
+        self.count = count
 
     async def format_page(self, menu, entries):
         embed = discord.Embed(
             title=self.title,
             color=discord.Color.blurple(),
         )
-        for i, x in enumerate(entries, start=menu.current_page * self.per_page):
+        start = menu.current_page * self.per_page
+        i = start
+        for i, x in enumerate(entries, start=start):
             embed.add_field(**self.format_item(i, x))
+        footer = f"Showing entries {start+1}–{i+1}"
+        if self.count is not None:
+            footer += f" out of {self.count}"
+        embed.set_footer(text=footer)
         return embed
 
 
