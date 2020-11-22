@@ -58,7 +58,7 @@ class Logging(commands.Cog):
     @commands.Cog.listener()
     async def on_raw_bulk_message_delete(self, payload):
         await self.bot.mongo.db.message.update_many(
-            {"_id": payload.message_ids},
+            {"_id": {"$in": list(payload.message_ids)}},
             {"$set": {"deleted_at": datetime.utcnow()}},
         )
 
