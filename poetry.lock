@@ -281,7 +281,7 @@ tls = ["ipaddress"]
 zstd = ["zstandard"]
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Alternative regular expression module, to replace re."
 name = "regex"
 optional = false
@@ -344,7 +344,7 @@ idna = ">=2.0"
 multidict = ">=4.0"
 
 [metadata]
-content-hash = "431cfa32d4b128a65cee8a4b80a0edd2058e2b56fed452e9009be560152258be"
+content-hash = "da0db28835f81fa686e1334df301d882f8173f73eaf4af061a551605ac847ffd"
 lock-version = "1.1"
 python-versions = "^3.8"
 

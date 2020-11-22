@@ -1,6 +1,5 @@
 import unicodedata
 
-import regex as re
 from discord.ext import commands
 
 LAST_RESORT_NICKNAME = "User"
@@ -17,10 +16,11 @@ class Names(commands.Cog):
         if text is None:
             return None
         text = unicodedata.normalize("NFKC", text)
-        match = re.search(r"[\p{L}\p{N}]", text)
-        if match is None or len(text) == 0:
+        while len(text) > 0 and text[0] < "0":
+            text = text[1:]
+        if len(text) == 0:
             return None
-        return text[match.start() :]
+        return text
 
     async def normalize_member(self, member):
         normalized = (
