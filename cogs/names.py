@@ -1,7 +1,6 @@
-import re
 import unicodedata
 
-import discord
+import regex as re
 from discord.ext import commands
 
 LAST_RESORT_NICKNAME = "User"
