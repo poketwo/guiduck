@@ -10,6 +10,8 @@ CHANNELS = [
 
 
 class PriceCheck(commands.Cog):
+    """For price checking."""
+
     def __init__(self, bot):
         self.bot = bot
         self.channels = itertools.cycle(CHANNELS)

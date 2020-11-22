@@ -13,7 +13,6 @@ class Bot(commands.Cog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
-
         if isinstance(error, commands.NoPrivateMessage):
             await ctx.send("This command cannot be used in private messages.")
         elif isinstance(error, commands.DisabledCommand):
@@ -43,7 +42,6 @@ class Bot(commands.Cog):
 
     @commands.Cog.listener()
     async def on_error(self, event, error):
-
         if isinstance(error, discord.NotFound):
             return
         else:
