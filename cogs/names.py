@@ -20,7 +20,7 @@ class Names(commands.Cog):
             text = text[1:]
         if len(text) == 0:
             return None
-        return text
+        return text[:32]
 
     async def normalize_member(self, member):
         normalized = (
