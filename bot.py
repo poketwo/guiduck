@@ -12,6 +12,7 @@ COGS = [
     "logging",
     "moderation",
     "mongo",
+    "names",
     "pricecheck",
     "tags",
 ]
