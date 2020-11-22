@@ -18,7 +18,7 @@ class Names(commands.Cog):
         if text is None:
             return None
         text = unicodedata.normalize("NFKC", text)
-        match = re.search(r"[A-Za-z0-9]", text)
+        match = re.search(r"[\p{L}\p{N}]", text)
         if match is None or len(text) == 0:
             return None
         return text[match.start() :]
