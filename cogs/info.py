@@ -20,7 +20,7 @@ class Info(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command()
+    @commands.command(aliases=("whois",))
     async def info(
         self, ctx, *, user: Union[discord.Member, FetchUserConverter] = None
     ):

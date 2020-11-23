@@ -26,6 +26,8 @@ class Logging(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        if message.guild is None:
+            return
         time = int(message.created_at.timestamp())
         await self.bot.mongo.db.message.insert_one(
             {
@@ -34,6 +36,10 @@ class Logging(commands.Cog):
                 "channel_id": message.channel.id,
                 "guild_id": message.guild.id,
                 "history": {str(time): message.content},
+                "attachments": [
+                    {"id": attachment.id, "filename": attachment.filename}
+                    for attachment in message.attachments
+                ],
                 "deleted_at": None,
             }
         )
@@ -50,6 +56,10 @@ class Logging(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload):
+        if payload.cached_message is not None:
+            for attachment in payload.cached_message.attachments:
+                fn = f"attachments/{attachment.id}_{attachment.filename}"
+                self.bot.loop.create_task(attachment.save(fn, use_cached=True))
         await self.bot.mongo.db.message.update_one(
             {"_id": payload.message_id},
             {"$set": {"deleted_at": datetime.utcnow()}},
