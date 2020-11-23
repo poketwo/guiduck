@@ -1,5 +1,4 @@
 from datetime import timedelta
-from string import Formatter
 
 from discord.ext import commands
 from durations_nlp import Duration
@@ -22,7 +21,7 @@ class TimeDelta(commands.Converter):
         return timedelta(seconds=seconds)
 
 
-def strfdelta(duration, long=False):
+def strfdelta(duration, long=False, max_len=None):
     seconds = int(duration.total_seconds())
     strings = []
     for period_name, period_short, period_seconds in PERIODS:
@@ -33,5 +32,7 @@ def strfdelta(duration, long=False):
                 strings.append(f"{period_value} {period_name}{has_s}")
             else:
                 strings.append(f"{period_value}{period_short}")
+        if max_len is not None and len(strings) >= max_len:
+            break
 
     return " ".join(strings)
