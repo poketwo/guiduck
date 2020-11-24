@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 
 from discord.ext import commands
+import discord
 
 formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
 
@@ -26,6 +27,7 @@ class Logging(commands.Cog):
         dlog.setLevel(logging.INFO)
 
     async def resync_guild(self, guild):
+        print(guild)
         await self.bot.mongo.db.guild.update_one(
             {"_id": guild.id},
             {
@@ -34,36 +36,24 @@ class Logging(commands.Cog):
                     "icon": str(guild.icon_url),
                     "channels": [
                         {"id": channel.id, "type": channel.type, "name": channel.name}
-                        for channel in guild.channels
+                        for channel in sorted(guild.channels, key=lambda x: x.position)
                     ],
                 }
             },
             upsert=True,
         )
 
-    @commands.Cog.listener()
-    async def on_guild_channel_create(self, channel):
-        await self.resync_guild(channel.guild)
-
-    @commands.Cog.listener()
-    async def on_guild_channel_delete(self, channel):
-        await self.resync_guild(channel.guild)
-
-    @commands.Cog.listener()
-    async def on_guild_channel_update(self, before, after):
-        await self.resync_guild(after.guild)
-
-    @commands.Cog.listener()
-    async def on_guild_channel_update(self, before, after):
-        await self.resync_guild(after.guild)
-
-    @commands.Cog.listener()
-    async def on_guild_join(self, guild):
-        await self.resync_guild(guild)
-
-    @commands.Cog.listener()
-    async def on_guild_update(self, before, after):
-        await self.resync_guild(after)
+    @commands.Cog.listener(name="on_guild_channel_create")
+    @commands.Cog.listener(name="on_guild_channel_delete")
+    @commands.Cog.listener(name="on_guild_channel_update")
+    @commands.Cog.listener(name="on_guild_channel_update")
+    @commands.Cog.listener(name="on_guild_join")
+    @commands.Cog.listener(name="on_guild_update")
+    async def on_guild_updates(self, *args):
+        thing = args[-1]
+        if not isinstance(thing, discord.Guild):
+            thing = thing.guild
+        await self.resync_guild(thing)
 
     @commands.Cog.listener()
     async def on_message(self, message):
