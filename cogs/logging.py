@@ -54,7 +54,7 @@ class Logging(commands.Cog):
             {"_id": member.id},
             {
                 "$set": {
-                    "tag": member.name,
+                    "name": member.name,
                     "discriminator": member.discriminator,
                     "nick": member.nick,
                     "avatar": str(member.avatar_url),
