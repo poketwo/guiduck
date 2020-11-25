@@ -1,8 +1,8 @@
 import logging
 from datetime import datetime
 
-from discord.ext import commands
 import discord
+from discord.ext import commands
 
 formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
 
@@ -27,7 +27,6 @@ class Logging(commands.Cog):
         dlog.setLevel(logging.INFO)
 
     async def resync_guild(self, guild):
-        print(guild)
         await self.bot.mongo.db.guild.update_one(
             {"_id": guild.id},
             {
@@ -35,8 +34,13 @@ class Logging(commands.Cog):
                     "name": guild.name,
                     "icon": str(guild.icon_url),
                     "channels": [
-                        {"id": channel.id, "type": channel.type, "name": channel.name}
-                        for channel in sorted(guild.channels, key=lambda x: x.position)
+                        {
+                            "id": channel.id,
+                            "type": channel.type,
+                            "name": channel.name,
+                            "position": channel.position,
+                        }
+                        for channel in guild.channels
                     ],
                 }
             },
