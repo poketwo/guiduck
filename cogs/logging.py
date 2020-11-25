@@ -6,6 +6,8 @@ from discord.ext import commands
 
 formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
 
+GUILD_ID = 716390832034414685
+
 
 class Logging(commands.Cog):
     """For logging."""
@@ -26,7 +28,7 @@ class Logging(commands.Cog):
         self.log.setLevel(logging.DEBUG)
         dlog.setLevel(logging.INFO)
 
-    async def resync_guild(self, guild):
+    async def sync_guild(self, guild):
         await self.bot.mongo.db.guild.update_one(
             {"_id": guild.id},
             {
@@ -47,6 +49,20 @@ class Logging(commands.Cog):
             upsert=True,
         )
 
+    async def sync_member(self, member):
+        await self.bot.mongo.db.member.update_one(
+            {"_id": member.id},
+            {
+                "$set": {
+                    "tag": member.name,
+                    "discriminator": member.discriminator,
+                    "nick": member.nick,
+                    "avatar": str(member.avatar_url),
+                }
+            },
+            upsert=True,
+        )
+
     @commands.Cog.listener(name="on_guild_channel_create")
     @commands.Cog.listener(name="on_guild_channel_delete")
     @commands.Cog.listener(name="on_guild_channel_update")
@@ -57,7 +73,17 @@ class Logging(commands.Cog):
         thing = args[-1]
         if not isinstance(thing, discord.Guild):
             thing = thing.guild
-        await self.resync_guild(thing)
+        await self.sync_guild(thing)
+
+    @commands.Cog.listener(name="on_member_join")
+    @commands.Cog.listener(name="on_member_update")
+    @commands.Cog.listener(name="on_user_update")
+    async def on_member_updates(self, *args):
+        thing = args[-1]
+        if isinstance(thing, discord.User):
+            guild = self.bot.get_guild(GUILD_ID)
+            thing = guild.get_member(thing.id)
+        await self.sync_member(thing)
 
     @commands.Cog.listener()
     async def on_message(self, message):
