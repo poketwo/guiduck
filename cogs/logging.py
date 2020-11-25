@@ -36,7 +36,7 @@ class Logging(commands.Cog):
                     "channels": [
                         {
                             "id": channel.id,
-                            "type": channel.type,
+                            "type": str(channel.type),
                             "name": channel.name,
                             "position": channel.position,
                         }
