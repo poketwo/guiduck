@@ -346,7 +346,7 @@ class Moderation(commands.Cog):
     async def cleanup(self, ctx, search=100):
         """Cleans up the bot's messages from the channel.
 
-        You must have Manage Messages permission to use this.
+        You must have the Manage Messages permission to use this.
         """
 
         def check(m):
@@ -370,7 +370,7 @@ class Moderation(commands.Cog):
     async def warn(self, ctx, target: discord.Member, *, reason=None):
         """Warns a member in the server.
 
-        You must have Kick Members permission to use this.
+        You must have the Kick Members permission to use this.
         """
 
         if any(x.id == STAFF_ROLE for x in target.roles):
@@ -388,7 +388,7 @@ class Moderation(commands.Cog):
     async def kick(self, ctx, target: discord.Member, *, reason=None):
         """Kicks a member from the server.
 
-        You must have Kick Members permission to use this.
+        You must have the Kick Members permission to use this.
         """
 
         if any(x.id == STAFF_ROLE for x in target.roles):
@@ -413,7 +413,7 @@ class Moderation(commands.Cog):
     ):
         """Bans a member from the server.
 
-        You must have Ban Members permission to use this.
+        You must have the Ban Members permission to use this.
         """
 
         if any(x.id == STAFF_ROLE for x in target.roles):
@@ -445,7 +445,7 @@ class Moderation(commands.Cog):
     async def unban(self, ctx, target: BanConverter, *, reason=None):
         """Unbans a member from the server.
 
-        You must have Ban Members permission to use this.
+        You must have the Ban Members permission to use this.
         """
 
         action = Unban(target=target.user, user=ctx.author, reason=reason)
@@ -461,7 +461,7 @@ class Moderation(commands.Cog):
     ):
         """Mutes a member in the server.
 
-        You must have Kick Members permission to use this.
+        You must have the Kick Members permission to use this.
         """
 
         print(duration)
@@ -495,7 +495,7 @@ class Moderation(commands.Cog):
     async def unmute(self, ctx, target: discord.Member, *, reason=None):
         """Unmutes a member in the server.
 
-        You must have Kick Members permission to use this.
+        You must have the Kick Members permission to use this.
         """
 
         action = Unmute(target=target, user=ctx.author, reason=reason)
@@ -512,7 +512,7 @@ class Moderation(commands.Cog):
     ):
         """Mutes a member in trading channels.
 
-        You must have Kick Members permission to use this.
+        You must have the Kick Members permission to use this.
         """
 
         print(duration)
@@ -548,7 +548,7 @@ class Moderation(commands.Cog):
     async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
         """Unmutes a member in trading channels.
 
-        You must have Kick Members permission to use this.
+        You must have the Kick Members permission to use this.
         """
 
         action = TradingUnmute(target=target, user=ctx.author, reason=reason)
@@ -606,7 +606,7 @@ class Moderation(commands.Cog):
     async def history(self, ctx, *, target: discord.Member):
         """Views a member's punishment history.
 
-        You must have Kick Members permission to use this.
+        You must have the Kick Members permission to use this.
         """
 
         query = {"target_id": target.id}
@@ -647,7 +647,7 @@ class Moderation(commands.Cog):
     async def delete(self, ctx, ids: commands.Greedy[int]):
         """Deletes one or more entries from punishment history.
 
-        You must have Kick Members permission to use this.
+        You must have the Kick Members permission to use this.
         """
 
         result = await self.bot.mongo.db.action.delete_many({"_id": {"$in": ids}})

@@ -34,17 +34,6 @@ class Logging(commands.Cog):
         self.log.setLevel(logging.DEBUG)
         dlog.setLevel(logging.INFO)
 
-    def serialize_channel(self, channel):
-        base = {
-            "id": channel.id,
-            "type": str(channel.type),
-            "name": channel.name,
-            "position": channel.position,
-        }
-        if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
-            base["category_id"] = channel.category_id
-        return base
-
     def serialize_role(self, role):
         return {
             "id": role.id,
@@ -60,11 +49,24 @@ class Logging(commands.Cog):
                 "$set": {
                     "name": guild.name,
                     "icon": str(guild.icon_url),
-                    "channels": [self.serialize_channel(x) for x in guild.channels],
                     "roles": [self.serialize_role(x) for x in guild.roles],
                 }
             },
             upsert=True,
+        )
+
+    async def sync_channel(self, channel):
+        base = {
+            "guild_id": channel.guild.id,
+            "type": str(channel.type),
+            "name": channel.name,
+            "position": channel.position,
+        }
+        if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
+            base["category_id"] = channel.category_id
+
+        await self.bot.mongo.db.channel.update_one(
+            {"_id": channel.id}, {"$set": base}, upsert=True
         )
 
     async def sync_member(self, member):
@@ -82,17 +84,10 @@ class Logging(commands.Cog):
             upsert=True,
         )
 
-    @commands.Cog.listener(name="on_guild_channel_create")
-    @commands.Cog.listener(name="on_guild_channel_delete")
-    @commands.Cog.listener(name="on_guild_channel_update")
-    @commands.Cog.listener(name="on_guild_channel_update")
     @commands.Cog.listener(name="on_guild_join")
     @commands.Cog.listener(name="on_guild_update")
     async def on_guild_updates(self, *args):
-        thing = args[-1]
-        if not isinstance(thing, discord.Guild):
-            thing = thing.guild
-        await self.sync_guild(thing)
+        await self.sync_guild(args[-1])
 
     @commands.Cog.listener(name="on_member_join")
     @commands.Cog.listener(name="on_member_update")
@@ -103,6 +98,20 @@ class Logging(commands.Cog):
             guild = self.bot.get_guild(GUILD_ID)
             thing = guild.get_member(thing.id)
         await self.sync_member(thing)
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        for channel in guild.channels:
+            await self.sync_channel(channel)
+
+    @commands.Cog.listener(name="on_guild_channel_create")
+    @commands.Cog.listener(name="on_guild_channel_update")
+    async def on_guild_channel_updates(self, *args):
+        await self.sync_channel(args[-1])
+
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel):
+        await self.bot.mongo.db.channel.delete_one({"_id": channel.id})
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -151,6 +160,31 @@ class Logging(commands.Cog):
             {"_id": {"$in": list(payload.message_ids)}},
             {"$set": {"deleted_at": datetime.utcnow()}},
         )
+
+    @commands.group(invoke_without_command=True)
+    @commands.has_permissions(manage_messages=True)
+    async def logs(self, ctx, *, channel: discord.TextChannel = None):
+        """Gets a link to the message logs for a channel.
+
+        You must have the Manage Messages permission to use this.
+        """
+
+        channel = channel or ctx.channel
+        await ctx.send(f"https://admin.poketwo.net/{channel.guild.id}/{channel.id}")
+
+    @logs.command()
+    @commands.has_permissions(administrator=True)
+    async def restrict(self, ctx, channel: discord.TextChannel = None):
+        """Restricts the logs for a channel to Admins.
+
+        You must have the Administrator permission to use this.
+        """
+
+        channel = channel or ctx.channel
+        await self.bot.mongo.db.channel.update_one(
+            {"_id": channel.id}, {"$set": {"restricted": True}}
+        )
+        await ctx.send(f"Restricted logs for **#{channel}** to Admins.")
 
 
 def setup(bot):
