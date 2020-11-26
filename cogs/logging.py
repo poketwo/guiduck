@@ -28,6 +28,16 @@ class Logging(commands.Cog):
         self.log.setLevel(logging.DEBUG)
         dlog.setLevel(logging.INFO)
 
+    def serialize_channel(self, channel):
+        base = {
+            "id": channel.id,
+            "type": str(channel.type),
+            "name": channel.name,
+            "position": channel.position,
+        }
+        if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
+            base["category_id"] = channel.category_id
+
     async def sync_guild(self, guild):
         await self.bot.mongo.db.guild.update_one(
             {"_id": guild.id},
@@ -36,13 +46,7 @@ class Logging(commands.Cog):
                     "name": guild.name,
                     "icon": str(guild.icon_url),
                     "channels": [
-                        {
-                            "id": channel.id,
-                            "type": str(channel.type),
-                            "name": channel.name,
-                            "position": channel.position,
-                        }
-                        for channel in guild.channels
+                        self.serialize_channel(channel) for channel in guild.channels
                     ],
                 }
             },
