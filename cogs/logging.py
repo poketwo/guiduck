@@ -37,6 +37,7 @@ class Logging(commands.Cog):
         }
         if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
             base["category_id"] = channel.category_id
+        return base
 
     async def sync_guild(self, guild):
         await self.bot.mongo.db.guild.update_one(
