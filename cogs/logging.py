@@ -45,6 +45,14 @@ class Logging(commands.Cog):
             base["category_id"] = channel.category_id
         return base
 
+    def serialize_role(self, role):
+        return {
+            "id": role.id,
+            "name": role.name,
+            "color": role.color.value,
+            "position": role.position,
+        }
+
     async def sync_guild(self, guild):
         await self.bot.mongo.db.guild.update_one(
             {"_id": guild.id},
@@ -52,17 +60,14 @@ class Logging(commands.Cog):
                 "$set": {
                     "name": guild.name,
                     "icon": str(guild.icon_url),
-                    "channels": [
-                        self.serialize_channel(channel) for channel in guild.channels
-                    ],
+                    "channels": [self.serialize_channel(x) for x in guild.channels],
+                    "roles": [self.serialize_role(x) for x in guild.roles],
                 }
             },
             upsert=True,
         )
 
     async def sync_member(self, member):
-        roles = [member.guild.get_role(x) for x in STAFF_ROLES]
-        role = discord.utils.find(lambda x: x in member.roles, roles)
         await self.bot.mongo.db.member.update_one(
             {"_id": member.id},
             {
@@ -71,7 +76,7 @@ class Logging(commands.Cog):
                     "discriminator": member.discriminator,
                     "nick": member.nick,
                     "avatar": str(member.avatar_url),
-                    "role": None if role is None else role.name,
+                    "roles": [x.id for x in member.roles],
                 }
             },
             upsert=True,
