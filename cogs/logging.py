@@ -7,6 +7,12 @@ from discord.ext import commands
 formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
 
 GUILD_ID = 716390832034414685
+STAFF_ROLES = [
+    718006431231508481,
+    724879492622843944,
+    732712709514199110,
+    721825360827777043,
+]
 
 
 class Logging(commands.Cog):
@@ -55,6 +61,8 @@ class Logging(commands.Cog):
         )
 
     async def sync_member(self, member):
+        roles = [member.guild.get_role(x) for x in STAFF_ROLES]
+        role = discord.utils.find(lambda x: x in member.roles, roles)
         await self.bot.mongo.db.member.update_one(
             {"_id": member.id},
             {
@@ -63,6 +71,7 @@ class Logging(commands.Cog):
                     "discriminator": member.discriminator,
                     "nick": member.nick,
                     "avatar": str(member.avatar_url),
+                    "role": None if role is None else role.name,
                 }
             },
             upsert=True,
