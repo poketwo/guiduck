@@ -7,9 +7,8 @@ class Mongo(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.db = AsyncIOMotorClient(bot.config.DATABASE_URI, io_loop=bot.loop)[
-            bot.config.DATABASE_NAME
-        ]
+        self.client = AsyncIOMotorClient(bot.config.DATABASE_URI, io_loop=bot.loop)
+        self.db = self.client[bot.config.DATABASE_NAME]
 
     async def reserve_id(self, name, reserve=1):
         result = await self.db.counter.find_one_and_update(
