@@ -170,7 +170,7 @@ class Logging(commands.Cog):
         """
 
         channel = channel or ctx.channel
-        await ctx.send(f"https://admin.poketwo.net/{channel.guild.id}/{channel.id}")
+        await ctx.send(f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}")
 
     @logs.command()
     @commands.has_permissions(administrator=True)
