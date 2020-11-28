@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands
@@ -119,7 +119,7 @@ class Logging(commands.Cog):
     async def on_message(self, message):
         if message.guild is None:
             return
-        time = int(message.created_at.timestamp())
+        time = int(message.created_at.replace(tzinfo=timezone.utc).timestamp() - 3600)
         await self.bot.mongo.db.message.insert_one(
             {
                 "_id": message.id,
@@ -142,7 +142,7 @@ class Logging(commands.Cog):
     async def on_raw_message_edit(self, payload):
         if "content" not in payload.data:
             return
-        time = int(datetime.utcnow().timestamp())
+        time = int(datetime.now().timestamp()) - 3600
         await self.bot.mongo.db.message.update_one(
             {"_id": payload.message_id},
             {"$set": {f"history.{time}": payload.data["content"]}},
