@@ -61,6 +61,7 @@ class Logging(commands.Cog):
             "type": str(channel.type),
             "name": channel.name,
             "position": channel.position,
+            "last_message_id": channel.last_message_id,
         }
         if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
             base["category_id"] = channel.category_id
@@ -132,6 +133,9 @@ class Logging(commands.Cog):
                 "deleted_at": None,
             }
         )
+        await self.bot.mongo.db.channel.update_one(
+            {"_id": message.channel.id}, {"$set": {"last_message_id": message.id}}
+        )
 
     @commands.Cog.listener()
     async def on_raw_message_edit(self, payload):
@@ -170,7 +174,9 @@ class Logging(commands.Cog):
         """
 
         channel = channel or ctx.channel
-        await ctx.send(f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}")
+        await ctx.send(
+            f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
+        )
 
     @logs.command()
     @commands.has_permissions(administrator=True)
