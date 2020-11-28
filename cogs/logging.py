@@ -64,6 +64,7 @@ class Logging(commands.Cog):
         }
         if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
             base["category_id"] = channel.category_id
+        if isinstance(channel, discord.TextChannel):
             base["last_message_id"] = channel.last_message_id
 
         await self.bot.mongo.db.channel.update_one(
