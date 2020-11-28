@@ -61,10 +61,10 @@ class Logging(commands.Cog):
             "type": str(channel.type),
             "name": channel.name,
             "position": channel.position,
-            "last_message_id": channel.last_message_id,
         }
         if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
             base["category_id"] = channel.category_id
+            base["last_message_id"] = channel.last_message_id
 
         await self.bot.mongo.db.channel.update_one(
             {"_id": channel.id}, {"$set": base}, upsert=True
