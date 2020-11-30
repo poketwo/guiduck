@@ -367,7 +367,7 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def warn(self, ctx, target: discord.Member, *, reason=None):
+    async def warn(self, ctx, target: discord.Member, *, reason):
         """Warns a member in the server.
 
         You must have the Kick Members permission to use this.
@@ -385,7 +385,7 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def kick(self, ctx, target: discord.Member, *, reason=None):
+    async def kick(self, ctx, target: discord.Member, *, reason):
         """Kicks a member from the server.
 
         You must have the Kick Members permission to use this.
@@ -404,12 +404,7 @@ class Moderation(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     async def ban(
-        self,
-        ctx,
-        target: MemberOrIdConverter,
-        duration: TimeDelta = None,
-        *,
-        reason=None,
+        self, ctx, target: MemberOrIdConverter, duration: TimeDelta = None, *, reason
     ):
         """Bans a member from the server.
 
@@ -442,7 +437,7 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
-    async def unban(self, ctx, target: BanConverter, *, reason=None):
+    async def unban(self, ctx, target: BanConverter, *, reason):
         """Unbans a member from the server.
 
         You must have the Ban Members permission to use this.
@@ -457,7 +452,7 @@ class Moderation(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def mute(
-        self, ctx, target: discord.Member, duration: TimeDelta = None, *, reason=None
+        self, ctx, target: discord.Member, duration: TimeDelta = None, *, reason
     ):
         """Mutes a member in the server.
 
@@ -492,7 +487,7 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def unmute(self, ctx, target: discord.Member, *, reason=None):
+    async def unmute(self, ctx, target: discord.Member, *, reason):
         """Unmutes a member in the server.
 
         You must have the Kick Members permission to use this.
@@ -508,7 +503,7 @@ class Moderation(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def tradingmute(
-        self, ctx, target: discord.Member, duration: TimeDelta = None, *, reason=None
+        self, ctx, target: discord.Member, duration: TimeDelta = None, *, reason
     ):
         """Mutes a member in trading channels.
 
@@ -545,7 +540,7 @@ class Moderation(commands.Cog):
     @commands.command(aliases=("tunmute",))
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
+    async def tradingunmute(self, ctx, target: discord.Member, *, reason):
         """Unmutes a member in trading channels.
 
         You must have the Kick Members permission to use this.
