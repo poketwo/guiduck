@@ -56,7 +56,7 @@ class Tags(commands.Cog):
     async def query_tags(self, query, sort=True):
         tags = self.bot.mongo.db.tag.find(query)
         if sort:
-            tags = tags.sort("name", 1)
+            tags = tags.sort("uses", -1)
         async for tag_data in tags:
             yield Tag(**tag_data)
 
