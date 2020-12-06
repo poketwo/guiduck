@@ -74,11 +74,8 @@ class Action(abc.ABC):
     def to_user_embed(self):
         embed = discord.Embed(
             title=f"{self.emoji} {self.past_tense.title()}",
+            description=f"You have been {self.past_tense}.",
             color=self.color,
-        )
-        embed.description = (
-            f"You have been {self.past_tense}. Please do not DM staff members to get unpunished. If your punishment"
-            "is permanent and you would like to appeal, [click here](https://forms.gle/FMqRugm5v47AvFQM8)."
         )
         reason = self.reason or "No reason provided"
         embed.add_field(name="Reason", value=reason, inline=False)
@@ -134,6 +131,13 @@ class Ban(Action):
     past_tense = "banned"
     emoji = "\N{HAMMER}"
     color = discord.Color.red()
+
+    def to_user_embed(self):
+        embed = super().to_user_embed()
+        embed.description += (
+            " Please do not DM staff members to get unpunished. "
+            "If you would like to appeal, [click here](https://forms.gle/FMqRugm5v47AvFQM8)."
+        )
 
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
