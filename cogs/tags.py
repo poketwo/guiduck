@@ -218,6 +218,22 @@ class Tags(commands.Cog):
         await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully force deleted.")
 
+    @commands.has_permissions(administrator=True)
+    @tag.command()
+    async def edit(self, ctx, name, *, content):
+        """Edits a tag by force."""
+
+        tag = await self.get_tag(name)
+        if tag is None:
+            return await ctx.send("Tag not found.")
+        if tag.alias:
+            return await ctx.send("You cannot edit an alias.")
+
+        await self.bot.mongo.db.tag.update_one(
+            {"_id": tag.id}, {"$set": {"content": content}}
+        )
+        await ctx.send(f"Successfully force edited tag.")
+
 
 def setup(bot):
     bot.add_cog(Tags(bot))
