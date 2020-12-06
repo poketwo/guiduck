@@ -74,16 +74,15 @@ class Action(abc.ABC):
     def to_user_embed(self):
         embed = discord.Embed(
             title=f"{self.emoji} {self.past_tense.title()}",
-            description=f"You have been {self.past_tense}.",
             color=self.color,
+        )
+        embed.description = (
+            f"You have been {self.past_tense}. Please do not DM staff members to get unpunished. If your punishment"
+            "is permanent and you would like to appeal, [click here](https://forms.gle/FMqRugm5v47AvFQM8)."
         )
         reason = self.reason or "No reason provided"
         embed.add_field(name="Reason", value=reason, inline=False)
         if self.duration is not None:
-            embed.description += (
-                " Please do not DM staff members to get unpunished. "
-                "If you would like to appeal, [click here](https://forms.gle/FMqRugm5v47AvFQM8)."
-            )
             embed.add_field(
                 name="Duration", value=time.strfdelta(self.duration, long=True)
             )
