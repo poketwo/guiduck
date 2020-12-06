@@ -138,6 +138,7 @@ class Ban(Action):
             " Please do not DM staff members to get unpunished. "
             "If you would like to appeal, [click here](https://forms.gle/FMqRugm5v47AvFQM8)."
         )
+        return embed
 
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
