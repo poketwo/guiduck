@@ -192,7 +192,7 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully edited tag.")
 
     @tag.command()
-    async def delete(self, ctx, name):
+    async def delete(self, ctx, *, name):
         """Removes a tag that you own."""
 
         tag = await self.get_tag(name)
@@ -207,7 +207,7 @@ class Tags(commands.Cog):
 
     @commands.has_permissions(administrator=True)
     @tag.command()
-    async def forcedelete(self, ctx, name):
+    async def forcedelete(self, ctx, *, name):
         """Removes a tag by force."""
 
         tag = await self.get_tag(name)

@@ -1,8 +1,8 @@
 import abc
-import typing
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional, Union
 
 import config
 import discord
@@ -10,13 +10,13 @@ from discord.ext import commands, menus, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from helpers import time
 from helpers.pagination import AsyncFieldsPageSource
-from helpers.utils import FakeUser
+from helpers.utils import FakeUser, FetchUserConverter
 
 LOG_CHANNEL = 720552022754983999
 STAFF_ROLE = 721825360827777043
 GUILD_ID = 716390832034414685
 
-TimeDelta = typing.Optional[time.TimeDelta]
+TimeDelta = Optional[time.TimeDelta]
 
 
 @dataclass
@@ -598,7 +598,7 @@ class Moderation(commands.Cog):
     @commands.group(invoke_without_command=True)
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def history(self, ctx, *, target: discord.Member):
+    async def history(self, ctx, *, target: Union[discord.Member, FetchUserConverter]):
         """Views a member's punishment history.
 
         You must have the Kick Members permission to use this.
