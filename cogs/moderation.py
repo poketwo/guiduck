@@ -80,6 +80,10 @@ class Action(abc.ABC):
         reason = self.reason or "No reason provided"
         embed.add_field(name="Reason", value=reason, inline=False)
         if self.duration is not None:
+            embed.description += (
+                " Please do not DM staff members to get unpunished. "
+                "If you would like to appeal, [click here](https://forms.gle/FMqRugm5v47AvFQM8)."
+            )
             embed.add_field(
                 name="Duration", value=time.strfdelta(self.duration, long=True)
             )
