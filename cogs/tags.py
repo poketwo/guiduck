@@ -220,7 +220,7 @@ class Tags(commands.Cog):
 
     @commands.has_permissions(administrator=True)
     @tag.command()
-    async def edit(self, ctx, name, *, content):
+    async def forceedit(self, ctx, name, *, content):
         """Edits a tag by force."""
 
         tag = await self.get_tag(name)
