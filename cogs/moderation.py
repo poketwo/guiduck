@@ -24,6 +24,8 @@ class Action(abc.ABC):
     target: discord.Member
     user: discord.Member
     reason: str
+    channel_id: int = None
+    message_id: int = None
     created_at: datetime = None
     expires_at: datetime = None
     resolved: bool = None
@@ -45,6 +47,8 @@ class Action(abc.ABC):
             "target": target,
             "user": user,
             "reason": x["reason"],
+            "channel_id": x.get("channel_id"),
+            "message_id": x.get("message_id"),
             "created_at": x["created_at"],
         }
         if "expires_at" in x:
@@ -58,12 +62,18 @@ class Action(abc.ABC):
             return None
         return self.expires_at - self.created_at
 
+    @property
+    def logs_url(self):
+        return f"https://admin.poketwo.net/logs/{GUILD_ID}/{self.channel_id}?before={self.message_id+1}"
+
     def to_dict(self):
         base = {
             "target_id": self.target.id,
             "user_id": self.user.id,
             "type": self.type,
             "reason": self.reason,
+            "channel_id": self.channel_id,
+            "message_id": self.message_id,
             "created_at": self.created_at,
         }
         if self.expires_at is not None:
@@ -95,7 +105,7 @@ class Action(abc.ABC):
         embed.set_thumbnail(url=self.target.avatar_url)
         embed.add_field(
             name=f"{self.emoji} {self.past_tense.title()} {self.target} (ID: {self.target.id})",
-            value=self.reason or "No reason provided",
+            value=(self.reason or "No reason provided") + f" ([Logs]({self.logs_url}))",
         )
         if self.duration is not None:
             embed.set_footer(
@@ -393,7 +403,14 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def kick(self, ctx, target: discord.Member, *, reason):
+    async def kick(
+        self,
+        ctx,
+        target: discord.Member,
+        message: Optional[discord.Message] = None,
+        *,
+        reason,
+    ):
         """Kicks a member from the server.
 
         You must have the Kick Members permission to use this.
@@ -402,7 +419,16 @@ class Moderation(commands.Cog):
         if any(x.id == STAFF_ROLE for x in target.roles):
             return await ctx.send("You can't punish staff members!")
 
-        action = Kick(target=target, user=ctx.author, reason=reason)
+        message = message or ctx.message
+
+        action = Kick(
+            target=target,
+            user=ctx.author,
+            reason=reason,
+            message_id=message.id,
+            channel_id=message.channel.id,
+            created_at=datetime.utcnow(),
+        )
         await action.notify()
         await action.execute(ctx)
         await ctx.send(f"Kicked **{target}**.")
@@ -412,7 +438,13 @@ class Moderation(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     async def ban(
-        self, ctx, target: MemberOrIdConverter, duration: TimeDelta = None, *, reason
+        self,
+        ctx,
+        target: MemberOrIdConverter,
+        duration: TimeDelta = None,
+        message: Optional[discord.Message] = None,
+        *,
+        reason,
     ):
         """Bans a member from the server.
 
@@ -427,10 +459,14 @@ class Moderation(commands.Cog):
         if duration is not None:
             expires_at = created_at + duration
 
+        message = message or ctx.message
+
         action = Ban(
             target=target,
             user=ctx.author,
             reason=reason,
+            message_id=message.id,
+            channel_id=message.channel.id,
             created_at=created_at,
             expires_at=expires_at,
         )
@@ -445,7 +481,7 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
-    async def unban(self, ctx, target: BanConverter, *, reason):
+    async def unban(self, ctx, target: BanConverter, *, reason=None):
         """Unbans a member from the server.
 
         You must have the Ban Members permission to use this.
@@ -460,14 +496,18 @@ class Moderation(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def mute(
-        self, ctx, target: discord.Member, duration: TimeDelta = None, *, reason
+        self,
+        ctx,
+        target: discord.Member,
+        duration: TimeDelta = None,
+        message: Optional[discord.Message] = None,
+        *,
+        reason,
     ):
         """Mutes a member in the server.
 
         You must have the Kick Members permission to use this.
         """
-
-        print(duration)
 
         if any(x.id == STAFF_ROLE for x in target.roles):
             return await ctx.send("You can't punish staff members!")
@@ -477,10 +517,14 @@ class Moderation(commands.Cog):
         if duration is not None:
             expires_at = created_at + duration
 
+        message = message or ctx.message
+
         action = Mute(
             target=target,
             user=ctx.author,
             reason=reason,
+            message_id=message.id,
+            channel_id=message.channel.id,
             created_at=created_at,
             expires_at=expires_at,
         )
@@ -495,7 +539,7 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def unmute(self, ctx, target: discord.Member, *, reason):
+    async def unmute(self, ctx, target: discord.Member, *, reason=None):
         """Unmutes a member in the server.
 
         You must have the Kick Members permission to use this.
@@ -511,7 +555,13 @@ class Moderation(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def tradingmute(
-        self, ctx, target: discord.Member, duration: TimeDelta = None, *, reason
+        self,
+        ctx,
+        target: discord.Member,
+        duration: TimeDelta = None,
+        message: Optional[discord.Message] = None,
+        *,
+        reason,
     ):
         """Mutes a member in trading channels.
 
@@ -528,10 +578,14 @@ class Moderation(commands.Cog):
         if duration is not None:
             expires_at = created_at + duration
 
+        message = message or ctx.message
+
         action = TradingMute(
             target=target,
             user=ctx.author,
             reason=reason,
+            message_id=message.id,
+            channel_id=message.channel.id,
             created_at=created_at,
             expires_at=expires_at,
         )
@@ -548,7 +602,7 @@ class Moderation(commands.Cog):
     @commands.command(aliases=("tunmute",))
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def tradingunmute(self, ctx, target: discord.Member, *, reason):
+    async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
         """Unmutes a member in trading channels.
 
         You must have the Kick Members permission to use this.
