@@ -19,6 +19,13 @@ GUILD_ID = 716390832034414685
 TimeDelta = Optional[time.TimeDelta]
 
 
+def message_channel(ctx, message):
+    if isinstance(message, discord.TextChannel):
+        return dict(message_id=message.last_message_id, channel_id=message.id)
+    message = message or ctx.message
+    return dict(message_id=message.id, channel_id=message.channel.id)
+
+
 @dataclass
 class Action(abc.ABC):
     target: discord.Member
@@ -102,7 +109,7 @@ class Action(abc.ABC):
     def to_log_embed(self):
         reason = self.reason or "No reason provided"
         if self.logs_url is not None:
-            reason += (f" ([Logs]({self.logs_url}))",)
+            reason += f" ([Logs]({self.logs_url}))"
 
         embed = discord.Embed(color=self.color)
         embed.set_author(
@@ -395,7 +402,7 @@ class Moderation(commands.Cog):
         self,
         ctx,
         target: discord.Member,
-        message: Optional[discord.Message] = None,
+        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
     ):
@@ -407,15 +414,12 @@ class Moderation(commands.Cog):
         if any(x.id == STAFF_ROLE for x in target.roles):
             return await ctx.send("You can't punish staff members!")
 
-        message = message or ctx.message
-
         action = Warn(
             target=target,
             user=ctx.author,
             reason=reason,
-            message_id=message.id,
-            channel_id=message.channel.id,
             created_at=datetime.utcnow(),
+            **message_channel(ctx, message),
         )
         await action.execute(ctx)
         await action.notify()
@@ -429,7 +433,7 @@ class Moderation(commands.Cog):
         self,
         ctx,
         target: discord.Member,
-        message: Optional[discord.Message] = None,
+        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
     ):
@@ -441,15 +445,12 @@ class Moderation(commands.Cog):
         if any(x.id == STAFF_ROLE for x in target.roles):
             return await ctx.send("You can't punish staff members!")
 
-        message = message or ctx.message
-
         action = Kick(
             target=target,
             user=ctx.author,
             reason=reason,
-            message_id=message.id,
-            channel_id=message.channel.id,
             created_at=datetime.utcnow(),
+            **message_channel(ctx, message),
         )
         await action.notify()
         await action.execute(ctx)
@@ -464,7 +465,7 @@ class Moderation(commands.Cog):
         ctx,
         target: MemberOrIdConverter,
         duration: TimeDelta = None,
-        message: Optional[discord.Message] = None,
+        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
     ):
@@ -481,16 +482,13 @@ class Moderation(commands.Cog):
         if duration is not None:
             expires_at = created_at + duration
 
-        message = message or ctx.message
-
         action = Ban(
             target=target,
             user=ctx.author,
             reason=reason,
-            message_id=message.id,
-            channel_id=message.channel.id,
             created_at=created_at,
             expires_at=expires_at,
+            **message_channel(ctx, message),
         )
         await action.notify()
         await action.execute(ctx)
@@ -522,7 +520,7 @@ class Moderation(commands.Cog):
         ctx,
         target: discord.Member,
         duration: TimeDelta = None,
-        message: Optional[discord.Message] = None,
+        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
     ):
@@ -539,16 +537,13 @@ class Moderation(commands.Cog):
         if duration is not None:
             expires_at = created_at + duration
 
-        message = message or ctx.message
-
         action = Mute(
             target=target,
             user=ctx.author,
             reason=reason,
-            message_id=message.id,
-            channel_id=message.channel.id,
             created_at=created_at,
             expires_at=expires_at,
+            **message_channel(ctx, message),
         )
         await action.execute(ctx)
         await action.notify()
@@ -581,7 +576,7 @@ class Moderation(commands.Cog):
         ctx,
         target: discord.Member,
         duration: TimeDelta = None,
-        message: Optional[discord.Message] = None,
+        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
     ):
@@ -600,16 +595,13 @@ class Moderation(commands.Cog):
         if duration is not None:
             expires_at = created_at + duration
 
-        message = message or ctx.message
-
         action = TradingMute(
             target=target,
             user=ctx.author,
             reason=reason,
-            message_id=message.id,
-            channel_id=message.channel.id,
             created_at=created_at,
             expires_at=expires_at,
+            **message_channel(ctx, message),
         )
         await action.execute(ctx)
         await action.notify()
