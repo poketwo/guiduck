@@ -64,6 +64,8 @@ class Action(abc.ABC):
 
     @property
     def logs_url(self):
+        if self.message_id is None or self.channel_id is None:
+            return None
         return f"https://admin.poketwo.net/logs/{GUILD_ID}/{self.channel_id}?before={self.message_id+1}"
 
     def to_dict(self):
@@ -98,6 +100,10 @@ class Action(abc.ABC):
         return embed
 
     def to_log_embed(self):
+        reason = self.reason or "No reason provided"
+        if self.logs_url is not None:
+            reason += (f" ([Logs]({self.logs_url}))",)
+
         embed = discord.Embed(color=self.color)
         embed.set_author(
             name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.avatar_url
@@ -105,7 +111,7 @@ class Action(abc.ABC):
         embed.set_thumbnail(url=self.target.avatar_url)
         embed.add_field(
             name=f"{self.emoji} {self.past_tense.title()} {self.target} (ID: {self.target.id})",
-            value=(self.reason or "No reason provided") + f" ([Logs]({self.logs_url}))",
+            value=reason,
         )
         if self.duration is not None:
             embed.set_footer(
@@ -385,7 +391,14 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def warn(self, ctx, target: discord.Member, *, reason):
+    async def warn(
+        self,
+        ctx,
+        target: discord.Member,
+        message: Optional[discord.Message] = None,
+        *,
+        reason,
+    ):
         """Warns a member in the server.
 
         You must have the Kick Members permission to use this.
@@ -394,7 +407,16 @@ class Moderation(commands.Cog):
         if any(x.id == STAFF_ROLE for x in target.roles):
             return await ctx.send("You can't punish staff members!")
 
-        action = Warn(target=target, user=ctx.author, reason=reason)
+        message = message or ctx.message
+
+        action = Warn(
+            target=target,
+            user=ctx.author,
+            reason=reason,
+            message_id=message.id,
+            channel_id=message.channel.id,
+            created_at=datetime.utcnow(),
+        )
         await action.execute(ctx)
         await action.notify()
         await ctx.send(f"Warned **{target}**.")
