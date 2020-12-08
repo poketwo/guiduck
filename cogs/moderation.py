@@ -613,7 +613,7 @@ class Moderation(commands.Cog):
             )
         self.bot.dispatch("action_perform", action)
 
-    @commands.command(aliases=("tunmute",))
+    @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
