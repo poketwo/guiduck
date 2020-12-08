@@ -14,10 +14,11 @@ REMINDER_MESSAGE = """
 
 To ensure you get a fair deal, you are highly encouraged to do the following:
 
-• Price all pokémon in the #price-check channel.
+• Price all pokémon in the <#722244899767844866> channel.
 • Research trades and auctions with similar pokémon from the past.
 • Ask for other trainers' opinions if unsure about the fairness of trade.
 • Don't give into pressure to buy or sell immediately. You can always try again later.
+• Read through the trading tips document linked in the <#754774504571666534> channel.
 """.strip()
 
 
