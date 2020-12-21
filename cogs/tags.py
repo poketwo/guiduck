@@ -87,7 +87,7 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
 
-        await ctx.send(tag.content)
+        await ctx.send(tag.content, allowed_mentions=discord.AllowedMentions.none())
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
 
     @tag.command()
