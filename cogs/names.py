@@ -1,9 +1,11 @@
 import unicodedata
+import re
 
 from discord.ext import commands
 
 LAST_RESORT_NICKNAME = "User"
 GUILD_ID = 716390832034414685
+URL_REGEX = re.compile(r"(([a-z]{3,6}://)|(^|\s))([a-zA-Z0-9\-]+\.)+[a-z]{2,13}[\.\?\=\&\%\/\w\-]*\b([^@]|$)")
 
 
 class Names(commands.Cog):
@@ -19,6 +21,8 @@ class Names(commands.Cog):
         while len(text) > 0 and text[0] < "0":
             text = text[1:]
         if len(text) == 0:
+            return None
+        if URL_REGEX.search(text):
             return None
         return text[:32]
 
