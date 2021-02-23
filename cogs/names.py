@@ -18,11 +18,10 @@ class Names(commands.Cog):
         if text is None:
             return None
         text = unicodedata.normalize("NFKC", text)
+        text = re.sub(URL_REGEX,"",text)
         while len(text) > 0 and text[0] < "0":
             text = text[1:]
         if len(text) == 0:
-            return None
-        if URL_REGEX.search(text):
             return None
         return text[:32]
 
