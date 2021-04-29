@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union
 
-import config
+from discord.channel import CategoryChannel
+
 import discord
 from discord.ext import commands, menus, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
@@ -99,9 +100,7 @@ class Action(abc.ABC):
         reason = self.reason or "No reason provided"
         embed.add_field(name="Reason", value=reason, inline=False)
         if self.duration is not None:
-            embed.add_field(
-                name="Duration", value=time.strfdelta(self.duration, long=True)
-            )
+            embed.add_field(name="Duration", value=time.strfdelta(self.duration, long=True))
             embed.set_footer(text="Expires")
             embed.timestamp = self.expires_at
         return embed
@@ -112,18 +111,14 @@ class Action(abc.ABC):
             reason += f" ([Logs]({self.logs_url}))"
 
         embed = discord.Embed(color=self.color)
-        embed.set_author(
-            name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.avatar_url
-        )
+        embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.avatar_url)
         embed.set_thumbnail(url=self.target.avatar_url)
         embed.add_field(
             name=f"{self.emoji} {self.past_tense.title()} {self.target} (ID: {self.target.id})",
             value=reason,
         )
         if self.duration is not None:
-            embed.set_footer(
-                text=f"Duration • {time.strfdelta(self.duration, long=True)}\nExpires"
-            )
+            embed.set_footer(text=f"Duration • {time.strfdelta(self.duration, long=True)}\nExpires")
             embed.timestamp = self.expires_at
         return embed
 
@@ -135,7 +130,7 @@ class Action(abc.ABC):
 
     @abc.abstractmethod
     async def execute(self, ctx):
-        pass
+        ctx.bot.dispatch("action_perform", self)
 
 
 class Kick(Action):
@@ -147,6 +142,7 @@ class Kick(Action):
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         await ctx.guild.kick(self.target, reason=reason)
+        await super().execute(ctx)
 
 
 class Ban(Action):
@@ -166,6 +162,7 @@ class Ban(Action):
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         await ctx.guild.ban(self.target, reason=reason)
+        await super().execute(ctx)
 
 
 class Unban(Action):
@@ -177,6 +174,7 @@ class Unban(Action):
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         await ctx.guild.unban(self.target, reason=reason)
+        await super().execute(ctx)
 
 
 class Warn(Action):
@@ -186,7 +184,7 @@ class Warn(Action):
     color = discord.Color.orange()
 
     async def execute(self, ctx):
-        pass
+        await super().execute(ctx)
 
 
 class Mute(Action):
@@ -202,6 +200,7 @@ class Mute(Action):
         await ctx.bot.mongo.db.member.update_one(
             {"_id": self.target.id}, {"$set": {"muted": True}}, upsert=True
         )
+        await super().execute(ctx)
 
 
 class Unmute(Action):
@@ -217,6 +216,7 @@ class Unmute(Action):
         await ctx.bot.mongo.db.member.update_one(
             {"_id": self.target.id}, {"$set": {"muted": False}}, upsert=True
         )
+        await super().execute(ctx)
 
 
 class TradingMute(Action):
@@ -234,6 +234,7 @@ class TradingMute(Action):
         await ctx.bot.mongo.db.member.update_one(
             {"_id": self.target.id}, {"$set": {"trading_muted": True}}, upsert=True
         )
+        await super().execute(ctx)
 
 
 class TradingUnmute(Action):
@@ -249,18 +250,16 @@ class TradingUnmute(Action):
         await ctx.bot.mongo.db.member.update_one(
             {"_id": self.target.id}, {"$set": {"trading_muted": False}}, upsert=True
         )
-
-
-cls_dict = {
-    x.type: x
-    for x in (Kick, Ban, Unban, Warn, Mute, Unmute, TradingMute, TradingUnmute)
-}
+        await super().execute(ctx)
 
 
 @dataclass
 class FakeContext:
     bot: commands.Bot
     guild: discord.Guild
+
+
+cls_dict = {x.type: x for x in (Kick, Ban, Unban, Warn, Mute, Unmute, TradingMute, TradingUnmute)}
 
 
 class BanConverter(commands.Converter):
@@ -381,7 +380,7 @@ class Moderation(commands.Cog):
         """
 
         def check(m):
-            return m.author == ctx.me or m.content.startswith(config.PREFIX)
+            return m.author == ctx.me or m.content.startswith(ctx.prefix)
 
         deleted = await ctx.channel.purge(limit=search, check=check, before=ctx.message)
         spammers = Counter(m.author.display_name for m in deleted)
@@ -424,7 +423,6 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         await ctx.send(f"Warned **{target}**.")
-        self.bot.dispatch("action_perform", action)
 
     @commands.command()
     @commands.guild_only()
@@ -455,7 +453,6 @@ class Moderation(commands.Cog):
         await action.notify()
         await action.execute(ctx)
         await ctx.send(f"Kicked **{target}**.")
-        self.bot.dispatch("action_perform", action)
 
     @commands.command()
     @commands.guild_only()
@@ -496,7 +493,6 @@ class Moderation(commands.Cog):
             await ctx.send(f"Banned **{target}**.")
         else:
             await ctx.send(f"Banned **{target}** for **{time.strfdelta(duration)}**.")
-        self.bot.dispatch("action_perform", action)
 
     @commands.command()
     @commands.guild_only()
@@ -510,9 +506,8 @@ class Moderation(commands.Cog):
         action = Unban(target=target.user, user=ctx.author, reason=reason)
         await action.execute(ctx)
         await ctx.send(f"Unbanned **{target.user}**.")
-        self.bot.dispatch("action_perform", action)
 
-    @commands.command()
+    @commands.group(invoke_without_command=True)
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def mute(
@@ -551,7 +546,6 @@ class Moderation(commands.Cog):
             await ctx.send(f"Muted **{target}**.")
         else:
             await ctx.send(f"Muted **{target}** for **{time.strfdelta(duration)}**.")
-        self.bot.dispatch("action_perform", action)
 
     @commands.command()
     @commands.guild_only()
@@ -566,8 +560,26 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         await ctx.send(f"Unmuted **{target}**.")
-        self.bot.dispatch("action_perform", action)
 
+    @mute.command(aliases=("sync",))
+    @commands.has_permissions(administrator=True)
+    async def setup(self, ctx):
+        """Sets up the Muted role's permissions.
+
+        You must have the Administrator permission to use this.
+        """
+
+        role = discord.utils.get(ctx.guild.roles, name="Muted")
+        if role is None:
+            return await ctx.send("Please create a role named Muted first.")
+
+        for channel in ctx.guild.channels:
+            if isinstance(channel, CategoryChannel) or not channel.permissions_synced:
+                await channel.set_permissions(role, send_messages=False, speak=False, stream=False)
+
+        await ctx.send("Set up permissions for the Muted role.")
+
+    @commands.command()
     @commands.command(aliases=("tmute",))
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
@@ -611,7 +623,6 @@ class Moderation(commands.Cog):
             await ctx.send(
                 f"Muted **{target}** in trading channels for **{time.strfdelta(duration)}**."
             )
-        self.bot.dispatch("action_perform", action)
 
     @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
     @commands.guild_only()
@@ -626,7 +637,6 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         await ctx.send(f"Unmuted **{target}** in trading channels.")
-        self.bot.dispatch("action_perform", action)
 
     async def reverse_raw_action(self, raw_action):
         action = Action.build_from_mongo(self.bot, raw_action)
