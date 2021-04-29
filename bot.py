@@ -5,6 +5,7 @@ from discord.ext.events import member_kick
 import config
 
 COGS = [
+    "automod",
     "bot",
     "collectors",
     "data",
@@ -15,6 +16,7 @@ COGS = [
     "mongo",
     "names",
     "pricecheck",
+    "redis",
     "tags",
 ]
 
@@ -38,6 +40,10 @@ class Bot(commands.Bot, events.EventsMixin):
     @property
     def mongo(self):
         return self.get_cog("Mongo")
+
+    @property
+    def redis(self):
+        return self.get_cog("Redis").pool
 
     @property
     def log(self):

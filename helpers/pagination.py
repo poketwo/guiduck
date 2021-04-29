@@ -4,6 +4,25 @@ import discord
 from discord.ext import commands, menus
 
 
+class AsyncEmbedListPageSource(menus.ListPageSource):
+    def __init__(self, data, title=None, show_index=False, format_item=str):
+        super().__init__(data, per_page=20)
+        self.title = title
+        self.show_index = show_index
+        self.format_item = format_item
+
+    async def format_page(self, menu, entries):
+        lines = (
+            f"{i+1}. {self.format_item(x)}" if self.show_index else self.format_item(x)
+            for i, x in enumerate(entries, start=menu.current_page * self.per_page)
+        )
+        return discord.Embed(
+            title=self.title,
+            color=discord.Color.blurple(),
+            description=f"\n".join(lines),
+        )
+
+
 class AsyncListPageSource(menus.AsyncIteratorPageSource):
     def __init__(self, data, title=None, show_index=False, format_item=str):
         super().__init__(data, per_page=20)
@@ -70,8 +89,7 @@ class Paginator:
             while True:
                 reaction, user = await ctx.bot.wait_for(
                     "reaction_add",
-                    check=lambda r, u: r.message.id == message.id
-                    and u.id == ctx.author.id,
+                    check=lambda r, u: r.message.id == message.id and u.id == ctx.author.id,
                     timeout=120,
                 )
                 try:
@@ -87,8 +105,7 @@ class Paginator:
                     ask_message = await ctx.send("What page would you like to go to?")
                     message = await ctx.bot.wait_for(
                         "message",
-                        check=lambda m: m.author == ctx.author
-                        and m.channel == ctx.channel,
+                        check=lambda m: m.author == ctx.author and m.channel == ctx.channel,
                         timeout=30,
                     )
                     try:

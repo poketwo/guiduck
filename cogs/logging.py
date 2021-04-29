@@ -117,6 +117,7 @@ class Logging(commands.Cog):
     async def on_message(self, message):
         if message.guild is None:
             return
+
         time = int(message.created_at.replace(tzinfo=timezone.utc).timestamp() - 3600)
         await self.bot.mongo.db.message.insert_one(
             {

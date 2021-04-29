@@ -1,5 +1,6 @@
 import abc
 from collections import Counter
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union
@@ -36,6 +37,7 @@ class Action(abc.ABC):
     message_id: int = None
     created_at: datetime = None
     expires_at: datetime = None
+    automod_bucket: str = None
     resolved: bool = None
     _id: int = None
 
@@ -62,6 +64,8 @@ class Action(abc.ABC):
         if "expires_at" in x:
             kwargs["expires_at"] = x["expires_at"]
             kwargs["resolved"] = x["resolved"]
+        if "automod_bucket" in x:
+            kwargs["automod_bucket"] = x["automod_bucket"]
         return cls_dict[x["type"]](**kwargs)
 
     @property
@@ -89,6 +93,8 @@ class Action(abc.ABC):
         if self.expires_at is not None:
             base["resolved"] = self.resolved
             base["expires_at"] = self.expires_at
+        if self.automod_bucket is not None:
+            base["automod_bucket"] = self.automod_bucket
         return base
 
     def to_user_embed(self):
@@ -123,10 +129,8 @@ class Action(abc.ABC):
         return embed
 
     async def notify(self):
-        try:
+        with suppress(discord.Forbidden, discord.HTTPException):
             await self.target.send(embed=self.to_user_embed())
-        except (discord.Forbidden, discord.HTTPException):
-            pass
 
     @abc.abstractmethod
     async def execute(self, ctx):
@@ -280,10 +284,8 @@ class BanConverter(commands.Converter):
 
 class MemberOrIdConverter(commands.Converter):
     async def convert(self, ctx, arg):
-        try:
+        with suppress(commands.MemberNotFound):
             return await commands.MemberConverter().convert(ctx, arg)
-        except commands.MemberNotFound:
-            pass
 
         try:
             return FakeUser(int(arg))
@@ -296,6 +298,7 @@ class Moderation(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.cls_dict = cls_dict
         self.check_actions.start()
 
     async def send_log_message(self, *args, **kwargs):
@@ -579,7 +582,6 @@ class Moderation(commands.Cog):
 
         await ctx.send("Set up permissions for the Muted role.")
 
-    @commands.command()
     @commands.command(aliases=("tmute",))
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
