@@ -40,7 +40,7 @@ class Automod(commands.Cog):
         banned = set(await self.fetch_banned_words(message.guild))
 
         word = discord.utils.find(lambda x: x in banned, words)
-        if word is not None and not message.author.permissions_in(message.channel).administrator:
+        if word is not None and not message.author.permissions_in(message.channel).manage_messages:
             ctx = await self.bot.get_context(message)
             await self.automod_punish(ctx, word)
 
