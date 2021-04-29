@@ -67,9 +67,7 @@ class Logging(commands.Cog):
         if isinstance(channel, discord.TextChannel):
             base["last_message_id"] = channel.last_message_id
 
-        await self.bot.mongo.db.channel.update_one(
-            {"_id": channel.id}, {"$set": base}, upsert=True
-        )
+        await self.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": base}, upsert=True)
 
     async def sync_member(self, member):
         await self.bot.mongo.db.member.update_one(
@@ -175,9 +173,7 @@ class Logging(commands.Cog):
         """
 
         channel = channel or ctx.channel
-        await ctx.send(
-            f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
-        )
+        await ctx.send(f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}")
 
     @logs.command()
     @commands.has_permissions(administrator=True)

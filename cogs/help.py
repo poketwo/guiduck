@@ -19,14 +19,10 @@ class CustomHelpCommand(commands.HelpCommand):
         embed = discord.Embed(color=discord.Color.blurple())
         embed.title = title
         embed.description = description
-        embed.set_footer(
-            text=f'Use "{self.clean_prefix}help command" for more info on a command.'
-        )
+        embed.set_footer(text=f'Use "{self.clean_prefix}help command" for more info on a command.')
 
         for command in commands:
-            signature = (
-                self.clean_prefix + command.qualified_name + " " + command.signature
-            )
+            signature = self.clean_prefix + command.qualified_name + " " + command.signature
             help = command.help or "No help found..."
 
             embed.add_field(
@@ -37,9 +33,7 @@ class CustomHelpCommand(commands.HelpCommand):
 
         return embed
 
-    def make_default_embed(
-        self, cogs, title="Command Categories", description=discord.Embed.Empty
-    ):
+    def make_default_embed(self, cogs, title="Command Categories", description=discord.Embed.Empty):
         embed = discord.Embed(color=discord.Color.blurple())
         embed.title = title
         embed.description = description
@@ -82,9 +76,7 @@ class CustomHelpCommand(commands.HelpCommand):
             pages.append((cog, description, commands))
 
         async def get_page(pidx):
-            cogs = pages[
-                min(len(pages) - 1, pidx * 6) : min(len(pages) - 1, pidx * 6 + 6)
-            ]
+            cogs = pages[min(len(pages) - 1, pidx * 6) : min(len(pages) - 1, pidx * 6 + 6)]
 
             embed = self.make_default_embed(
                 cogs,

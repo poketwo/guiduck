@@ -24,9 +24,7 @@ class Names(commands.Cog):
 
     async def normalize_member(self, member):
         normalized = (
-            self.normalized(member.nick)
-            or self.normalized(member.name)
-            or LAST_RESORT_NICKNAME
+            self.normalized(member.nick) or self.normalized(member.name) or LAST_RESORT_NICKNAME
         )
         if normalized != member.display_name:
             await member.edit(nick=normalized)

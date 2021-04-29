@@ -21,9 +21,7 @@ class Info(commands.Cog):
         self.bot = bot
 
     @commands.command(aliases=("whois",))
-    async def info(
-        self, ctx, *, user: Union[discord.Member, FetchUserConverter] = None
-    ):
+    async def info(self, ctx, *, user: Union[discord.Member, FetchUserConverter] = None):
         """Shows info about a user."""
 
         user = user or ctx.author
