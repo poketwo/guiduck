@@ -374,18 +374,9 @@ class Moderation(commands.Cog):
         )
         self.bot.dispatch("action_perform", action)
 
-    @commands.command()
-    @commands.has_permissions(manage_messages=True)
-    async def cleanup(self, ctx, search=100):
-        """Cleans up the bot's messages from the channel.
-
-        You must have the Manage Messages permission to use this.
-        """
-
-        def check(m):
-            return m.author == ctx.me or m.content.startswith(ctx.prefix)
-
-        deleted = await ctx.channel.purge(limit=search, check=check, before=ctx.message)
+    async def run_purge(self, ctx, limit, check):
+        await ctx.message.delete()
+        deleted = await ctx.channel.purge(limit=limit, check=check, before=ctx.message)
         spammers = Counter(m.author.display_name for m in deleted)
         count = len(deleted)
 
@@ -396,6 +387,51 @@ class Moderation(commands.Cog):
             messages.extend(f"– **{author}**: {count}" for author, count in spammers)
 
         await ctx.send("\n".join(messages), delete_after=5)
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    async def cleanup(self, ctx, search=100):
+        """Cleans up the bot's messages from the channel.
+
+        You must have the Manage Messages permission to use this.
+        """
+
+        await self.run_purge(
+            ctx, search, lambda m: m.author == ctx.me or m.content.startswith(ctx.prefix)
+        )
+
+    @commands.group(invoke_without_command=True, aliases=("remove",))
+    @commands.has_permissions(manage_messages=True)
+    async def purge(self, ctx):
+        """Mass deletes messages that meet a certain criteria
+
+        You must have the Manage Members permission to use this.
+        """
+
+        await ctx.send_help(ctx.command)
+
+    @purge.command()
+    @commands.has_permissions(manage_messages=True)
+    async def all(self, ctx, *, search=100):
+        """Purges all messages."""
+        await self.run_purge(ctx, search, lambda m: True)
+
+    @purge.command()
+    @commands.has_permissions(manage_messages=True)
+    async def user(self, ctx, user: discord.Member, search=100):
+        """Purges messages from a user."""
+        await self.run_purge(ctx, search, lambda m: m.author == user)
+
+    @purge.command()
+    @commands.has_permissions(manage_messages=True)
+    async def contains(self, ctx, *text):
+        """Purges messages that contain a substring."""
+        search = 100
+        if text[-1].isdigit():
+            text, search = text[:-1], int(text[-1])
+        await self.run_purge(
+            ctx, search, lambda m: " ".join(text).casefold() in m.content.casefold()
+        )
 
     @commands.command()
     @commands.guild_only()
