@@ -99,8 +99,8 @@ class Automod(commands.Cog):
     async def on_message(self, message):
         if message.guild is None:
             return
-        # if message.author.permissions_in(message.channel).manage_messages:
-        #     return
+        if message.author.permissions_in(message.channel).manage_messages:
+            return
 
         ctx = await self.bot.get_context(message)
         for module in self.modules:
