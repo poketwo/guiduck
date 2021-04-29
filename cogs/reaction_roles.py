@@ -8,7 +8,7 @@ class ReactionRoles(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.group(invoke_without_command=True)
+    @commands.group(invoke_without_command=True, aliases=("rm",))
     @commands.has_permissions(administrator=True)
     async def rolemenu(self, ctx):
         """Utilities for reaction role menus."""

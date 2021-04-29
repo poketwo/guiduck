@@ -16,6 +16,7 @@ COGS = [
     "mongo",
     "names",
     "pricecheck",
+    "reaction_roles",
     "redis",
     "tags",
 ]
