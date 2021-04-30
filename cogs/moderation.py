@@ -783,7 +783,7 @@ class Moderation(commands.Cog):
         await channel.send(
             f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}"
         )
-        await ctx.send("Reported **{user}**.")
+        await ctx.send(f"Reported **{user}**.")
 
     def cog_unload(self):
         self.check_actions.cancel()
