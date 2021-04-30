@@ -104,7 +104,7 @@ class Reputation(commands.Cog):
         count = await self.bot.mongo.db.member.count_documents({"reputation": {"$gt": 0}})
 
         def format_embed(e):
-            e.description += f"\nUse `{ctx.prefix}rep` to view your reputation, and `?giverep` to give rep to others."
+            e.description += f"\nUse `{ctx.prefix}rep` to view your reputation, and `{ctx.prefix}giverep` to give rep to others."
 
         def format_item(x):
             name = f"{x['name']}#{x['discriminator']}"
