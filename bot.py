@@ -10,7 +10,6 @@ COGS = [
     "collectors",
     "data",
     "help",
-    "info",
     "logging",
     "moderation",
     "mongo",
