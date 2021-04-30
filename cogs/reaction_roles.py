@@ -5,7 +5,7 @@ import discord
 class ReactionRoles(commands.Cog):
     """For adding roles utility."""
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
 
     @commands.group(invoke_without_command=True, aliases=("rm",))

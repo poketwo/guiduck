@@ -6,7 +6,7 @@ from data import DataManager
 class Data(commands.Cog):
     """For game data."""
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
         self.instance = DataManager()
 
