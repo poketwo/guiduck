@@ -15,6 +15,7 @@ from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
 
 LOG_CHANNEL = 720552022754983999
+REPORT_CHANNEL = 761124957769039892
 STAFF_ROLE = 721825360827777043
 GUILD_ID = 716390832034414685
 
@@ -403,7 +404,7 @@ class Moderation(commands.Cog):
     @commands.group(invoke_without_command=True, aliases=("remove",))
     @commands.has_permissions(manage_messages=True)
     async def purge(self, ctx):
-        """Mass deletes messages that meet a certain criteria
+        """Mass deletes messages that meet a certain criteria.
 
         You must have the Manage Members permission to use this.
         """
@@ -772,6 +773,17 @@ class Moderation(commands.Cog):
         result = await self.bot.mongo.db.action.delete_many({"_id": {"$in": ids}})
         word = "entry" if result.deleted_count == 1 else "entries"
         await ctx.send(f"Successfully deleted {result.deleted_count} {word}.")
+
+    @commands.command()
+    @commands.cooldown(1, 20, commands.BucketType.user)
+    async def report(self, ctx, user: discord.Member, *, reason):
+        """Reports a user to server moderators."""
+
+        channel = self.bot.get_channel(REPORT_CHANNEL)
+        await channel.send(
+            f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}"
+        )
+        await ctx.send("Reported **{user}**.")
 
     def cog_unload(self):
         self.check_actions.cancel()
