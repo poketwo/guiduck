@@ -11,7 +11,7 @@ import discord
 from discord.ext import commands, menus, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from helpers import time
-from helpers.pagination import AsyncFieldsPageSource
+from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
 
 LOG_CHANNEL = 720552022754983999
@@ -747,7 +747,7 @@ class Moderation(commands.Cog):
             return {"name": name, "value": "\n".join(lines), "inline": False}
 
         pages = menus.MenuPages(
-            source=AsyncFieldsPageSource(
+            source=AsyncEmbedFieldsPageSource(
                 get_actions(),
                 title=f"Punishment History • {target}",
                 format_item=format_item,

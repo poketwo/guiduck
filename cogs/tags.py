@@ -5,7 +5,7 @@ import discord
 import pymongo
 from bson.objectid import ObjectId
 from discord.ext import commands, menus
-from helpers.pagination import AsyncListPageSource
+from helpers.pagination import AsyncEmbedListPageSource
 
 
 @dataclass
@@ -62,7 +62,7 @@ class Tags(commands.Cog):
 
     async def send_tags(self, ctx, tags):
         pages = menus.MenuPages(
-            source=AsyncListPageSource(
+            source=AsyncEmbedListPageSource(
                 tags,
                 show_index=True,
                 format_item=lambda x: x.name,

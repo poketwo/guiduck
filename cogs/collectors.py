@@ -1,4 +1,4 @@
-from helpers.pagination import AsyncListPageSource
+from helpers.pagination import AsyncEmbedListPageSource
 import discord
 from discord.ext import commands, menus
 
@@ -42,7 +42,7 @@ class Collectors(commands.Cog):
         result = await self.bot.mongo.db.collector.find_one({"_id": member.id})
 
         pages = menus.MenuPages(
-            source=AsyncListPageSource(
+            source=AsyncEmbedListPageSource(
                 self.doc_to_species(result or {}),
                 title=str(member),
                 format_item=lambda x: x.name,
@@ -96,7 +96,7 @@ class Collectors(commands.Cog):
 
         users = self.bot.mongo.db.collector.find({str(species.id): True})
         pages = menus.MenuPages(
-            source=AsyncListPageSource(
+            source=AsyncEmbedListPageSource(
                 users,
                 title=str(species),
                 format_item=lambda x: f"<@{x['_id']}>",

@@ -1,8 +1,10 @@
 import sys
 import traceback
+from datetime import timedelta
 
 import discord
 from discord.ext import commands
+from helpers import time
 
 
 class Bot(commands.Cog):
@@ -28,6 +30,10 @@ class Bot(commands.Cog):
                 await ctx.send(message)
         elif isinstance(error, commands.MissingRequiredArgument):
             await ctx.send_help(ctx.command)
+        elif isinstance(error, commands.CommandOnCooldown):
+            await ctx.send(
+                f"You're on cooldown! Try again in **{time.strfdelta(timedelta(seconds=error.retry_after))}**."
+            )
         elif isinstance(error, commands.CheckFailure):
             await ctx.send(error)
         elif isinstance(error, commands.UserInputError):

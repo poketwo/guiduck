@@ -1,12 +1,12 @@
-from contextlib import suppress
-import re
 import abc
 import json
+import re
+from contextlib import suppress
 from datetime import datetime, timedelta
-import discord
 
+import discord
 from discord.ext import commands, menus
-from helpers.pagination import AsyncEmbedListPageSource
+from helpers.pagination import EmbedListPageSource
 
 INVITE_REGEX = r"(?:https?://)?discord(?:app)?\.(?:com/invite|gg)/([a-zA-Z0-9]+)/?"
 URL_REGEX = r"(?:https?:)?(?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n]+)"
@@ -153,7 +153,7 @@ class Automod(commands.Cog):
         """
 
         pages = menus.MenuPages(
-            source=AsyncEmbedListPageSource(
+            source=EmbedListPageSource(
                 await self.banned_words.fetch(ctx.guild),
                 title="Banned Words",
                 show_index=True,

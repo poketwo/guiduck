@@ -4,45 +4,99 @@ import discord
 from discord.ext import commands, menus
 
 
+class AsyncEmbedCodeBlockTablePageSource(menus.AsyncIteratorPageSource):
+    def __init__(
+        self,
+        data,
+        title=None,
+        count=None,
+        show_index=False,
+        format_embed=lambda x: None,
+        format_item=str,
+    ):
+        super().__init__(data, per_page=20)
+        self.title = title
+        self.show_index = show_index
+        self.format_embed = format_embed
+        self.format_item = format_item
+        self.count = count
+
+    def justify(self, s, width):
+        if s.isdigit():
+            return s.rjust(width)
+        else:
+            return s.ljust(width)
+
+    async def format_page(self, menu, entries):
+        start = menu.current_page * self.per_page
+        table = [
+            (f"{i+1}.", *self.format_item(x)) if self.show_index else self.format_item(x)
+            for i, x in enumerate(entries, start=menu.current_page * self.per_page)
+        ]
+        col_lens = [max(len(x) for x in col) for col in zip(*table)]
+        lines = [
+            "  ".join(self.justify(x, col_lens[i]) for i, x in enumerate(line)).rstrip()
+            for line in table
+        ]
+        embed = discord.Embed(
+            title=self.title,
+            color=discord.Color.blurple(),
+            description="```" + f"\n".join(lines) + "```",
+        )
+        self.format_embed(embed)
+        footer = f"Showing entries {start + 1}–{start + len(lines)}"
+        if self.count is not None:
+            footer += f" out of {self.count}"
+        embed.set_footer(text=footer)
+        return embed
+
+
+class EmbedListPageSource(menus.ListPageSource):
+    def __init__(self, data, title=None, show_index=False, format_item=str):
+        super().__init__(data, per_page=20)
+        self.title = title
+        self.show_index = show_index
+        self.format_item = format_item
+
+    async def format_page(self, menu, entries):
+        lines = (
+            f"{i+1}. {self.format_item(x)}" if self.show_index else self.format_item(x)
+            for i, x in enumerate(entries, start=menu.current_page * self.per_page)
+        )
+        return discord.Embed(
+            title=self.title,
+            color=discord.Color.blurple(),
+            description=f"\n".join(lines),
+        )
+
+
 class AsyncEmbedListPageSource(menus.ListPageSource):
-    def __init__(self, data, title=None, show_index=False, format_item=str):
+    def __init__(self, data, title=None, count=None, show_index=False, format_item=str):
         super().__init__(data, per_page=20)
         self.title = title
         self.show_index = show_index
         self.format_item = format_item
+        self.count = count
 
     async def format_page(self, menu, entries):
-        lines = (
+        start = menu.current_page * self.per_page
+        lines = [
             f"{i+1}. {self.format_item(x)}" if self.show_index else self.format_item(x)
-            for i, x in enumerate(entries, start=menu.current_page * self.per_page)
-        )
-        return discord.Embed(
+            for i, x in enumerate(entries, start=start)
+        ]
+        embed = discord.Embed(
             title=self.title,
             color=discord.Color.blurple(),
             description=f"\n".join(lines),
         )
+        footer = f"Showing entries {start + 1}–{start + len(lines) + 1}"
+        if self.count is not None:
+            footer += f" out of {self.count}"
+        embed.set_footer(text=footer)
+        return embed
 
 
-class AsyncListPageSource(menus.AsyncIteratorPageSource):
-    def __init__(self, data, title=None, show_index=False, format_item=str):
-        super().__init__(data, per_page=20)
-        self.title = title
-        self.show_index = show_index
-        self.format_item = format_item
-
-    async def format_page(self, menu, entries):
-        lines = (
-            f"{i+1}. {self.format_item(x)}" if self.show_index else self.format_item(x)
-            for i, x in enumerate(entries, start=menu.current_page * self.per_page)
-        )
-        return discord.Embed(
-            title=self.title,
-            color=discord.Color.blurple(),
-            description=f"\n".join(lines),
-        )
-
-
-class AsyncFieldsPageSource(menus.AsyncIteratorPageSource):
+class AsyncEmbedFieldsPageSource(menus.AsyncIteratorPageSource):
     def __init__(self, data, title=None, count=None, format_item=lambda i, x: (i, x)):
         super().__init__(data, per_page=5)
         self.title = title
@@ -55,7 +109,6 @@ class AsyncFieldsPageSource(menus.AsyncIteratorPageSource):
             color=discord.Color.blurple(),
         )
         start = menu.current_page * self.per_page
-        i = start
         for i, x in enumerate(entries, start=start):
             embed.add_field(**self.format_item(i, x))
         footer = f"Showing entries {start+1}–{i+1}"

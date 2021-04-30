@@ -18,6 +18,7 @@ COGS = [
     "pricecheck",
     "reaction_roles",
     "redis",
+    "reputation",
     "tags",
 ]
 
