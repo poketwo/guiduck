@@ -60,7 +60,7 @@ class Reputation(commands.Cog):
             ctx = await self.bot.get_context(message)
             await self.process_giverep(ctx, message.mentions[0])
 
-    @commands.command(aliases=("reputation",))
+    @commands.command()
     async def rep(self, ctx, *, user: discord.Member = None):
         """Shows the reputation of a given user."""
 
@@ -74,7 +74,7 @@ class Reputation(commands.Cog):
         embed.add_field(name="Rank", value=str(rank + 1))
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=("gr", "givereputation"))
+    @commands.command(aliases=("gr", "+"))
     @commands.cooldown(1, 120, commands.BucketType.user)
     async def giverep(self, ctx, *, user: discord.Member):
         """Gives a reputation point to a user.
@@ -86,7 +86,7 @@ class Reputation(commands.Cog):
 
         print(msg)
 
-    @commands.command(aliases=("setreputation",))
+    @commands.command()
     @commands.has_permissions(administrator=True)
     async def setrep(self, ctx, user: discord.Member, value: int):
         """Sets a user's reputation to a given value.
@@ -96,7 +96,7 @@ class Reputation(commands.Cog):
         await self.update_rep(user, set=value)
         await ctx.send(f"Set **{user}**'s rep to **{value}**")
 
-    @commands.command(aliases=("topreputation",))
+    @commands.command()
     async def toprep(self, ctx):
         """Displays the server reputation leaderboard."""
 
