@@ -15,7 +15,7 @@ GIVEREP_TRIGGERS = [
     "tnx",
     "tysm",
     "tyvm",
-    "thanx"
+    "thanx",
 ]
 
 

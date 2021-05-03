@@ -402,26 +402,28 @@ class Moderation(commands.Cog):
             ctx, search, lambda m: m.author == ctx.me or m.content.startswith(ctx.prefix)
         )
 
-    @commands.group(invoke_without_command=True, aliases=("remove", "clean", "clear",))
+    @commands.group(invoke_without_command=True, aliases=("remove", "clean", "clear"))
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
-    async def purge(self, ctx):
+    async def purge(self, ctx, search: int):
         """Mass deletes messages that meet a certain criteria.
+
+        If no subcommand is called, purges all messages.
 
         You must have the Manage Members permission to use this.
         """
 
-        await ctx.send_help(ctx.command)
+        await ctx.invoke(self.all, search=search)
 
     @purge.command()
     @commands.has_permissions(manage_messages=True)
-    async def all(self, ctx, *, search=100):
+    async def all(self, ctx, search: int = 100):
         """Purges all messages."""
         await self.run_purge(ctx, search, lambda m: True)
 
     @purge.command()
     @commands.has_permissions(manage_messages=True)
-    async def user(self, ctx, user: discord.Member, search=100):
+    async def user(self, ctx, user: discord.Member, search: int = 100):
         """Purges messages from a user."""
         await self.run_purge(ctx, search, lambda m: m.author == user)
 
