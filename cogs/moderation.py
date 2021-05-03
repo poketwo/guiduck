@@ -390,6 +390,7 @@ class Moderation(commands.Cog):
         await ctx.send("\n".join(messages), delete_after=5)
 
     @commands.command()
+    @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     async def cleanup(self, ctx, search=100):
         """Cleans up the bot's messages from the channel.
@@ -401,7 +402,8 @@ class Moderation(commands.Cog):
             ctx, search, lambda m: m.author == ctx.me or m.content.startswith(ctx.prefix)
         )
 
-    @commands.group(invoke_without_command=True, aliases=("remove",))
+    @commands.group(invoke_without_command=True, aliases=("remove", "clean", "clear",))
+    @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     async def purge(self, ctx):
         """Mass deletes messages that meet a certain criteria.
