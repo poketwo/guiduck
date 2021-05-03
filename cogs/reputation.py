@@ -11,6 +11,11 @@ GIVEREP_TRIGGERS = [
     "thank",
     "thx",
     "ty",
+    "thnx",
+    "tnx",
+    "tysm",
+    "tyvm",
+    "thanx"
 ]
 
 
@@ -75,6 +80,7 @@ class Reputation(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(aliases=("gr", "+"))
+    @commands.guild_only()
     @commands.cooldown(1, 120, commands.BucketType.user)
     async def giverep(self, ctx, *, user: discord.Member):
         """Gives a reputation point to a user.
