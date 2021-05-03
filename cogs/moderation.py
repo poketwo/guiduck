@@ -778,7 +778,7 @@ class Moderation(commands.Cog):
         word = "entry" if result.deleted_count == 1 else "entries"
         await ctx.send(f"Successfully deleted {result.deleted_count} {word}.")
 
-    @commands.command()
+    @commands.command(cooldown_after_parsing=True)
     @commands.cooldown(1, 20, commands.BucketType.user)
     async def report(self, ctx, user: discord.Member, *, reason):
         """Reports a user to server moderators."""

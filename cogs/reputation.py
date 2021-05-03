@@ -79,7 +79,7 @@ class Reputation(commands.Cog):
         embed.add_field(name="Rank", value=str(rank + 1))
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=("gr", "+"))
+    @commands.command(aliases=("gr", "+"), cooldown_after_parsing=True)
     @commands.guild_only()
     @commands.cooldown(1, 120, commands.BucketType.user)
     async def giverep(self, ctx, *, user: discord.Member):
