@@ -70,7 +70,7 @@ class EmbedListPageSource(menus.ListPageSource):
         )
 
 
-class AsyncEmbedListPageSource(menus.ListPageSource):
+class AsyncEmbedListPageSource(menus.AsyncIteratorPageSource):
     def __init__(self, data, title=None, count=None, show_index=False, format_item=str):
         super().__init__(data, per_page=20)
         self.title = title
