@@ -94,12 +94,16 @@ class Collectors(commands.Cog):
     async def search(self, ctx, *, species: SpeciesConverter):
         """Lists the collectors of a pokémon species."""
 
+        def format_item(x):
+            user = self.bot.get_user(x["_id"])
+            return f"{user} {user.mention}"
+
         users = self.bot.mongo.db.collector.find({str(species.id): True})
         pages = menus.MenuPages(
             source=AsyncEmbedListPageSource(
                 users,
                 title=str(species),
-                format_item=lambda x: f"<@{x['_id']}>",
+                format_item=format_item,
             )
         )
 
