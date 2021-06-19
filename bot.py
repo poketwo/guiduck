@@ -5,7 +5,7 @@ from discord.ext.events import member_kick
 import config
 
 COGS = [
-    "automod",
+    # "automod",
     "bot",
     "collectors",
     "data",
@@ -14,10 +14,10 @@ COGS = [
     "moderation",
     "mongo",
     "names",
-    "pricecheck",
+    # "pricecheck",
     "reaction_roles",
     "redis",
-    "reputation",
+    # "reputation",
     "tags",
 ]
 
