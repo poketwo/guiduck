@@ -15,7 +15,7 @@ if DATABASE_URI is None:
 if os.getenv("API_BASE") is not None:
     discord.http.Route.BASE = os.getenv("API_BASE")
 
-PREFIX = os.environ["PREFIX"]
+PREFIX = os.environ["PREFIX"].split()
 DATABASE_NAME = os.environ["DATABASE_NAME"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 REDIS_URI = os.environ["REDIS_URI"]
