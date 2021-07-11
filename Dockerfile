@@ -9,6 +9,7 @@ RUN poetry config virtualenvs.create false
 
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-dev
+RUN mkdir logs
 
 COPY . .
 CMD ["python", "bot.py"]
