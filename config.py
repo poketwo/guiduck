@@ -6,7 +6,7 @@ import discord
 DATABASE_URI = os.getenv("DATABASE_URI")
 
 if DATABASE_URI is None:
-    uri = "mongodb://{}:{}@{}".format(
+    DATABASE_URI = "mongodb://{}:{}@{}".format(
         quote_plus(os.environ["DATABASE_USERNAME"]),
         quote_plus(os.environ["DATABASE_PASSWORD"]),
         os.environ["DATABASE_HOST"],
