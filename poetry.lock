@@ -129,9 +129,9 @@ develop = false
 
 [package.source]
 type = "git"
-url = "https://github.com/Ext-Creators/discord-ext-events.git"
-reference = "master"
-resolved_reference = "3c748575e46ce79961623e8caebcfe8bc54c088d"
+url = "https://github.com/oliver-ni/discord-ext-events"
+reference = "patch-1"
+resolved_reference = "a91ba6441705bc2a319a387cfbc139cc2e8c1472"
 
 [[package]]
 name = "discord-ext-menus"
@@ -384,7 +384,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "053ec623c4ed7bff41f047e1ca008da01c51d6ee6b7c33913e5ce9d32ed4c37d"
+content-hash = "7cb8377a00dd8d93cb509a568a283931c48aa84b073931d0db3d6928573d3070"
 
 [metadata.files]
 aiohttp = [
