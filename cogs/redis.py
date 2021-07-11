@@ -12,7 +12,7 @@ class Redis(commands.Cog):
         self._connect_task = self.bot.loop.create_task(self.connect())
 
     async def connect(self):
-        self.pool = await aioredis.create_redis_pool(self.bot.config.REDIS_URL)
+        self.pool = await aioredis.create_redis_pool(self.bot.config.REDIS_URI)
 
     async def close(self):
         self.pool.close()
