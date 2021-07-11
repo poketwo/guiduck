@@ -5,7 +5,8 @@ from contextlib import suppress
 from datetime import datetime, timedelta
 
 import discord
-from discord.ext import commands, menus
+from discord.ext import commands
+from discord.ext.menus.views import ViewMenuPages
 from helpers.pagination import EmbedListPageSource
 
 INVITE_REGEX = r"(?:https?://)?discord(?:app)?\.(?:com/invite|gg)/([a-zA-Z0-9]+)/?"
@@ -99,7 +100,7 @@ class Automod(commands.Cog):
     async def on_message(self, message):
         if message.guild is None:
             return
-        if message.author.permissions_in(message.channel).manage_messages:
+        if message.channel.permissions_for(message.author).manage_messages:
             return
 
         ctx = await self.bot.get_context(message)
@@ -152,7 +153,7 @@ class Automod(commands.Cog):
         You must have the Administrator permission to use this.
         """
 
-        pages = menus.MenuPages(
+        pages = ViewMenuPages(
             source=EmbedListPageSource(
                 await self.banned_words.fetch(ctx.guild),
                 title="Banned Words",

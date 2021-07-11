@@ -48,7 +48,7 @@ class Logging(commands.Cog):
             {
                 "$set": {
                     "name": guild.name,
-                    "icon": str(guild.icon_url),
+                    "icon": str(guild.icon.url),
                     "roles": [self.serialize_role(x) for x in guild.roles],
                 }
             },
@@ -77,7 +77,7 @@ class Logging(commands.Cog):
                     "name": member.name,
                     "discriminator": member.discriminator,
                     "nick": member.nick,
-                    "avatar": str(member.avatar_url),
+                    "avatar": str(member.avatar.url),
                     "roles": [x.id for x in member.roles],
                 }
             },

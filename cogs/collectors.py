@@ -1,6 +1,7 @@
-from helpers.pagination import AsyncEmbedListPageSource
 import discord
-from discord.ext import commands, menus
+from discord.ext import commands
+from discord.ext.menus.views import ViewMenuPages
+from helpers.pagination import AsyncEmbedListPageSource
 
 
 class SpeciesConverter(commands.Converter):
@@ -41,7 +42,7 @@ class Collectors(commands.Cog):
 
         result = await self.bot.mongo.db.collector.find_one({"_id": member.id})
 
-        pages = menus.MenuPages(
+        pages = ViewMenuPages(
             source=AsyncEmbedListPageSource(
                 self.doc_to_species(result or {}),
                 title=str(member),
@@ -101,7 +102,7 @@ class Collectors(commands.Cog):
             return f"{user} {user.mention}"
 
         users = self.bot.mongo.db.collector.find({str(species.id): True})
-        pages = menus.MenuPages(
+        pages = ViewMenuPages(
             source=AsyncEmbedListPageSource(
                 users,
                 title=str(species),

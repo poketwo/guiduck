@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from helpers.utils import FakeUser
 
 import discord
 import pymongo
 from bson.objectid import ObjectId
-from discord.ext import commands, menus
+from discord.ext import commands
+from discord.ext.menus.views import ViewMenuPages
 from helpers.pagination import AsyncEmbedListPageSource
+from helpers.utils import FakeUser
 
 
 @dataclass
@@ -61,7 +62,7 @@ class Tags(commands.Cog):
             yield Tag(**tag_data)
 
     async def send_tags(self, ctx, tags):
-        pages = menus.MenuPages(
+        pages = ViewMenuPages(
             source=AsyncEmbedListPageSource(
                 tags,
                 show_index=True,
@@ -108,7 +109,7 @@ class Tags(commands.Cog):
             embed.add_field(name="Original", value=tag.original)
         else:
             embed.add_field(name="Uses", value=tag.uses)
-        embed.set_author(name=str(user), icon_url=user.avatar_url)
+        embed.set_author(name=str(user), icon_url=user.avatar.url)
 
         await ctx.send(embed=embed)
 

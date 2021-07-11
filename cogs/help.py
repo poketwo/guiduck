@@ -19,10 +19,12 @@ class CustomHelpCommand(commands.HelpCommand):
         embed = discord.Embed(color=discord.Color.blurple())
         embed.title = title
         embed.description = description
-        embed.set_footer(text=f'Use "{self.clean_prefix}help command" for more info on a command.')
+        embed.set_footer(
+            text=f'Use "{self.context.clean_prefix}help command" for more info on a command.'
+        )
 
         for command in commands:
-            signature = self.clean_prefix + command.qualified_name + " " + command.signature
+            signature = self.context.clean_prefix + command.qualified_name + " " + command.signature
             help = command.help or "No help found..."
 
             embed.add_field(
@@ -82,8 +84,8 @@ class CustomHelpCommand(commands.HelpCommand):
                 cogs,
                 title=f"Command Categories (Page {pidx+1}/{len(pages)//6+1})",
                 description=(
-                    f"Use `{self.clean_prefix}help <command>` for more info on a command.\n"
-                    f"Use `{self.clean_prefix}help <category>` for more info on a category."
+                    f"Use `{self.context.clean_prefix}help <command>` for more info on a command.\n"
+                    f"Use `{self.context.clean_prefix}help <category>` for more info on a category."
                 ),
             )
 
@@ -128,7 +130,7 @@ class CustomHelpCommand(commands.HelpCommand):
 
     async def send_command_help(self, command):
         embed = discord.Embed(color=discord.Color.blurple())
-        embed.title = self.clean_prefix + command.qualified_name
+        embed.title = self.context.clean_prefix + command.qualified_name
 
         if command.description:
             embed.description = f"{command.description}\n\n{command.help}"

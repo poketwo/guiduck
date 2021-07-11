@@ -1,7 +1,8 @@
 from datetime import timedelta
 
 import discord
-from discord.ext import commands, menus
+from discord.ext import commands
+from discord.ext.menus.views import ViewMenuPages
 from helpers import time
 from helpers.pagination import AsyncEmbedCodeBlockTablePageSource
 
@@ -74,7 +75,7 @@ class Reputation(commands.Cog):
 
         rep, rank = await self.get_rep(user)
         embed = discord.Embed(color=discord.Color.blurple())
-        embed.set_author(name=user.display_name, icon_url=user.avatar_url)
+        embed.set_author(name=user.display_name, icon_url=user.avatar.url)
         embed.add_field(name="Reputation", value=str(rep))
         embed.add_field(name="Rank", value=str(rank + 1))
         await ctx.send(embed=embed)
@@ -116,7 +117,7 @@ class Reputation(commands.Cog):
             name = f"{x['name']}#{x['discriminator']}"
             return f"{x.get('reputation', 0)}", "-", name
 
-        pages = menus.MenuPages(
+        pages = ViewMenuPages(
             source=AsyncEmbedCodeBlockTablePageSource(
                 users,
                 title=f"Reputation Leaderboard",

@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union
 
-from discord.channel import CategoryChannel
-
 import discord
-from discord.ext import commands, menus, tasks
+from discord.channel import CategoryChannel
+from discord.ext import commands, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
+from discord.ext.menus.views import ViewMenuPages
 from helpers import time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
@@ -118,8 +118,8 @@ class Action(abc.ABC):
             reason += f" ([Logs]({self.logs_url}))"
 
         embed = discord.Embed(color=self.color)
-        embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.avatar_url)
-        embed.set_thumbnail(url=self.target.avatar_url)
+        embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.avatar.url)
+        embed.set_thumbnail(url=self.target.avatar.url)
         embed.add_field(
             name=f"{self.emoji} {self.past_tense.title()} {self.target} (ID: {self.target.id})",
             value=reason,
@@ -751,7 +751,7 @@ class Moderation(commands.Cog):
                 lines.insert(1, f"– **Duration:** {time.strfdelta(x.duration)}")
             return {"name": name, "value": "\n".join(lines), "inline": False}
 
-        pages = menus.MenuPages(
+        pages = ViewMenuPages(
             source=AsyncEmbedFieldsPageSource(
                 get_actions(),
                 title=f"Punishment History • {target}",
