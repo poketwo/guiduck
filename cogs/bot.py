@@ -1,20 +1,18 @@
 import sys
 import traceback
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Union
 
 import discord
 from discord.ext import commands
 from helpers import time
-from helpers.time import strfdelta
 from helpers.utils import FetchUserConverter
 
 
 def format_date(date):
     if date is None:
         return "N/A"
-    delta = datetime.now() - date
-    return f"{date:%B %-d, %Y %-H:%M} UTC ({strfdelta(delta, long=True, max_len=3)})"
+    return f"{discord.utils.format_dt(date, 'F')} ({discord.utils.format_dt(date, 'R')})"
 
 
 class Bot(commands.Cog):
