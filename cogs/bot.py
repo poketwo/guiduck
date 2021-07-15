@@ -82,7 +82,7 @@ class Bot(commands.Cog):
         embed.set_author(name=str(user))
 
         embed.add_field(name="ID", value=user.id, inline=False)
-        embed.add_field(name="Avatar", value=f"[Link]({user.avatar_url})", inline=False)
+        embed.add_field(name="Avatar", value=f"[Link]({user.avatar.url})", inline=False)
         embed.add_field(
             name="Joined",
             value=format_date(getattr(user, "joined_at", None)),
