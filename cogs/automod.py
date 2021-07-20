@@ -3,6 +3,7 @@ import json
 import re
 from contextlib import suppress
 from datetime import datetime, timedelta
+from typing import Dict, Optional, Tuple
 
 import discord
 from discord.ext import commands
@@ -11,15 +12,12 @@ from helpers.pagination import EmbedListPageSource
 
 INVITE_REGEX = r"(?:https?://)?discord(?:app)?\.(?:com/invite|gg)/([a-zA-Z0-9]+)/?"
 URL_REGEX = r"(?:https?:)?(?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n]+)"
-PUNISHMENTS = {
-    5: ("ban", None),
-    3: ("mute", timedelta(days=3)),
-    2: ("mute", timedelta(hours=2)),
-    0: ("warn", None),
-}
 
 
 class AutomodModule(abc.ABC):
+    bucket: str
+    punishments: Dict[int, Tuple[str, Optional[timedelta]]]
+
     @abc.abstractmethod
     async def check(self, ctx):
         pass
@@ -27,6 +25,12 @@ class AutomodModule(abc.ABC):
 
 class BannedWords(AutomodModule):
     bucket = "banned_words"
+    punishments = {
+        4: ("ban", None),
+        2: ("mute", timedelta(days=3)),
+        1: ("mute", timedelta(hours=2)),
+        0: ("warn", None),
+    }
 
     def __init__(self, bot):
         self.url_regex = re.compile(URL_REGEX)
@@ -67,6 +71,11 @@ class BannedWords(AutomodModule):
 
 class MassMention(AutomodModule):
     bucket = "mass_mention"
+    punishments = {
+        2: ("ban", None),
+        1: ("mute", timedelta(days=3)),
+        0: ("mute", timedelta(hours=2)),
+    }
 
     async def check(self, ctx):
         if len(ctx.message.mentions) >= 10:
@@ -75,6 +84,12 @@ class MassMention(AutomodModule):
 
 class ServerInvites(AutomodModule):
     bucket = "server_invites"
+    punishments = {
+        3: ("ban", None),
+        2: ("mute", timedelta(days=3)),
+        1: ("mute", timedelta(hours=2)),
+        0: ("warn", None),
+    }
 
     def __init__(self, bot):
         self.regex = re.compile(INVITE_REGEX, flags=re.I)
@@ -90,6 +105,10 @@ class ServerInvites(AutomodModule):
 
 class Spamming(AutomodModule):
     bucket = "spamming"
+    punishments = {
+        1: ("ban", None),
+        0: ("mute", timedelta(days=1)),
+    }
 
     def __init__(self):
         self.cooldown = commands.CooldownMapping.from_cooldown(15, 17.0, commands.BucketType.member)
@@ -120,9 +139,9 @@ class Automod(commands.Cog):
         ctx = await self.bot.get_context(message)
         for module in self.modules:
             if reason := await module.check(ctx):
-                await self.automod_punish(ctx, module.bucket, reason=reason)
+                await self.automod_punish(ctx, module, reason=reason)
 
-    async def automod_punish(self, ctx, bucket, *, reason):
+    async def automod_punish(self, ctx, module, *, reason):
         with suppress(discord.Forbidden, discord.HTTPException):
             await ctx.message.delete()
         cog = self.bot.get_cog("Moderation")
@@ -133,19 +152,19 @@ class Automod(commands.Cog):
             "target_id": ctx.author.id,
             "user_id": self.bot.user.id,
             "created_at": {"$gt": datetime.utcnow() - timedelta(weeks=1)},
-            "automod_bucket": bucket,
+            "automod_bucket": module.bucket,
         }
-        count = await self.bot.mongo.db.action.count_documents(query) + 1
+        count = await self.bot.mongo.db.action.count_documents(query)
 
         kwargs = dict(
             target=ctx.author,
             user=self.bot.user,
             reason=f"Automod: {reason}",
             created_at=datetime.utcnow(),
-            automod_bucket=bucket,
+            automod_bucket=module.bucket,
         )
 
-        type, duration = next(x for c, x in PUNISHMENTS.items() if count >= c)
+        type, duration = next(x for c, x in module.punishments.items() if count >= c)
         if duration is not None:
             kwargs["expires_at"] = kwargs["created_at"] + duration
 
