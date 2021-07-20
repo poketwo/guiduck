@@ -87,6 +87,19 @@ class ServerInvites(AutomodModule):
                 if invite.guild != ctx.guild:
                     return f"Sending invites to another server."
 
+class Spamming(AutomodModule):
+    bucket = "spamming"
+    def __init__(self):
+        self.cooldown = commands.CooldownMapping.from_cooldown(15, 17.0, commands.BucketType.member)
+
+    async def check(self, ctx):
+        bucket = self.cooldown.get_bucket(ctx.message)
+        if bucket.update_rate_limit():
+            self.cooldown._cache[self.cooldown._bucket_key(ctx.message)].reset()
+            await ctx.channel.purge(limit=15, check = lambda m: m.author == ctx.author)
+            return "Spamming"
+
+
 
 class Automod(commands.Cog):
     """For moderation."""
@@ -94,7 +107,7 @@ class Automod(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.banned_words = BannedWords(bot)
-        self.modules = [self.banned_words, ServerInvites(bot), MassMention()]
+        self.modules = [self.banned_words, ServerInvites(bot), MassMention(), Spamming()]
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -109,7 +122,8 @@ class Automod(commands.Cog):
                 await self.automod_punish(ctx, module.bucket, reason=reason)
 
     async def automod_punish(self, ctx, bucket, *, reason):
-        await ctx.message.delete()
+        with suppress(discord.Forbidden, discord.HTTPException):
+            await ctx.message.delete()
         cog = self.bot.get_cog("Moderation")
         if cog is None:
             return
