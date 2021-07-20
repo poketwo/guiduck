@@ -87,8 +87,10 @@ class ServerInvites(AutomodModule):
                 if invite.guild != ctx.guild:
                     return f"Sending invites to another server."
 
+
 class Spamming(AutomodModule):
     bucket = "spamming"
+
     def __init__(self):
         self.cooldown = commands.CooldownMapping.from_cooldown(15, 17.0, commands.BucketType.member)
 
@@ -96,9 +98,8 @@ class Spamming(AutomodModule):
         bucket = self.cooldown.get_bucket(ctx.message)
         if bucket.update_rate_limit():
             self.cooldown._cache[self.cooldown._bucket_key(ctx.message)].reset()
-            await ctx.channel.purge(limit=15, check = lambda m: m.author == ctx.author)
+            await ctx.channel.purge(limit=15, check=lambda m: m.author == ctx.author)
             return "Spamming"
-
 
 
 class Automod(commands.Cog):
