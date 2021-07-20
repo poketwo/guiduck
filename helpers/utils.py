@@ -1,11 +1,16 @@
 import discord
 from discord.ext import commands
+from typing import NamedTuple
+
+
+class FakeAvatar(NamedTuple):
+    url: str
 
 
 class FakeUser(discord.Object):
     @property
-    def avatar_url(self):
-        return "https://cdn.discordapp.com/embed/avatars/0.png"
+    def avatar(self):
+        return FakeAvatar("https://cdn.discordapp.com/embed/avatars/0.png")
 
     @property
     def mention(self):
