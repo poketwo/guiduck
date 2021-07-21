@@ -88,7 +88,7 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
 
-        await ctx.send(tag.content, allowed_mentions=discord.AllowedMentions.none())
+        await ctx.send(tag.content, allowed_mentions=discord.AllowedMentions.none(), reference=ctx.message.reference)
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
 
     @tag.command()
@@ -119,7 +119,7 @@ class Tags(commands.Cog):
 
         tag = await self.get_tag(name, original=True)
         first_step = discord.utils.escape_markdown(tag.content)
-        await ctx.send(first_step.replace("<", "\\<"))
+        await ctx.send(first_step.replace("<", "\\<"), reference=ctx.message.reference)
 
     # Searching tags
 
