@@ -14,11 +14,6 @@ from helpers import time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
 
-LOG_CHANNEL = 720552022754983999
-REPORT_CHANNEL = 761124957769039892
-STAFF_ROLE = 721825360827777043
-GUILD_ID = 716390832034414685
-
 TimeDelta = Optional[time.TimeDelta]
 
 
@@ -34,6 +29,7 @@ class Action(abc.ABC):
     target: discord.Member
     user: discord.Member
     reason: str
+    guild_id: int
     channel_id: int = None
     message_id: int = None
     created_at: datetime = None
@@ -50,7 +46,7 @@ class Action(abc.ABC):
 
     @classmethod
     def build_from_mongo(cls, bot, x):
-        guild = bot.get_guild(GUILD_ID)
+        guild = bot.get_guild(x["guild_id"])
         user = guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
         target = guild.get_member(x["target_id"]) or FakeUser(x["target_id"])
         kwargs = {
@@ -58,6 +54,7 @@ class Action(abc.ABC):
             "target": target,
             "user": user,
             "reason": x["reason"],
+            "guild_id": x["guild_id"],
             "channel_id": x.get("channel_id"),
             "message_id": x.get("message_id"),
             "created_at": x["created_at"],
@@ -79,7 +76,7 @@ class Action(abc.ABC):
     def logs_url(self):
         if self.message_id is None or self.channel_id is None:
             return None
-        return f"https://admin.poketwo.net/logs/{GUILD_ID}/{self.channel_id}?before={self.message_id+1}"
+        return f"https://admin.poketwo.net/logs/{self.guild_id}/{self.channel_id}?before={self.message_id+1}"
 
     def to_dict(self):
         base = {
@@ -284,7 +281,7 @@ class BanConverter(commands.Converter):
 
 
 class MemberOrIdConverter(commands.Converter):
-    async def convert(self, ctx, arg):
+    async def convert(self, ctx, arg) -> discord.Member:
         with suppress(commands.MemberNotFound):
             return await commands.MemberConverter().convert(ctx, arg)
 
@@ -302,17 +299,20 @@ class Moderation(commands.Cog):
         self.cls_dict = cls_dict
         self.check_actions.start()
 
-    async def send_log_message(self, *args, **kwargs):
-        channel = self.bot.get_channel(LOG_CHANNEL)
-        await channel.send(*args, **kwargs)
-
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        data = await self.bot.mongo.db.member.find_one({"_id": member.id})
+        data = await self.bot.mongo.db.member.find_one(
+            {"_id": member.id, "guild_id": member.guild.id}
+        )
         if data is None:
             return
         ctx = FakeContext(self.bot, member.guild)
-        kwargs = dict(target=member, user=self.bot.user, reason="User rejoined guild")
+        kwargs = dict(
+            target=member,
+            user=self.bot.user,
+            reason="User rejoined guild",
+            guild_id=member.guild.id,
+        )
         if data.get("muted", False):
             await Mute(**kwargs).execute(ctx)
         if data.get("trading_muted", False):
@@ -321,12 +321,20 @@ class Moderation(commands.Cog):
     @commands.Cog.listener()
     async def on_action_perform(self, action):
         await self.bot.mongo.db.action.update_many(
-            {"target_id": action.target.id, "type": action.type, "resolved": False},
+            {
+                "target_id": action.target.id,
+                "guild_id": action.guild_id,
+                "type": action.type,
+                "resolved": False,
+            },
             {"$set": {"resolved": True}},
         )
         id = await self.bot.mongo.reserve_id("action")
         await self.bot.mongo.db.action.insert_one({"_id": id, **action.to_dict()})
-        await self.send_log_message(embed=action.to_log_embed())
+
+        data = await self.bot.mongo.db.guild.find_one({"_id": action.guild_id})
+        channel = self.bot.get_channel(data["logs_channel_id"])
+        await channel.send(embed=action.to_log_embed())
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, target):
@@ -342,6 +350,7 @@ class Moderation(commands.Cog):
             target=target,
             user=entry.user,
             reason=entry.reason,
+            guild_id=guild.id,
             created_at=entry.created_at,
         )
         self.bot.dispatch("action_perform", action)
@@ -358,6 +367,7 @@ class Moderation(commands.Cog):
             target=target,
             user=entry.user,
             reason=entry.reason,
+            guild_id=guild.id,
             created_at=entry.created_at,
         )
         self.bot.dispatch("action_perform", action)
@@ -371,6 +381,7 @@ class Moderation(commands.Cog):
             target=target,
             user=entry.user,
             reason=entry.reason,
+            guild_id=target.guild.id,
             created_at=entry.created_at,
         )
         self.bot.dispatch("action_perform", action)
@@ -454,13 +465,14 @@ class Moderation(commands.Cog):
         You must have the Kick Members permission to use this.
         """
 
-        if any(x.id == STAFF_ROLE for x in target.roles):
-            return await ctx.send("You can't punish staff members!")
+        if target.guild_permissions.kick_members:
+            return await ctx.send("You can't punish that person!")
 
         action = Warn(
             target=target,
             user=ctx.author,
             reason=reason,
+            guild_id=ctx.guild.id,
             created_at=datetime.utcnow(),
             **message_channel(ctx, message),
         )
@@ -484,13 +496,14 @@ class Moderation(commands.Cog):
         You must have the Kick Members permission to use this.
         """
 
-        if any(x.id == STAFF_ROLE for x in target.roles):
-            return await ctx.send("You can't punish staff members!")
+        if target.guild_permissions.kick_members:
+            return await ctx.send("You can't punish that person!")
 
         action = Kick(
             target=target,
             user=ctx.author,
             reason=reason,
+            guild_id=ctx.guild.id,
             created_at=datetime.utcnow(),
             **message_channel(ctx, message),
         )
@@ -515,8 +528,8 @@ class Moderation(commands.Cog):
         You must have the Ban Members permission to use this.
         """
 
-        if any(x.id == STAFF_ROLE for x in target.roles):
-            return await ctx.send("You can't punish staff members!")
+        if target.guild_permissions.ban_members:
+            return await ctx.send("You can't punish that person!")
 
         created_at = datetime.utcnow()
         expires_at = None
@@ -527,6 +540,7 @@ class Moderation(commands.Cog):
             target=target,
             user=ctx.author,
             reason=reason,
+            guild_id=ctx.guild.id,
             created_at=created_at,
             expires_at=expires_at,
             **message_channel(ctx, message),
@@ -547,7 +561,12 @@ class Moderation(commands.Cog):
         You must have the Ban Members permission to use this.
         """
 
-        action = Unban(target=target.user, user=ctx.author, reason=reason)
+        action = Unban(
+            target=target.user,
+            user=ctx.author,
+            reason=reason,
+            guild_id=ctx.guild.id,
+        )
         await action.execute(ctx)
         await ctx.send(f"Unbanned **{target.user}**.")
 
@@ -568,8 +587,8 @@ class Moderation(commands.Cog):
         You must have the Kick Members permission to use this.
         """
 
-        if any(x.id == STAFF_ROLE for x in target.roles):
-            return await ctx.send("You can't punish staff members!")
+        if target.guild_permissions.kick_members:
+            return await ctx.send("You can't punish that person!")
 
         created_at = datetime.utcnow()
         expires_at = None
@@ -580,6 +599,7 @@ class Moderation(commands.Cog):
             target=target,
             user=ctx.author,
             reason=reason,
+            guild_id=ctx.guild.id,
             created_at=created_at,
             expires_at=expires_at,
             **message_channel(ctx, message),
@@ -600,7 +620,12 @@ class Moderation(commands.Cog):
         You must have the Kick Members permission to use this.
         """
 
-        action = Unmute(target=target, user=ctx.author, reason=reason)
+        action = Unmute(
+            target=target,
+            user=ctx.author,
+            reason=reason,
+            guild_id=ctx.guild.id,
+        )
         await action.execute(ctx)
         await action.notify()
         await ctx.send(f"Unmuted **{target}**.")
@@ -619,7 +644,13 @@ class Moderation(commands.Cog):
 
         for channel in ctx.guild.channels:
             if isinstance(channel, CategoryChannel) or not channel.permissions_synced:
-                await channel.set_permissions(role, send_messages=False, speak=False, stream=False)
+                await channel.set_permissions(
+                    role,
+                    send_messages=False,
+                    add_reactions=False,
+                    speak=False,
+                    stream=False,
+                )
 
         await ctx.send("Set up permissions for the Muted role.")
 
@@ -640,10 +671,8 @@ class Moderation(commands.Cog):
         You must have the Kick Members permission to use this.
         """
 
-        print(duration)
-
-        if any(x.id == STAFF_ROLE for x in target.roles):
-            return await ctx.send("You can't punish staff members!")
+        if target.guild_permissions.kick_members:
+            return await ctx.send("You can't punish that person!")
 
         created_at = datetime.utcnow()
         expires_at = None
@@ -654,6 +683,7 @@ class Moderation(commands.Cog):
             target=target,
             user=ctx.author,
             reason=reason,
+            guild_id=ctx.guild.id,
             created_at=created_at,
             expires_at=expires_at,
             **message_channel(ctx, message),
@@ -676,7 +706,12 @@ class Moderation(commands.Cog):
         You must have the Kick Members permission to use this.
         """
 
-        action = TradingUnmute(target=target, user=ctx.author, reason=reason)
+        action = TradingUnmute(
+            target=target,
+            user=ctx.author,
+            reason=reason,
+            guild_id=ctx.guild.id,
+        )
         await action.execute(ctx)
         await action.notify()
         await ctx.send(f"Unmuted **{target}** in trading channels.")
@@ -684,7 +719,7 @@ class Moderation(commands.Cog):
     async def reverse_raw_action(self, raw_action):
         action = Action.build_from_mongo(self.bot, raw_action)
 
-        guild = self.bot.get_guild(GUILD_ID)
+        guild = self.bot.get_guild(action.guild_id)
         target = action.target
 
         if action.type == "ban":
@@ -701,16 +736,17 @@ class Moderation(commands.Cog):
         else:
             return
 
-        action = action_type(
+        new_action = action_type(
             target=target,
             user=self.bot.user,
             reason="Punishment duration expired",
+            guild_id=action.guild_id,
             created_at=datetime.utcnow(),
         )
 
-        await action.execute(FakeContext(self.bot, guild))
-        await action.notify()
-        self.bot.dispatch("action_perform", action)
+        await new_action.execute(FakeContext(self.bot, guild))
+        await new_action.notify()
+        self.bot.dispatch("action_perform", new_action)
 
         await self.bot.mongo.db.action.update_one(
             {"_id": raw_action["_id"]}, {"$set": {"resolved": True}}
@@ -733,7 +769,7 @@ class Moderation(commands.Cog):
         You must have the Kick Members permission to use this.
         """
 
-        query = {"target_id": target.id}
+        query = {"target_id": target.id, "guild_id": ctx.guild.id}
         count = await self.bot.mongo.db.action.count_documents(query)
 
         async def get_actions():
@@ -774,7 +810,9 @@ class Moderation(commands.Cog):
         You must have the Kick Members permission to use this.
         """
 
-        result = await self.bot.mongo.db.action.delete_many({"_id": {"$in": ids}})
+        result = await self.bot.mongo.db.action.delete_many(
+            {"_id": {"$in": ids}, "guild_id": ctx.guild.id}
+        )
         word = "entry" if result.deleted_count == 1 else "entries"
         await ctx.send(f"Successfully deleted {result.deleted_count} {word}.")
 
@@ -783,7 +821,9 @@ class Moderation(commands.Cog):
     async def report(self, ctx, user: discord.Member, *, reason):
         """Reports a user to server moderators."""
 
-        channel = self.bot.get_channel(REPORT_CHANNEL)
+        data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
+        channel = ctx.guild.get_channel(data["report_channel_id"])
+
         await channel.send(
             f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}"
         )

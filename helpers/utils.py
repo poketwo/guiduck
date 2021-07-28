@@ -17,8 +17,8 @@ class FakeUser(discord.Object):
         return "<@{0.id}>".format(self)
 
     @property
-    def roles(self):
-        return []
+    def guild_permissions(self):
+        return discord.Permissions.none()
 
     def __str__(self):
         return str(self.id)
