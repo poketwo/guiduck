@@ -97,9 +97,11 @@ class Collectors(commands.Cog):
 
         def format_item(x):
             user = self.bot.get_user(x["_id"])
-            if user is None:
-                return str(x["_id"])
-            return f"{user} {user.mention}"
+            guild = self.bot.get_guild(ctx.guild.id)
+            if guild.get_member(user.id) is not None:
+                if user is None:
+                    return f"<@{user.id}> \<@{user.id}>"
+                return f"{user} {user.mention} \<@{user.id}>"
 
         users = self.bot.mongo.db.collector.find({str(species.id): True})
         pages = ViewMenuPages(
