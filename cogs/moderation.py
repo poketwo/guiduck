@@ -281,7 +281,7 @@ class BanConverter(commands.Converter):
 
 
 class MemberOrIdConverter(commands.Converter):
-    async def convert(self, ctx, arg) -> discord.Member:
+    async def convert(self, ctx, arg):
         with suppress(commands.MemberNotFound):
             return await commands.MemberConverter().convert(ctx, arg)
 
