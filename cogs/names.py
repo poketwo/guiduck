@@ -42,8 +42,10 @@ class Names(commands.Cog):
         if before.name == after.name:
             return
         for guild in self.bot.guilds:
-            after = guild.get_member(after.id)
-            await self.normalize_member(after)
+            member = guild.get_member(after.id)
+            if member is None:
+                continue
+            await self.normalize_member(member)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):

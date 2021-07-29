@@ -87,9 +87,11 @@ class Logging(commands.Cog):
         await self.sync_member(args[-1])
 
     @commands.Cog.listener()
-    async def on_user_update(self, *args):
+    async def on_user_update(self, _, new):
         for guild in self.bot.guilds:
-            member = guild.get_member(args[-1].id)
+            member = guild.get_member(new.id)
+            if member is None:
+                continue
             await self.sync_member(member)
 
     @commands.Cog.listener()
