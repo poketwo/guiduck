@@ -119,7 +119,7 @@ class Tags(commands.Cog):
 
         tag = await self.get_tag(name, original=True)
         first_step = discord.utils.escape_markdown(tag.content)
-        await ctx.send(first_step.replace("<", "\\<"), reference=ctx.message.reference)
+        await ctx.send(first_step.replace("<", "\\<"), allowed_mentions=discord.AllowedMentions.none(), reference=ctx.message.reference)
 
     # Searching tags
 

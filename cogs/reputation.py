@@ -60,6 +60,8 @@ class Reputation(commands.Cog):
     async def on_message(self, message):
         if len(message.mentions) == 0:
             return
+        if message.author.bot:
+            return
 
         words = message.content.casefold().split()
         if any(x in words for x in GIVEREP_TRIGGERS):
