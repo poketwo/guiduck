@@ -745,7 +745,7 @@ class Moderation(commands.Cog):
             reason = x.reason or "No reason provided"
             lines = [
                 f"– **Reason:** {reason}",
-                f"– at {x.created_at:%m-%d-%y %I:%M %p}",
+                f"– at {discord.utils.format_dt(x.created_at)} ({discord.utils.format_dt(x.created_at, 'R')})",
             ]
             if x.duration is not None:
                 lines.insert(1, f"– **Duration:** {time.strfdelta(x.duration)}")
