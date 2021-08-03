@@ -129,8 +129,11 @@ class Automod(commands.Cog):
         self.banned_words = BannedWords(bot)
         self.modules = [self.banned_words, ServerInvites(bot), MassMention(), Spamming()]
 
-    @commands.Cog.listener()
-    async def on_message(self, message):
+    @commands.Cog.listener(name="on_message")
+    @commands.Cog.listener(name="on_message_edit")
+    async def on_message(self, *args):
+        message = args[-1]
+
         if message.guild is None:
             return
         if message.channel.permissions_for(message.author).manage_messages:
