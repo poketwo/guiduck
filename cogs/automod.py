@@ -78,6 +78,8 @@ class MassMention(AutomodModule):
     }
 
     async def check(self, ctx):
+        if ctx.channel.id == 722244899767844866:
+            return
         if len(ctx.message.mentions) >= 10:
             return f"Sending too many mentions."
 
