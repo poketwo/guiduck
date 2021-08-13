@@ -1,11 +1,12 @@
 import itertools
 from collections import defaultdict
+from typing import List
 
 from discord.ext import commands, tasks
 
 
 class AutoPost:
-    def __init__(self, channels: list[int], message: str, *, each: int = 1):
+    def __init__(self, channels: List[int], message: str, *, each: int = 1):
         self.do_post = itertools.cycle([True] + [False] * (each - 1))
         self.channels = itertools.cycle(channels)
         self.message = message.strip()
