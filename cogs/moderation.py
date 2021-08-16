@@ -619,7 +619,9 @@ class Moderation(commands.Cog):
 
         for channel in ctx.guild.channels:
             if isinstance(channel, CategoryChannel) or not channel.permissions_synced:
-                await channel.set_permissions(role, send_messages=False, speak=False, stream=False)
+                await channel.set_permissions(
+                    role, send_messages=False, add_reactions=False, speak=False, stream=False
+                )
 
         await ctx.send("Set up permissions for the Muted role.")
 
