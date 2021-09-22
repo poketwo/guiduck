@@ -51,8 +51,14 @@ class HumanTime:
     calendar = pdt.Calendar(version=pdt.VERSION_CONTEXT_STYLE)
 
     def __init__(self, argument, *, now=None):
-        now = now or datetime.utcnow()
+        now = now or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+
         dt, status = self.calendar.parseDT(argument, sourceTime=now)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
         if not status.hasDateOrTime:
             raise commands.BadArgument('invalid time provided, try e.g. "tomorrow" or "3 days"')
 

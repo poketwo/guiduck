@@ -2,7 +2,7 @@ import abc
 from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Union
 
 import discord
@@ -38,7 +38,7 @@ class Action(abc.ABC):
 
     def __post_init__(self):
         if self.created_at is None:
-            self.created_at = datetime.utcnow()
+            self.created_at = datetime.now(timezone.utc)
         if self.expires_at is not None:
             self.resolved = False
 
@@ -102,7 +102,7 @@ class Action(abc.ABC):
         reason = self.reason or "No reason provided"
         embed.add_field(name="Reason", value=reason, inline=False)
         if self.duration is not None:
-            embed.add_field(name="Duration", value=time.human_timedelta(self.duration, long=True))
+            embed.add_field(name="Duration", value=time.human_timedelta(self.duration))
             embed.set_footer(text="Expires")
             embed.timestamp = self.expires_at
         return embed
@@ -122,9 +122,7 @@ class Action(abc.ABC):
             value=reason,
         )
         if self.duration is not None:
-            embed.set_footer(
-                text=f"Duration • {time.human_timedelta(self.duration, long=True)}\nExpires"
-            )
+            embed.set_footer(text=f"Duration • {time.human_timedelta(self.duration)}\nExpires")
             embed.timestamp = self.expires_at
         return embed
 
@@ -475,7 +473,7 @@ class Moderation(commands.Cog):
             user=ctx.author,
             reason=reason,
             guild_id=ctx.guild.id,
-            created_at=datetime.utcnow(),
+            created_at=ctx.message.created_at,
             **message_channel(ctx, message),
         )
         await action.execute(ctx)
@@ -506,7 +504,7 @@ class Moderation(commands.Cog):
             user=ctx.author,
             reason=reason,
             guild_id=ctx.guild.id,
-            created_at=datetime.utcnow(),
+            created_at=ctx.message.created_at,
             **message_channel(ctx, message),
         )
         await action.notify()
@@ -520,7 +518,7 @@ class Moderation(commands.Cog):
         self,
         ctx,
         target: MemberOrIdConverter,
-        duration: Optional[time.HumanTime] = None,
+        expires_at: Optional[time.FutureTime] = None,
         message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
@@ -533,18 +531,13 @@ class Moderation(commands.Cog):
         if target.guild_permissions.ban_members:
             return await ctx.send("You can't punish that person!")
 
-        created_at = datetime.utcnow()
-        expires_at = None
-        if duration is not None:
-            expires_at = created_at + duration
-
         action = Ban(
             target=target,
             user=ctx.author,
             reason=reason,
             guild_id=ctx.guild.id,
-            created_at=created_at,
-            expires_at=expires_at,
+            created_at=ctx.message.created_at,
+            expires_at=None if expires_at is None else expires_at.dt,
             **message_channel(ctx, message),
         )
         await action.notify()
@@ -552,7 +545,7 @@ class Moderation(commands.Cog):
         if action.duration is None:
             await ctx.send(f"Banned **{target}**.")
         else:
-            await ctx.send(f"Banned **{target}** for **{time.human_timedelta(duration)}**.")
+            await ctx.send(f"Banned **{target}** for **{time.human_timedelta(action.duration)}**.")
 
     @commands.command()
     @commands.guild_only()
@@ -579,7 +572,7 @@ class Moderation(commands.Cog):
         self,
         ctx,
         target: discord.Member,
-        duration: Optional[time.HumanTime] = None,
+        expires_at: Optional[time.FutureTime] = None,
         message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
@@ -592,18 +585,13 @@ class Moderation(commands.Cog):
         if target.guild_permissions.kick_members:
             return await ctx.send("You can't punish that person!")
 
-        created_at = datetime.utcnow()
-        expires_at = None
-        if duration is not None:
-            expires_at = created_at + duration
-
         action = Mute(
             target=target,
             user=ctx.author,
             reason=reason,
             guild_id=ctx.guild.id,
-            created_at=created_at,
-            expires_at=expires_at,
+            created_at=ctx.message.created_at,
+            expires_at=None if expires_at is None else expires_at.dt,
             **message_channel(ctx, message),
         )
         await action.execute(ctx)
@@ -611,7 +599,7 @@ class Moderation(commands.Cog):
         if action.duration is None:
             await ctx.send(f"Muted **{target}**.")
         else:
-            await ctx.send(f"Muted **{target}** for **{time.human_timedelta(duration)}**.")
+            await ctx.send(f"Muted **{target}** for **{time.human_timedelta(action.duration)}**.")
 
     @commands.command()
     @commands.guild_only()
@@ -659,7 +647,7 @@ class Moderation(commands.Cog):
         self,
         ctx,
         target: discord.Member,
-        duration: Optional[time.HumanTime] = None,
+        expires_at: Optional[time.FutureTime] = None,
         message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
@@ -672,18 +660,13 @@ class Moderation(commands.Cog):
         if target.guild_permissions.kick_members:
             return await ctx.send("You can't punish that person!")
 
-        created_at = datetime.utcnow()
-        expires_at = None
-        if duration is not None:
-            expires_at = created_at + duration
-
         action = TradingMute(
             target=target,
             user=ctx.author,
             reason=reason,
             guild_id=ctx.guild.id,
-            created_at=created_at,
-            expires_at=expires_at,
+            created_at=ctx.message.created_at,
+            expires_at=None if expires_at is None else expires_at.dt,
             **message_channel(ctx, message),
         )
         await action.execute(ctx)
@@ -692,7 +675,7 @@ class Moderation(commands.Cog):
             await ctx.send(f"Muted **{target}** in trading channels.")
         else:
             await ctx.send(
-                f"Muted **{target}** in trading channels for **{time.human_timedelta(duration)}**."
+                f"Muted **{target}** in trading channels for **{time.human_timedelta(action.duration)}**."
             )
 
     @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
@@ -739,7 +722,7 @@ class Moderation(commands.Cog):
             user=self.bot.user,
             reason="Punishment duration expired",
             guild_id=action.guild_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
         await new_action.execute(FakeContext(self.bot, guild))

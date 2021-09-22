@@ -2,7 +2,7 @@ import abc
 import json
 import re
 from contextlib import suppress
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 
 import discord
@@ -165,7 +165,7 @@ class Automod(commands.Cog):
             target=ctx.author,
             user=self.bot.user,
             reason=f"Automod: {reason}",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             automod_bucket=module.bucket,
         )
 
