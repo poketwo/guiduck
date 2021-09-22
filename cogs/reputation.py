@@ -75,7 +75,7 @@ class Reputation(commands.Cog):
 
         rep, rank = await self.get_rep(user)
         embed = discord.Embed(color=discord.Color.blurple())
-        embed.set_author(name=user.display_name, icon_url=user.avatar.url)
+        embed.set_author(name=user.display_name, icon_url=user.display_avatar.url)
         embed.add_field(name="Reputation", value=str(rep))
         embed.add_field(name="Rank", value=str(rank + 1))
         await ctx.send(embed=embed)

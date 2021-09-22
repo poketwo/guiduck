@@ -88,7 +88,11 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
 
-        await ctx.send(tag.content, allowed_mentions=discord.AllowedMentions.none(), reference=ctx.message.reference)
+        await ctx.send(
+            tag.content,
+            allowed_mentions=discord.AllowedMentions.none(),
+            reference=ctx.message.reference,
+        )
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
 
     @tag.command()
@@ -109,7 +113,7 @@ class Tags(commands.Cog):
             embed.add_field(name="Original", value=tag.original)
         else:
             embed.add_field(name="Uses", value=tag.uses)
-        embed.set_author(name=str(user), icon_url=user.avatar.url)
+        embed.set_author(name=str(user), icon_url=user.display_avatar.url)
 
         await ctx.send(embed=embed)
 

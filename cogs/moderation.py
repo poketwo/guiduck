@@ -113,8 +113,10 @@ class Action(abc.ABC):
             reason += f" ([Logs]({self.logs_url}))"
 
         embed = discord.Embed(color=self.color)
-        embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.avatar.url)
-        embed.set_thumbnail(url=self.target.avatar.url)
+        embed.set_author(
+            name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.display_avatar.url
+        )
+        embed.set_thumbnail(url=self.target.display_avatar.url)
         embed.add_field(
             name=f"{self.emoji} {self.past_tense.title()} {self.target} (ID: {self.target.id})",
             value=reason,

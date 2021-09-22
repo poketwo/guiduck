@@ -90,7 +90,7 @@ class Logging(commands.Cog):
                     "name": member.name,
                     "discriminator": member.discriminator,
                     "nick": member.nick,
-                    "avatar": str(member.avatar.url),
+                    "avatar": str(member.display_avatar.url),
                     "roles": [x.id for x in member.roles],
                 }
             },

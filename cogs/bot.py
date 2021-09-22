@@ -80,7 +80,7 @@ class Bot(commands.Cog):
         embed.set_author(name=str(user))
 
         embed.add_field(name="ID", value=user.id, inline=False)
-        embed.add_field(name="Avatar", value=f"[Link]({user.avatar.url})", inline=False)
+        embed.add_field(name="Avatar", value=f"[Link]({user.display_avatar.url})", inline=False)
         embed.add_field(
             name="Joined",
             value=format_date(getattr(user, "joined_at", None)),
@@ -101,7 +101,7 @@ class Bot(commands.Cog):
             embed.set_footer(text="This user is not in this server.")
 
         embed.color = user.color
-        embed.set_thumbnail(url=user.avatar.url)
+        embed.set_thumbnail(url=user.display_avatar.url)
 
         await ctx.send(embed=embed)
 
