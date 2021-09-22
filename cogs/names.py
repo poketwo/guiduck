@@ -3,9 +3,10 @@ import re
 
 from discord.ext import commands
 
-LAST_RESORT_NICKNAME = "User"
-GUILD_ID = 716390832034414685
-URL_REGEX = re.compile(r"(([a-z]{3,6}://)|(^|\s))([a-zA-Z0-9\-]+\.)+[a-z]{2,13}[\.\?\=\&\%\/\w\-]*\b([^@]|$)")
+LAST_RESORT = "User"
+URL_REGEX = re.compile(
+    r"(([a-z]{3,6}://)|(^|\s))([a-zA-Z0-9\-]+\.)+[a-z]{2,13}[\.\?\=\&\%\/\w\-]*\b([^@]|$)"
+)
 
 
 class Names(commands.Cog):
@@ -18,7 +19,7 @@ class Names(commands.Cog):
         if text is None:
             return None
         text = unicodedata.normalize("NFKC", text)
-        text = re.sub(URL_REGEX,"",text)
+        text = re.sub(URL_REGEX, "", text)
         while len(text) > 0 and text[0] < "0":
             text = text[1:]
         if len(text) == 0:
@@ -26,9 +27,7 @@ class Names(commands.Cog):
         return text[:32]
 
     async def normalize_member(self, member):
-        normalized = (
-            self.normalized(member.nick) or self.normalized(member.name) or LAST_RESORT_NICKNAME
-        )
+        normalized = self.normalized(member.nick) or self.normalized(member.name) or LAST_RESORT
         if normalized != member.display_name:
             await member.edit(nick=normalized)
 
@@ -42,14 +41,14 @@ class Names(commands.Cog):
     async def on_user_update(self, before, after):
         if before.name == after.name:
             return
-        guild = self.bot.get_guild(GUILD_ID)
-        after = guild.get_member(after.id)
-        await self.normalize_member(after)
+        for guild in self.bot.guilds:
+            member = guild.get_member(after.id)
+            if member is None:
+                continue
+            await self.normalize_member(member)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        guild = self.bot.get_guild(GUILD_ID)
-        member = guild.get_member(member.id)
         await self.normalize_member(member)
 
 

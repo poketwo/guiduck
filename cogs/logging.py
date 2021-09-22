@@ -7,14 +7,6 @@ from pymongo import UpdateOne
 
 formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
 
-GUILD_ID = 716390832034414685
-STAFF_ROLES = [
-    718006431231508481,
-    724879492622843944,
-    732712709514199110,
-    721825360827777043,
-]
-
 
 class Logging(commands.Cog):
     """For logging."""
@@ -112,13 +104,20 @@ class Logging(commands.Cog):
 
     @commands.Cog.listener(name="on_member_join")
     @commands.Cog.listener(name="on_member_update")
-    @commands.Cog.listener(name="on_user_update")
     async def on_member_updates(self, *args):
         thing = args[-1]
         if isinstance(thing, discord.User):
             guild = self.bot.get_guild(GUILD_ID)
             thing = guild.get_member(thing.id)
         await self.bot.mongo.db.member.bulk_write([self.make_sync_member(thing)])
+
+    @commands.Cog.listener()
+    async def on_user_update(self, _, new):
+        for guild in self.bot.guilds:
+            member = guild.get_member(new.id)
+            if member is None:
+                continue
+            await self.bot.mongo.db.member.bulk_write([self.make_sync_member(member)])
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
