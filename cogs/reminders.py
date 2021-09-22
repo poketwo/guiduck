@@ -73,7 +73,9 @@ class Reminders(commands.Cog):
         self._current = None
         self.bot.loop.create_task(self.update_current())
 
-    @commands.group(invoke_without_command=True, aliases=("remindme",), usage="<when> [event]")
+    @commands.group(
+        invoke_without_command=True, aliases=("remindme", "reminder"), usage="<when> [event]"
+    )
     @commands.guild_only()
     async def remind(
         self, ctx, *, when: time.UserFriendlyTime(commands.clean_content, default="\u2026")
