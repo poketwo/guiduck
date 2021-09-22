@@ -15,6 +15,11 @@ from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
 
 
+class ModerationUserFriendlyTime(time.UserFriendlyTime):
+    def __init__(self):
+        super().__init__(commands.clean_content, default="No reason provided")
+
+
 def message_channel(ctx, message):
     if isinstance(message, discord.TextChannel):
         return dict(message_id=message.last_message_id, channel_id=message.id)
@@ -495,11 +500,11 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await ctx.send(f"Kicked **{target}**.")
 
-    @commands.command(usage="<target> [expires_at] <reason>")
+    @commands.command(usage="<target> [expires_at] [reason]")
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     async def ban(
-        self, ctx, target: MemberOrIdConverter, *, reason: Union[time.UserFriendlyTime, str]
+        self, ctx, target: MemberOrIdConverter, *, reason: Union[ModerationUserFriendlyTime, str]
     ):
         """Bans a member from the server.
 
@@ -526,7 +531,7 @@ class Moderation(commands.Cog):
         await action.notify()
         await action.execute(ctx)
         if action.duration is None:
-            await ctx.send(f"Banned **{target}** permanently.")
+            await ctx.send(f"Banned **{target}**.")
         else:
             await ctx.send(f"Banned **{target}** for **{time.human_timedelta(action.duration)}**.")
 
@@ -548,10 +553,12 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await ctx.send(f"Unbanned **{target.user}**.")
 
-    @commands.group(invoke_without_command=True, usage="<target> [expires_at] <reason>")
+    @commands.group(invoke_without_command=True, usage="<target> [expires_at] [reason]")
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def mute(self, ctx, target: discord.Member, *, reason: Union[time.UserFriendlyTime, str]):
+    async def mute(
+        self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
+    ):
         """Mutes a member in the server.
 
         You must have the Kick Members permission to use this.
@@ -577,7 +584,7 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         if action.duration is None:
-            await ctx.send(f"Muted **{target}** permanently.")
+            await ctx.send(f"Muted **{target}**.")
         else:
             await ctx.send(f"Muted **{target}** for **{time.human_timedelta(action.duration)}**.")
 
@@ -620,11 +627,11 @@ class Moderation(commands.Cog):
 
         await ctx.send("Set up permissions for the Muted role.")
 
-    @commands.command(aliases=("tmute",), usage="<target> [expires_at] <reason>")
+    @commands.command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def tradingmute(
-        self, ctx, target: discord.Member, *, reason: Union[time.UserFriendlyTime, str]
+        self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
     ):
         """Mutes a member in trading channels.
 
@@ -651,7 +658,7 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         if action.duration is None:
-            await ctx.send(f"Muted **{target}** in trading channels permanently.")
+            await ctx.send(f"Muted **{target}** in trading channels.")
         else:
             await ctx.send(
                 f"Muted **{target}** in trading channels for **{time.human_timedelta(action.duration)}**."
