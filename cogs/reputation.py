@@ -50,7 +50,7 @@ class Reputation(commands.Cog):
 
         cd = await self.bot.redis.pttl(key := f"rep:{ctx.author.id}:{user.id}")
         if cd >= 0:
-            return f"You can rep **{user}** again in **{time.strfdelta(timedelta(seconds=cd / 1000))}**."
+            return f"You can rep **{user}** again in **{time.human_timedelta(timedelta(seconds=cd / 1000))}**."
 
         await self.bot.redis.set(key, 1, expire=3600)
         await self.update_rep(user, inc=1)

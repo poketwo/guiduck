@@ -40,7 +40,7 @@ class Bot(commands.Cog):
             await ctx.send_help(ctx.command)
         elif isinstance(error, commands.CommandOnCooldown):
             await ctx.send(
-                f"You're on cooldown! Try again in **{time.strfdelta(timedelta(seconds=error.retry_after))}**."
+                f"You're on cooldown! Try again in **{time.human_timedelta(timedelta(seconds=error.retry_after))}**."
             )
         elif isinstance(error, commands.CheckFailure):
             await ctx.send(error)

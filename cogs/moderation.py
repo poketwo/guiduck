@@ -14,8 +14,6 @@ from helpers import time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
 
-TimeDelta = Optional[time.TimeDelta]
-
 
 def message_channel(ctx, message):
     if isinstance(message, discord.TextChannel):
@@ -104,7 +102,7 @@ class Action(abc.ABC):
         reason = self.reason or "No reason provided"
         embed.add_field(name="Reason", value=reason, inline=False)
         if self.duration is not None:
-            embed.add_field(name="Duration", value=time.strfdelta(self.duration, long=True))
+            embed.add_field(name="Duration", value=time.human_timedelta(self.duration, long=True))
             embed.set_footer(text="Expires")
             embed.timestamp = self.expires_at
         return embed
@@ -122,7 +120,9 @@ class Action(abc.ABC):
             value=reason,
         )
         if self.duration is not None:
-            embed.set_footer(text=f"Duration • {time.strfdelta(self.duration, long=True)}\nExpires")
+            embed.set_footer(
+                text=f"Duration • {time.human_timedelta(self.duration, long=True)}\nExpires"
+            )
             embed.timestamp = self.expires_at
         return embed
 
@@ -518,7 +518,7 @@ class Moderation(commands.Cog):
         self,
         ctx,
         target: MemberOrIdConverter,
-        duration: TimeDelta = None,
+        duration: Optional[time.HumanTime] = None,
         message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
@@ -550,7 +550,7 @@ class Moderation(commands.Cog):
         if action.duration is None:
             await ctx.send(f"Banned **{target}**.")
         else:
-            await ctx.send(f"Banned **{target}** for **{time.strfdelta(duration)}**.")
+            await ctx.send(f"Banned **{target}** for **{time.human_timedelta(duration)}**.")
 
     @commands.command()
     @commands.guild_only()
@@ -577,7 +577,7 @@ class Moderation(commands.Cog):
         self,
         ctx,
         target: discord.Member,
-        duration: TimeDelta = None,
+        duration: Optional[time.HumanTime] = None,
         message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
@@ -609,7 +609,7 @@ class Moderation(commands.Cog):
         if action.duration is None:
             await ctx.send(f"Muted **{target}**.")
         else:
-            await ctx.send(f"Muted **{target}** for **{time.strfdelta(duration)}**.")
+            await ctx.send(f"Muted **{target}** for **{time.human_timedelta(duration)}**.")
 
     @commands.command()
     @commands.guild_only()
@@ -657,7 +657,7 @@ class Moderation(commands.Cog):
         self,
         ctx,
         target: discord.Member,
-        duration: TimeDelta = None,
+        duration: Optional[time.HumanTime] = None,
         message: Optional[Union[discord.Message, discord.TextChannel]] = None,
         *,
         reason,
@@ -690,7 +690,7 @@ class Moderation(commands.Cog):
             await ctx.send(f"Muted **{target}** in trading channels.")
         else:
             await ctx.send(
-                f"Muted **{target}** in trading channels for **{time.strfdelta(duration)}**."
+                f"Muted **{target}** in trading channels for **{time.human_timedelta(duration)}**."
             )
 
     @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
@@ -780,7 +780,7 @@ class Moderation(commands.Cog):
                 f"– at {discord.utils.format_dt(x.created_at)} ({discord.utils.format_dt(x.created_at, 'R')})",
             ]
             if x.duration is not None:
-                lines.insert(1, f"– **Duration:** {time.strfdelta(x.duration)}")
+                lines.insert(1, f"– **Duration:** {time.human_timedelta(x.duration)}")
             return {"name": name, "value": "\n".join(lines), "inline": False}
 
         pages = ViewMenuPages(
