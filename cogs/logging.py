@@ -172,14 +172,14 @@ class Logging(commands.Cog):
                 self.bot.loop.create_task(attachment.save(fn, use_cached=True))
         await self.bot.mongo.db.message.update_one(
             {"_id": payload.message_id},
-            {"$set": {"deleted_at": datetime.utcnow()}},
+            {"$set": {"deleted_at": datetime.now(timezone.utc)}},
         )
 
     @commands.Cog.listener()
     async def on_raw_bulk_message_delete(self, payload):
         await self.bot.mongo.db.message.update_many(
             {"_id": {"$in": list(payload.message_ids)}},
-            {"$set": {"deleted_at": datetime.utcnow()}},
+            {"$set": {"deleted_at": datetime.now(timezone.utc)}},
         )
 
     @commands.group(invoke_without_command=True)

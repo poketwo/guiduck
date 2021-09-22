@@ -722,7 +722,7 @@ class Moderation(commands.Cog):
     @tasks.loop(seconds=30)
     async def check_actions(self):
         await self.bot.wait_until_ready()
-        query = {"resolved": False, "expires_at": {"$lt": datetime.utcnow()}}
+        query = {"resolved": False, "expires_at": {"$lt": datetime.now(timezone.utc)}}
 
         async for action in self.bot.mongo.db.action.find(query):
             self.bot.loop.create_task(self.reverse_raw_action(action))

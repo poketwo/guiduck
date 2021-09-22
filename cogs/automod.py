@@ -136,7 +136,7 @@ class Automod(commands.Cog):
     async def on_message(self, *args):
         message = args[-1]
 
-        if message.guild is None:
+        if message.guild is None or not isinstance(message.author, discord.Member):
             return
         if message.channel.permissions_for(message.author).manage_messages:
             return
@@ -156,7 +156,7 @@ class Automod(commands.Cog):
         query = {
             "target_id": ctx.author.id,
             "user_id": self.bot.user.id,
-            "created_at": {"$gt": datetime.utcnow() - timedelta(weeks=1)},
+            "created_at": {"$gt": datetime.now(timezone.utc) - timedelta(weeks=1)},
             "automod_bucket": module.bucket,
         }
         count = await self.bot.mongo.db.action.count_documents(query)
