@@ -6,6 +6,7 @@ import config
 
 COGS = [
     "automod",
+    "autopost",
     "bot",
     "collectors",
     "data",
@@ -14,7 +15,6 @@ COGS = [
     "moderation",
     "mongo",
     "names",
-    "pricecheck",
     "reaction_roles",
     "redis",
     "reputation",

@@ -58,7 +58,7 @@ class Reputation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if len(message.mentions) == 0:
+        if message.author.bot or len(message.mentions) == 0:
             return
 
         words = message.content.casefold().split()

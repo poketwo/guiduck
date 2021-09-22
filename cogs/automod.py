@@ -78,6 +78,8 @@ class MassMention(AutomodModule):
     }
 
     async def check(self, ctx):
+        if ctx.channel.id == 722244899767844866:
+            return
         if len(ctx.message.mentions) >= 10:
             return f"Sending too many mentions."
 
@@ -129,8 +131,11 @@ class Automod(commands.Cog):
         self.banned_words = BannedWords(bot)
         self.modules = [self.banned_words, ServerInvites(bot), MassMention(), Spamming()]
 
-    @commands.Cog.listener()
-    async def on_message(self, message):
+    @commands.Cog.listener(name="on_message")
+    @commands.Cog.listener(name="on_message_edit")
+    async def on_message(self, *args):
+        message = args[-1]
+
         if message.guild is None:
             return
         if message.channel.permissions_for(message.author).manage_messages:

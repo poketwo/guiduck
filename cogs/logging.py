@@ -2,7 +2,8 @@ import logging
 from datetime import datetime, timezone
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
+from pymongo import UpdateOne
 
 formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
 
@@ -26,6 +27,17 @@ class Logging(commands.Cog):
         self.log.setLevel(logging.DEBUG)
         dlog.setLevel(logging.INFO)
 
+        self.sync_all.start()
+
+    @tasks.loop(minutes=20)
+    async def sync_all(self):
+        guild = self.bot.get_guild(GUILD_ID)
+        await self.full_sync_guild(guild)
+
+    @sync_all.before_loop
+    async def before_sync_all(self):
+        return await self.bot.wait_until_ready()
+
     def serialize_role(self, role):
         return {
             "id": role.id,
@@ -34,8 +46,17 @@ class Logging(commands.Cog):
             "position": role.position,
         }
 
-    async def sync_guild(self, guild):
-        await self.bot.mongo.db.guild.update_one(
+    async def full_sync_guild(self, guild):
+        await self.bot.mongo.db.guild.bulk_write([self.make_sync_guild(guild)])
+        await self.bot.mongo.db.channel.bulk_write(
+            [self.make_sync_channel(channel) for channel in guild.channels]
+        )
+        await self.bot.mongo.db.member.bulk_write(
+            [self.make_sync_member(member) for member in guild.members]
+        )
+
+    def make_sync_guild(self, guild):
+        return UpdateOne(
             {"_id": guild.id},
             {
                 "$set": {
@@ -47,7 +68,7 @@ class Logging(commands.Cog):
             upsert=True,
         )
 
-    async def sync_channel(self, channel):
+    def make_sync_channel(self, channel):
         base = {
             "guild_id": channel.guild.id,
             "type": str(channel.type),
@@ -59,10 +80,10 @@ class Logging(commands.Cog):
         if isinstance(channel, discord.TextChannel):
             base["last_message_id"] = channel.last_message_id
 
-        await self.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": base}, upsert=True)
+        return UpdateOne({"_id": channel.id}, {"$set": base}, upsert=True)
 
-    async def sync_member(self, member):
-        await self.bot.mongo.db.member.update_one(
+    def make_sync_member(self, member):
+        return UpdateOne(
             {"_id": member.id},
             {
                 "$set": {
@@ -79,12 +100,16 @@ class Logging(commands.Cog):
     @commands.Cog.listener(name="on_guild_join")
     @commands.Cog.listener(name="on_guild_update")
     async def on_guild_updates(self, *args):
-        await self.sync_guild(args[-1])
+        await self.bot.mongo.db.guild.bulk_write([self.make_sync_guild(args[-1])])
 
     @commands.Cog.listener(name="on_member_join")
     @commands.Cog.listener(name="on_member_update")
     async def on_member_updates(self, *args):
-        await self.sync_member(args[-1])
+        thing = args[-1]
+        if isinstance(thing, discord.User):
+            guild = self.bot.get_guild(GUILD_ID)
+            thing = guild.get_member(thing.id)
+        await self.bot.mongo.db.member.bulk_write([self.make_sync_member(thing)])
 
     @commands.Cog.listener()
     async def on_user_update(self, _, new):
@@ -92,17 +117,17 @@ class Logging(commands.Cog):
             member = guild.get_member(new.id)
             if member is None:
                 continue
-            await self.sync_member(member)
+            await self.bot.mongo.db.member.bulk_write([self.make_sync_member(member)])
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
         for channel in guild.channels:
-            await self.sync_channel(channel)
+            await self.bot.mongo.db.channel.bulk_write([self.make_sync_channel(channel)])
 
     @commands.Cog.listener(name="on_guild_channel_create")
     @commands.Cog.listener(name="on_guild_channel_update")
     async def on_guild_channel_updates(self, *args):
-        await self.sync_channel(args[-1])
+        await self.bot.mongo.db.channel.bulk_write([self.make_sync_channel(args[-1])])
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel):
@@ -184,6 +209,15 @@ class Logging(commands.Cog):
             {"_id": channel.id}, {"$set": {"restricted": True}}
         )
         await ctx.send(f"Restricted logs for **#{channel}** to Admins.")
+
+    @commands.command()
+    async def fullsync(self, ctx):
+        await ctx.send("Starting full guild resync...")
+        await self.full_sync_guild(ctx.guild)
+        await ctx.send("Completed full guild resync.")
+
+    def cog_unload(self):
+        self.sync_all.cancel()
 
 
 def setup(bot):

@@ -27,8 +27,9 @@ class Collectors(commands.Cog):
 
     async def doc_to_species(self, doc):
         for x in doc.keys():
-            if x != "_id":
-                yield self.bot.data.species_by_number(int(x))
+            if x == "_id":
+                continue
+            yield self.bot.data.species_by_number(int(x))
 
     @commands.group(aliases=("col",), invoke_without_command=True)
     async def collect(self, ctx, *, member: discord.Member = None):
@@ -91,20 +92,23 @@ class Collectors(commands.Cog):
         await self.bot.mongo.db.collector.delete_one({"_id": ctx.author.id})
         await ctx.send("Cleared your collecting list.")
 
+    async def query_collectors(self, species):
+        async for x in self.bot.mongo.db.collector.find({str(species.id): True}):
+            user = self.bot.get_user(x["_id"])
+            if user is None:
+                continue
+            yield user
+
     @collect.command()
     async def search(self, ctx, *, species: SpeciesConverter):
         """Lists the collectors of a pokémon species."""
 
-        def format_item(x):
-            user = self.bot.get_user(x["_id"])
-            if user is None:
-                return str(x["_id"])
-            return f"{user} {user.mention}"
+        def format_item(user):
+            return f"{user} {user.mention} `<@{user.id}>`"
 
-        users = self.bot.mongo.db.collector.find({str(species.id): True})
         pages = ViewMenuPages(
             source=AsyncEmbedListPageSource(
-                users,
+                self.query_collectors(species),
                 title=str(species),
                 format_item=format_item,
             )

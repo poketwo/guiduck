@@ -645,11 +645,7 @@ class Moderation(commands.Cog):
         for channel in ctx.guild.channels:
             if isinstance(channel, CategoryChannel) or not channel.permissions_synced:
                 await channel.set_permissions(
-                    role,
-                    send_messages=False,
-                    add_reactions=False,
-                    speak=False,
-                    stream=False,
+                    role, send_messages=False, add_reactions=False, speak=False, stream=False
                 )
 
         await ctx.send("Set up permissions for the Muted role.")
@@ -781,7 +777,7 @@ class Moderation(commands.Cog):
             reason = x.reason or "No reason provided"
             lines = [
                 f"– **Reason:** {reason}",
-                f"– at {x.created_at:%m-%d-%y %I:%M %p}",
+                f"– at {discord.utils.format_dt(x.created_at)} ({discord.utils.format_dt(x.created_at, 'R')})",
             ]
             if x.duration is not None:
                 lines.insert(1, f"– **Duration:** {time.strfdelta(x.duration)}")
