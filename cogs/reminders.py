@@ -112,6 +112,8 @@ class Reminders(commands.Cog):
     @remind.command()
     @commands.guild_only()
     async def list(self, ctx):
+        """Lists future reminders set by you."""
+
         query = {"resolved": False, "user_id": ctx.author.id}
         count = await self.bot.mongo.db.reminder.count_documents(query)
 
