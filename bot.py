@@ -17,6 +17,7 @@ COGS = [
     "names",
     "reaction_roles",
     "redis",
+    "reminders",
     "reputation",
     "tags",
 ]
