@@ -120,7 +120,7 @@ class CustomHelpCommand(commands.HelpCommand):
 
         embed = self.make_page_embed(
             filtered,
-            title=group.qualified_name,
+            title=self.get_command_signature(group),
             description=f"{group.description}\n\n{group.help}"
             if group.description
             else group.help or "No help found...",
@@ -130,14 +130,12 @@ class CustomHelpCommand(commands.HelpCommand):
 
     async def send_command_help(self, command):
         embed = discord.Embed(color=discord.Color.blurple())
-        embed.title = self.context.clean_prefix + command.qualified_name
+        embed.title = self.get_command_signature(command)
 
         if command.description:
             embed.description = f"{command.description}\n\n{command.help}"
         else:
             embed.description = command.help or "No help found..."
-
-        embed.add_field(name="Signature", value=self.get_command_signature(command))
 
         await self.context.send(embed=embed)
 

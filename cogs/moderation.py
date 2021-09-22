@@ -3,7 +3,7 @@ from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional, Union
+from typing import Union
 
 import discord
 from discord.channel import CategoryChannel
@@ -452,14 +452,7 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def warn(
-        self,
-        ctx,
-        target: discord.Member,
-        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
-        *,
-        reason,
-    ):
+    async def warn(self, ctx, target: discord.Member, *, reason):
         """Warns a member in the server.
 
         You must have the Kick Members permission to use this.
@@ -474,7 +467,6 @@ class Moderation(commands.Cog):
             reason=reason,
             guild_id=ctx.guild.id,
             created_at=ctx.message.created_at,
-            **message_channel(ctx, message),
         )
         await action.execute(ctx)
         await action.notify()
@@ -483,14 +475,7 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def kick(
-        self,
-        ctx,
-        target: discord.Member,
-        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
-        *,
-        reason,
-    ):
+    async def kick(self, ctx, target: discord.Member, *, reason):
         """Kicks a member from the server.
 
         You must have the Kick Members permission to use this.
@@ -505,23 +490,16 @@ class Moderation(commands.Cog):
             reason=reason,
             guild_id=ctx.guild.id,
             created_at=ctx.message.created_at,
-            **message_channel(ctx, message),
         )
         await action.notify()
         await action.execute(ctx)
         await ctx.send(f"Kicked **{target}**.")
 
-    @commands.command()
+    @commands.command(usage="<target> [expires_at] <reason>")
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     async def ban(
-        self,
-        ctx,
-        target: MemberOrIdConverter,
-        expires_at: Optional[time.FutureTime] = None,
-        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
-        *,
-        reason,
+        self, ctx, target: MemberOrIdConverter, *, reason: Union[time.UserFriendlyTime, str]
     ):
         """Bans a member from the server.
 
@@ -531,14 +509,19 @@ class Moderation(commands.Cog):
         if target.guild_permissions.ban_members:
             return await ctx.send("You can't punish that person!")
 
+        if isinstance(reason, time.UserFriendlyTime):
+            expires_at = reason.dt
+            reason = reason.arg
+        else:
+            expires_at = None
+
         action = Ban(
             target=target,
             user=ctx.author,
             reason=reason,
             guild_id=ctx.guild.id,
             created_at=ctx.message.created_at,
-            expires_at=None if expires_at is None else expires_at.dt,
-            **message_channel(ctx, message),
+            expires_at=expires_at,
         )
         await action.notify()
         await action.execute(ctx)
@@ -565,18 +548,10 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await ctx.send(f"Unbanned **{target.user}**.")
 
-    @commands.group(invoke_without_command=True)
+    @commands.group(invoke_without_command=True, usage="<target> [expires_at] <reason>")
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
-    async def mute(
-        self,
-        ctx,
-        target: discord.Member,
-        expires_at: Optional[time.FutureTime] = None,
-        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
-        *,
-        reason,
-    ):
+    async def mute(self, ctx, target: discord.Member, *, reason: Union[time.UserFriendlyTime, str]):
         """Mutes a member in the server.
 
         You must have the Kick Members permission to use this.
@@ -585,14 +560,19 @@ class Moderation(commands.Cog):
         if target.guild_permissions.kick_members:
             return await ctx.send("You can't punish that person!")
 
+        if isinstance(reason, time.UserFriendlyTime):
+            expires_at = reason.dt
+            reason = reason.arg
+        else:
+            expires_at = None
+
         action = Mute(
             target=target,
             user=ctx.author,
             reason=reason,
             guild_id=ctx.guild.id,
             created_at=ctx.message.created_at,
-            expires_at=None if expires_at is None else expires_at.dt,
-            **message_channel(ctx, message),
+            expires_at=expires_at,
         )
         await action.execute(ctx)
         await action.notify()
@@ -640,17 +620,11 @@ class Moderation(commands.Cog):
 
         await ctx.send("Set up permissions for the Muted role.")
 
-    @commands.command(aliases=("tmute",))
+    @commands.command(aliases=("tmute",), usage="<target> [expires_at] <reason>")
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     async def tradingmute(
-        self,
-        ctx,
-        target: discord.Member,
-        expires_at: Optional[time.FutureTime] = None,
-        message: Optional[Union[discord.Message, discord.TextChannel]] = None,
-        *,
-        reason,
+        self, ctx, target: discord.Member, *, reason: Union[time.UserFriendlyTime, str]
     ):
         """Mutes a member in trading channels.
 
@@ -660,14 +634,19 @@ class Moderation(commands.Cog):
         if target.guild_permissions.kick_members:
             return await ctx.send("You can't punish that person!")
 
+        if isinstance(reason, time.UserFriendlyTime):
+            expires_at = reason.dt
+            reason = reason.arg
+        else:
+            expires_at = None
+
         action = TradingMute(
             target=target,
             user=ctx.author,
             reason=reason,
             guild_id=ctx.guild.id,
             created_at=ctx.message.created_at,
-            expires_at=None if expires_at is None else expires_at.dt,
-            **message_channel(ctx, message),
+            expires_at=expires_at,
         )
         await action.execute(ctx)
         await action.notify()
