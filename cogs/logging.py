@@ -31,8 +31,8 @@ class Logging(commands.Cog):
 
     @tasks.loop(minutes=20)
     async def sync_all(self):
-        guild = self.bot.get_guild(GUILD_ID)
-        await self.full_sync_guild(guild)
+        for guild in self.bot.guilds:
+            await self.full_sync_guild(guild)
 
     @sync_all.before_loop
     async def before_sync_all(self):
@@ -106,9 +106,6 @@ class Logging(commands.Cog):
     @commands.Cog.listener(name="on_member_update")
     async def on_member_updates(self, *args):
         thing = args[-1]
-        if isinstance(thing, discord.User):
-            guild = self.bot.get_guild(GUILD_ID)
-            thing = guild.get_member(thing.id)
         await self.bot.mongo.db.member.bulk_write([self.make_sync_member(thing)])
 
     @commands.Cog.listener()
