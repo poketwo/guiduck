@@ -526,7 +526,7 @@ class Moderation(commands.Cog):
         await action.notify()
         await action.execute(ctx)
         if action.duration is None:
-            await ctx.send(f"Banned **{target}**.")
+            await ctx.send(f"Banned **{target}** permanently.")
         else:
             await ctx.send(f"Banned **{target}** for **{time.human_timedelta(action.duration)}**.")
 
@@ -577,7 +577,7 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         if action.duration is None:
-            await ctx.send(f"Muted **{target}**.")
+            await ctx.send(f"Muted **{target}** permanently.")
         else:
             await ctx.send(f"Muted **{target}** for **{time.human_timedelta(action.duration)}**.")
 
@@ -651,7 +651,7 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         if action.duration is None:
-            await ctx.send(f"Muted **{target}** in trading channels.")
+            await ctx.send(f"Muted **{target}** in trading channels permanently.")
         else:
             await ctx.send(
                 f"Muted **{target}** in trading channels for **{time.human_timedelta(action.duration)}**."
