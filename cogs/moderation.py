@@ -87,6 +87,7 @@ class Action(abc.ABC):
             "user_id": self.user.id,
             "type": self.type,
             "reason": self.reason,
+            "guild_id": self.guild_id,
             "channel_id": self.channel_id,
             "message_id": self.message_id,
             "created_at": self.created_at,
