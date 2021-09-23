@@ -10,6 +10,7 @@ COGS = [
     "bot",
     "collectors",
     "data",
+    "forms",
     "help",
     "logging",
     "moderation",

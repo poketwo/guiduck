@@ -161,10 +161,7 @@ class Ban(Action):
 
     def to_user_embed(self):
         embed = super().to_user_embed()
-        embed.description += (
-            " Please do not DM staff members to get unpunished. "
-            "If you would like to appeal, [click here](https://forms.gle/FMqRugm5v47AvFQM8)."
-        )
+        embed.description += " Please do not DM staff members to get unpunished. If you would like to appeal, [click here](https://forms.poketwo.net/)."
         return embed
 
     async def execute(self, ctx):
