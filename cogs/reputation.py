@@ -64,7 +64,7 @@ class Reputation(commands.Cog):
         words = message.content.casefold().split()
         if any(x in words for x in GIVEREP_TRIGGERS):
             ctx = await self.bot.get_context(message)
-            await self.process_giverep(ctx, message.mentions[0])
+            await ctx.invoke(self.bot.get_command('giverep'), user=message.mentions[0])
 
     @commands.command()
     async def rep(self, ctx, *, user: discord.Member = None):
