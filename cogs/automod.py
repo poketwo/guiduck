@@ -149,6 +149,7 @@ class Automod(commands.Cog):
     async def automod_punish(self, ctx, module, *, reason):
         with suppress(discord.Forbidden, discord.HTTPException):
             await ctx.message.delete()
+
         cog = self.bot.get_cog("Moderation")
         if cog is None:
             return
@@ -156,6 +157,7 @@ class Automod(commands.Cog):
         query = {
             "target_id": ctx.author.id,
             "user_id": self.bot.user.id,
+            "guild_id": ctx.guild.id,
             "created_at": {"$gt": datetime.now(timezone.utc) - timedelta(weeks=1)},
             "automod_bucket": module.bucket,
         }
@@ -165,6 +167,7 @@ class Automod(commands.Cog):
             target=ctx.author,
             user=self.bot.user,
             reason=f"Automod: {reason}",
+            guild_id=ctx.guild.id,
             created_at=datetime.now(timezone.utc),
             automod_bucket=module.bucket,
         )
