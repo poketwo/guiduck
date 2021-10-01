@@ -21,6 +21,7 @@ COGS = [
     "reminders",
     "reputation",
     "tags",
+    "utility"
 ]
 
 
