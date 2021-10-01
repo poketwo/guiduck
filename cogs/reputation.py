@@ -48,11 +48,16 @@ class Reputation(commands.Cog):
         if user == ctx.author:
             return "You can't give rep to yourself!"
 
-        cd = await self.bot.redis.pttl(key := f"rep:{ctx.author.id}:{user.id}")
+        cd = await self.bot.redis.pttl(key := f"rep:{ctx.author.id}")
         if cd >= 0:
-            return f"You can rep **{user}** again in **{time.human_timedelta(timedelta(seconds=cd / 1000))}**."
+            return f"You're on cooldown! Try again in **{time.human_timedelta(timedelta(seconds=cd / 1000))}**."
 
-        await self.bot.redis.set(key, 1, expire=3600)
+        user_cd = await self.bot.redis.pttl(user_key := f"rep:{ctx.author.id}:{user.id}")
+        if user_cd >= 0:
+            return f"You can rep **{user}** again in **{time.human_timedelta(timedelta(seconds=user_cd / 1000))}**."
+
+        await self.bot.redis.set(key, 1, expire=120)
+        await self.bot.redis.set(user_key, 1, expire=3600)
         await self.update_rep(user, inc=1)
         await ctx.send(f"Gave 1 rep to **{user}**.")
 
@@ -90,8 +95,6 @@ class Reputation(commands.Cog):
 
         if msg := await self.process_giverep(ctx, user):
             await ctx.send(msg)
-
-        print(msg)
 
     @commands.command()
     @commands.has_permissions(administrator=True)
