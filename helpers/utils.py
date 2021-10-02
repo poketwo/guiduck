@@ -1,6 +1,7 @@
+from typing import NamedTuple
+
 import discord
 from discord.ext import commands
-from typing import NamedTuple
 
 
 class FakeAvatar(NamedTuple):
@@ -10,7 +11,15 @@ class FakeAvatar(NamedTuple):
 class FakeUser(discord.Object):
     @property
     def avatar(self):
+        return None
+
+    @property
+    def default_avatar(self):
         return FakeAvatar("https://cdn.discordapp.com/embed/avatars/0.png")
+
+    @property
+    def display_avatar(self):
+        return self.default_avatar
 
     @property
     def mention(self):

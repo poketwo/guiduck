@@ -87,6 +87,7 @@ class Logging(commands.Cog):
             {"_id": member.id},
             {
                 "$set": {
+                    "guild_id": member.guild.id,
                     "name": member.name,
                     "discriminator": member.discriminator,
                     "nick": member.nick,
