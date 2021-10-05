@@ -136,9 +136,12 @@ class Automod(commands.Cog):
     async def on_message(self, *args):
         message = args[-1]
 
-        if message.guild is None or not isinstance(message.author, discord.Member):
-            return
-        if message.channel.permissions_for(message.author).manage_messages:
+        if (
+            message.guild is None
+            or not isinstance(message.author, discord.Member)
+            or message.author.bot
+            or message.channel.permissions_for(message.author).manage_messages
+        ):
             return
 
         ctx = await self.bot.get_context(message)
