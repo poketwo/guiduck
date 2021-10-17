@@ -790,7 +790,7 @@ class Moderation(commands.Cog):
         channel = ctx.guild.get_channel(data["report_channel_id"])
 
         await channel.send(
-            f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}"
+            f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}\n{ctx.message.jump_url}"
         )
         await ctx.send(f"Reported **{user}**.")
 
