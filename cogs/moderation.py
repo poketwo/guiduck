@@ -419,7 +419,7 @@ class Moderation(commands.Cog):
     @commands.group(invoke_without_command=True, aliases=("remove", "clean", "clear"))
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
-    async def purge(self, ctx, search: int):
+    async def purge(self, ctx, search: Union[discord.Member, int]):
         """Mass deletes messages that meet a certain criteria.
 
         If no subcommand is called, purges all messages.
@@ -427,7 +427,10 @@ class Moderation(commands.Cog):
         You must have the Manage Members permission to use this.
         """
 
-        await ctx.invoke(self.all, search=search)
+        if isinstance(search, discord.Member):
+            await ctx.invoke(self.user, user=search)
+        else:
+            await ctx.invoke(self.all, search=search)
 
     @purge.command()
     @commands.has_permissions(manage_messages=True)
