@@ -793,9 +793,11 @@ class Moderation(commands.Cog):
         data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
         channel = ctx.guild.get_channel(data["report_channel_id"])
 
-        await channel.send(
-            f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}\n{ctx.message.jump_url}"
-        )
+        msg = f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}\n{ctx.message.jump_url}"
+        if ctx.message.attachments:
+            await channel.send(content=msg, files=[await f.to_file() for f in ctx.message.attachments])
+        else:
+            await channel.send(msg)
         await ctx.send(f"Reported **{user}**.")
 
     def cog_unload(self):
