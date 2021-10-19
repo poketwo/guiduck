@@ -422,7 +422,8 @@ class Moderation(commands.Cog):
     async def purge(self, ctx, search: Union[discord.Member, int]):
         """Mass deletes messages that meet a certain criteria.
 
-        If no subcommand is called, purges all messages.
+        If no subcommand is called, purges either all messages from a user or
+        all messages, depending on the argument provided.
 
         You must have the Manage Members permission to use this.
         """
