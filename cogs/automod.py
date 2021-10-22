@@ -27,7 +27,8 @@ class BannedWords(AutomodModule):
     bucket = "banned_words"
     punishments = {
         4: ("ban", None),
-        2: ("mute", timedelta(days=3)),
+        3: ("mute", timedelta(days=4)),
+        2: ("mute", timedelta(days=1)),
         1: ("mute", timedelta(hours=2)),
         0: ("warn", None),
     }
