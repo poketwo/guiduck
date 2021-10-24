@@ -789,11 +789,9 @@ class Moderation(commands.Cog):
     @commands.cooldown(1, 20, commands.BucketType.user)
     async def report(self, ctx, user: discord.Member, *, reason):
         """Reports a user to server moderators."""
+        channel = self.bot.get_channel(761124957769039892)
 
-        data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
-        channel = ctx.guild.get_channel(data["report_channel_id"])
-
-        msg = f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}\n{ctx.message.jump_url}"
+        msg = f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention if ctx.guild else ('DMs')}{' ('+ctx.message.jump_url+')' if ctx.guild else ('')} for:\n>>> {reason}"
         if ctx.message.attachments:
             await channel.send(content=msg, files=[await f.to_file() for f in ctx.message.attachments])
         else:
