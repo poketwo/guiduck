@@ -37,6 +37,7 @@ class Action(abc.ABC):
     message_id: int = None
     created_at: datetime = None
     expires_at: datetime = None
+    note: str = None
     automod_bucket: str = None
     resolved: bool = None
     _id: int = None
@@ -67,6 +68,8 @@ class Action(abc.ABC):
             kwargs["resolved"] = x["resolved"]
         if "automod_bucket" in x:
             kwargs["automod_bucket"] = x["automod_bucket"]
+        if "note" in x:
+            kwargs["note"] = x["note"]
         return cls_dict[x["type"]](**kwargs)
 
     @property
@@ -132,13 +135,33 @@ class Action(abc.ABC):
             embed.timestamp = self.expires_at
         return embed
 
+    def to_info_embed(self):
+        reason = self.reason or "No reason provided"
+        embed = discord.Embed(
+            color=self.color, title=f"{self.emoji} {self.past_tense.title()} {self.target}"
+        )
+        embed.set_author(name=f"{self.user}", icon_url=self.user.display_avatar.url)
+        embed.set_thumbnail(url=self.target.display_avatar.url)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        if self.note is not None:
+            embed.add_field(name="Note", value=self.note)
+        if self.logs_url is not None:
+            embed.add_field(name="Logs", value=f"[Link]({self.logs_url})", inline=False)
+        if self.duration is not None:
+            duration = f"{time.human_timedelta(self.duration)}"
+            expires_at = f"{discord.utils.format_dt(self.expires_at)} ({discord.utils.format_dt(self.expires_at, 'R')}"
+            embed.add_field(name="Duration", value=duration, inline=False)
+            embed.add_field(name="Expires At", value=expires_at, inline=False)
+        embed.timestamp = self.created_at
+        return embed
+
     async def notify(self):
         with suppress(discord.Forbidden, discord.HTTPException):
             await self.target.send(embed=self.to_user_embed())
 
     @abc.abstractmethod
     async def execute(self, ctx):
-        ctx.bot.dispatch("action_perform", self)
+        await ctx.bot.get_cog("Moderation").save_action(self)
 
 
 class Kick(Action):
@@ -321,8 +344,7 @@ class Moderation(commands.Cog):
         if data.get("trading_muted", False):
             await TradingMute(**kwargs).execute(ctx)
 
-    @commands.Cog.listener()
-    async def on_action_perform(self, action):
+    async def save_action(self, action: Action):
         await self.bot.mongo.db.action.update_many(
             {
                 "target_id": action.target.id,
@@ -332,12 +354,13 @@ class Moderation(commands.Cog):
             },
             {"$set": {"resolved": True}},
         )
-        id = await self.bot.mongo.reserve_id("action")
-        await self.bot.mongo.db.action.insert_one({"_id": id, **action.to_dict()})
+        action._id = await self.bot.mongo.reserve_id("action")
+        await self.bot.mongo.db.action.insert_one({"_id": action._id, **action.to_dict()})
 
         data = await self.bot.mongo.db.guild.find_one({"_id": action.guild_id})
         channel = self.bot.get_channel(data["logs_channel_id"])
-        await channel.send(embed=action.to_log_embed())
+        if channel is not None:
+            await channel.send(embed=action.to_log_embed())
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, target):
@@ -356,7 +379,7 @@ class Moderation(commands.Cog):
             guild_id=guild.id,
             created_at=entry.created_at,
         )
-        self.bot.dispatch("action_perform", action)
+        await self.save_action(action)
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild, target):
@@ -373,7 +396,7 @@ class Moderation(commands.Cog):
             guild_id=guild.id,
             created_at=entry.created_at,
         )
-        self.bot.dispatch("action_perform", action)
+        await self.save_action(action)
 
     @commands.Cog.listener()
     async def on_member_kick(self, target, entry):
@@ -387,7 +410,7 @@ class Moderation(commands.Cog):
             guild_id=target.guild.id,
             created_at=entry.created_at,
         )
-        self.bot.dispatch("action_perform", action)
+        await self.save_action(action)
 
     async def run_purge(self, ctx, limit, check):
         await ctx.message.delete()
@@ -500,7 +523,7 @@ class Moderation(commands.Cog):
         )
         await action.notify()
         await action.execute(ctx)
-        await ctx.send(f"Kicked **{target}**.")
+        await ctx.send(f"Kicked **{target}** (Case #{action._id}).")
 
     @commands.command(usage="<target> [expires_at] [reason]")
     @commands.guild_only()
@@ -715,7 +738,6 @@ class Moderation(commands.Cog):
 
         await new_action.execute(FakeContext(self.bot, guild))
         await new_action.notify()
-        self.bot.dispatch("action_perform", new_action)
 
         await self.bot.mongo.db.action.update_one(
             {"_id": raw_action["_id"]}, {"$set": {"resolved": True}}
@@ -754,6 +776,8 @@ class Moderation(commands.Cog):
             ]
             if x.duration is not None:
                 lines.insert(1, f"– **Duration:** {time.human_timedelta(x.duration)}")
+            if x.note is not None:
+                lines.insert(1, f"– **Note:** {x.note}")
             return {"name": name, "value": "\n".join(lines), "inline": False}
 
         pages = ViewMenuPages(
@@ -784,6 +808,38 @@ class Moderation(commands.Cog):
         )
         word = "entry" if result.deleted_count == 1 else "entries"
         await ctx.send(f"Successfully deleted {result.deleted_count} {word}.")
+
+    @history.command()
+    @commands.guild_only()
+    @checks.is_moderator()
+    async def note(self, ctx, id: int, *, note):
+        """Adds a note to an entry from punishment history.
+
+        You must have the Moderator role to use this.
+        """
+
+        result = await self.bot.mongo.db.action.find_one_and_update(
+            {"_id": id, "guild_id": ctx.guild.id}, {"$set": {"note": note}}
+        )
+        if result is None:
+            return await ctx.send("Could not find an entry with that ID.")
+        await ctx.send(f"Successfully added a note to that entry.")
+
+    @history.command(aliases=("show",))
+    @commands.guild_only()
+    @checks.is_moderator()
+    async def info(self, ctx, id: int):
+        """Shows an entry from punishment history.
+
+        You must have the Moderator role to use this.
+        """
+
+        action = await self.bot.mongo.db.action.find_one({"_id": id, "guild_id": ctx.guild.id})
+        if action is None:
+            return await ctx.send("Could not find an entry with that ID.")
+
+        action = Action.build_from_mongo(self.bot, action)
+        await ctx.send(embed=action.to_info_embed())
 
     @commands.command(cooldown_after_parsing=True)
     @commands.cooldown(1, 20, commands.BucketType.user)
