@@ -488,7 +488,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
+        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         action = Warn(
@@ -511,7 +511,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
+        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         action = Kick(
@@ -536,7 +536,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
+        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
@@ -589,7 +589,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
+        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
@@ -663,7 +663,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
+        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
