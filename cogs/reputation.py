@@ -3,7 +3,7 @@ from datetime import timedelta
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
-from helpers import time
+from helpers import checks, time
 from helpers.pagination import AsyncEmbedCodeBlockTablePageSource
 
 GIVEREP_TRIGGERS = [
@@ -97,11 +97,11 @@ class Reputation(commands.Cog):
             await ctx.send(msg)
 
     @commands.command()
-    @commands.has_permissions(administrator=True)
+    @checks.is_community_manager()
     async def setrep(self, ctx, user: discord.Member, value: int):
         """Sets a user's reputation to a given value.
 
-        You must have the Administrator permission to use this."""
+        You must have the Community Manager role to use this."""
 
         await self.update_rep(user, set=value)
         await ctx.send(f"Set **{user}**'s rep to **{value}**")

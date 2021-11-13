@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands, tasks
+from helpers import checks
 from pymongo import UpdateOne
 
 formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
@@ -184,22 +185,22 @@ class Logging(commands.Cog):
         )
 
     @commands.group(invoke_without_command=True)
-    @commands.has_permissions(manage_messages=True)
+    @checks.is_moderator()
     async def logs(self, ctx, *, channel: discord.TextChannel = None):
         """Gets a link to the message logs for a channel.
 
-        You must have the Manage Messages permission to use this.
+        You must have the Moderator role to use this.
         """
 
         channel = channel or ctx.channel
         await ctx.send(f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}")
 
     @logs.command()
-    @commands.has_permissions(administrator=True)
+    @checks.is_community_manager()
     async def restrict(self, ctx, channel: discord.TextChannel = None):
         """Restricts the logs for a channel to Admins.
 
-        You must have the Administrator permission to use this.
+        You must have the Community Manager role to use this.
         """
 
         channel = channel or ctx.channel

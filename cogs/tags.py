@@ -5,6 +5,7 @@ import pymongo
 from bson.objectid import ObjectId
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
+from helpers import checks
 from helpers.pagination import AsyncEmbedListPageSource
 from helpers.utils import FakeUser
 
@@ -206,10 +207,12 @@ class Tags(commands.Cog):
         await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully deleted.")
 
-    @commands.has_permissions(administrator=True)
     @tag.command()
+    @checks.is_community_manager()
     async def forcedelete(self, ctx, *, name):
-        """Removes a tag by force."""
+        """Removes a tag by force.
+
+        You must have the Community Manager role to do this."""
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -219,10 +222,12 @@ class Tags(commands.Cog):
         await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully force deleted.")
 
-    @commands.has_permissions(administrator=True)
     @tag.command()
+    @checks.is_community_manager()
     async def forceedit(self, ctx, name, *, content):
-        """Edits a tag by force."""
+        """Edits a tag by force.
+
+        You must have the Community Manager role to do this."""
 
         tag = await self.get_tag(name)
         if tag is None:

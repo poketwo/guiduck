@@ -10,7 +10,7 @@ from discord.channel import CategoryChannel
 from discord.ext import commands, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from discord.ext.menus.views import ViewMenuPages
-from helpers import time
+from helpers import checks, time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
 
@@ -405,11 +405,11 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_permissions(manage_messages=True)
+    @checks.is_moderator()
     async def cleanup(self, ctx, search=100):
         """Cleans up the bot's messages from the channel.
 
-        You must have the Manage Messages permission to use this.
+        You must have the Moderator Role to use this.
         """
 
         await self.run_purge(
@@ -418,14 +418,14 @@ class Moderation(commands.Cog):
 
     @commands.group(invoke_without_command=True, aliases=("remove", "clean", "clear"))
     @commands.guild_only()
-    @commands.has_permissions(manage_messages=True)
+    @checks.is_moderator()
     async def purge(self, ctx, search: Union[discord.Member, int]):
         """Mass deletes messages that meet a certain criteria.
 
         If no subcommand is called, purges either all messages from a user or
         all messages, depending on the argument provided.
 
-        You must have the Manage Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
         if isinstance(search, discord.Member):
@@ -434,19 +434,19 @@ class Moderation(commands.Cog):
             await ctx.invoke(self.all, search=search)
 
     @purge.command()
-    @commands.has_permissions(manage_messages=True)
+    @checks.is_moderator()
     async def all(self, ctx, search: int = 100):
         """Purges all messages."""
         await self.run_purge(ctx, search, lambda m: True)
 
     @purge.command()
-    @commands.has_permissions(manage_messages=True)
+    @checks.is_moderator()
     async def user(self, ctx, user: discord.Member, search: int = 100):
         """Purges messages from a user."""
         await self.run_purge(ctx, search, lambda m: m.author == user)
 
     @purge.command()
-    @commands.has_permissions(manage_messages=True)
+    @checks.is_moderator()
     async def contains(self, ctx, *text):
         """Purges messages that contain a substring."""
         search = 100
@@ -458,14 +458,14 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_permissions(kick_members=True)
+    @checks.is_moderator()
     async def warn(self, ctx, target: discord.Member, *, reason):
         """Warns a member in the server.
 
-        You must have the Kick Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
-        if target.guild_permissions.kick_members:
+        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
             return await ctx.send("You can't punish that person!")
 
         action = Warn(
@@ -481,14 +481,14 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_permissions(kick_members=True)
+    @checks.is_moderator()
     async def kick(self, ctx, target: discord.Member, *, reason):
         """Kicks a member from the server.
 
-        You must have the Kick Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
-        if target.guild_permissions.kick_members:
+        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
             return await ctx.send("You can't punish that person!")
 
         action = Kick(
@@ -504,16 +504,16 @@ class Moderation(commands.Cog):
 
     @commands.command(usage="<target> [expires_at] [reason]")
     @commands.guild_only()
-    @commands.has_permissions(ban_members=True)
+    @checks.is_moderator()
     async def ban(
         self, ctx, target: MemberOrIdConverter, *, reason: Union[ModerationUserFriendlyTime, str]
     ):
         """Bans a member from the server.
 
-        You must have the Ban Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
-        if target.guild_permissions.ban_members:
+        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
@@ -539,11 +539,11 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_permissions(ban_members=True)
+    @checks.is_moderator()
     async def unban(self, ctx, target: BanConverter, *, reason=None):
         """Unbans a member from the server.
 
-        You must have the Ban Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
         action = Unban(
@@ -557,16 +557,16 @@ class Moderation(commands.Cog):
 
     @commands.group(invoke_without_command=True, usage="<target> [expires_at] [reason]")
     @commands.guild_only()
-    @commands.has_permissions(kick_members=True)
+    @checks.is_moderator()
     async def mute(
         self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
     ):
         """Mutes a member in the server.
 
-        You must have the Kick Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
-        if target.guild_permissions.kick_members:
+        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
@@ -592,11 +592,11 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_permissions(kick_members=True)
+    @checks.is_moderator()
     async def unmute(self, ctx, target: discord.Member, *, reason=None):
         """Unmutes a member in the server.
 
-        You must have the Kick Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
         action = Unmute(
@@ -610,11 +610,11 @@ class Moderation(commands.Cog):
         await ctx.send(f"Unmuted **{target}**.")
 
     @mute.command(aliases=("sync",))
-    @commands.has_permissions(administrator=True)
+    @checks.is_community_manager()
     async def setup(self, ctx):
         """Sets up the Muted role's permissions.
 
-        You must have the Administrator permission to use this.
+        You must have the Community Manager role to use this.
         """
 
         role = discord.utils.get(ctx.guild.roles, name="Muted")
@@ -631,16 +631,16 @@ class Moderation(commands.Cog):
 
     @commands.command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
     @commands.guild_only()
-    @commands.has_permissions(kick_members=True)
+    @checks.is_moderator()
     async def tradingmute(
         self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
     ):
         """Mutes a member in trading channels.
 
-        You must have the Kick Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
-        if target.guild_permissions.kick_members:
+        if any(role.id in checks.MODERATOR_ROLES for role in target.roles):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
@@ -668,11 +668,11 @@ class Moderation(commands.Cog):
 
     @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
     @commands.guild_only()
-    @commands.has_permissions(kick_members=True)
+    @checks.is_moderator()
     async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
         """Unmutes a member in trading channels.
 
-        You must have the Kick Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
         action = TradingUnmute(
@@ -731,11 +731,11 @@ class Moderation(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     @commands.guild_only()
-    @commands.has_permissions(kick_members=True)
+    @checks.is_moderator()
     async def history(self, ctx, *, target: Union[discord.Member, FetchUserConverter]):
         """Views a member's punishment history.
 
-        You must have the Kick Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
         query = {"target_id": target.id, "guild_id": ctx.guild.id}
@@ -772,11 +772,11 @@ class Moderation(commands.Cog):
 
     @history.command(aliases=("del",))
     @commands.guild_only()
-    @commands.has_permissions(kick_members=True)
+    @checks.is_moderator()
     async def delete(self, ctx, ids: commands.Greedy[int]):
         """Deletes one or more entries from punishment history.
 
-        You must have the Kick Members permission to use this.
+        You must have the Moderator role to use this.
         """
 
         result = await self.bot.mongo.db.action.delete_many(

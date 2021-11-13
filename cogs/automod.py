@@ -8,6 +8,7 @@ from typing import Dict, Optional, Tuple
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
+from helpers import checks
 from helpers.pagination import EmbedListPageSource
 
 INVITE_REGEX = r"(?:https?://)?discord(?:app)?\.(?:com/invite|gg)/([a-zA-Z0-9]+)/?"
@@ -185,18 +186,18 @@ class Automod(commands.Cog):
         await action.execute(ctx)
 
     @commands.group(invoke_without_command=True)
-    @commands.has_permissions(administrator=True)
+    @checks.is_community_manager()
     async def automod(self, ctx):
         """Utilities for automoderation."""
 
         await ctx.send_help(ctx.command)
 
     @automod.group(invoke_without_command=True)
-    @commands.has_permissions(administrator=True)
+    @checks.is_community_manager()
     async def words(self, ctx):
         """Displays the banned words list.
 
-        You must have the Administrator permission to use this.
+        You must have the Community Manager role to use this.
         """
 
         pages = ViewMenuPages(
@@ -209,11 +210,11 @@ class Automod(commands.Cog):
         await pages.start(ctx)
 
     @words.command()
-    @commands.has_permissions(administrator=True)
+    @checks.is_community_manager()
     async def add(self, ctx, *words):
         """Adds words to the banned words list.
 
-        You must have the Administrator permission to use this.
+        You must have the Community Manager role to use this.
         """
 
         await self.banned_words.update(ctx.guild, push=[x.casefold() for x in words])
@@ -221,11 +222,11 @@ class Automod(commands.Cog):
         await ctx.send(f"Added {words_msg} to the banned words list.")
 
     @words.command()
-    @commands.has_permissions(administrator=True)
+    @checks.is_community_manager()
     async def remove(self, ctx, *words):
         """Removes words from the banned words list.
 
-        You must have the Administrator permission to use this.
+        You must have the Community Manager role to use this.
         """
 
         await self.banned_words.update(ctx.guild, pull=[x.casefold() for x in words])
