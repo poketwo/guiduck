@@ -830,7 +830,7 @@ class Moderation(commands.Cog):
         )
             return await ctx.send(f"Successfully removed note of entry **{id}**.")
         
-        await ctx.send(f"Successfully added a note to that entry.")
+        await ctx.send(f"Successfully added a note to entry **{id}**.")
 
     @history.command(aliases=("show",))
     @commands.guild_only()
