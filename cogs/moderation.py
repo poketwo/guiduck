@@ -825,9 +825,9 @@ class Moderation(commands.Cog):
         if result is None:
             return await ctx.send("Could not find an entry with that ID.")
         if note.lower() == "reset":
-            await self.bot.mongo.db.action.find_one_and_update(
-            {"_id": id, "guild_id": ctx.guild.id}, {"$set": {"note": None}}
-        )
+            await self.bot.mongo.db.action.update_one(
+                {"_id": id, "guild_id": ctx.guild.id}, {"$unset": {"note": 1}}
+            )
             return await ctx.send(f"Successfully removed note of entry **{id}**.")
         
         await ctx.send(f"Successfully added a note to entry **{id}**.")
