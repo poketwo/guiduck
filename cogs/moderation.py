@@ -500,7 +500,7 @@ class Moderation(commands.Cog):
         )
         await action.execute(ctx)
         await action.notify()
-        await ctx.send(f"Warned **{target}**.")
+        await ctx.send(f"Warned **{target}** (Case #{action._id}).")
 
     @commands.command()
     @commands.guild_only()
@@ -556,9 +556,9 @@ class Moderation(commands.Cog):
         await action.notify()
         await action.execute(ctx)
         if action.duration is None:
-            await ctx.send(f"Banned **{target}**.")
+            await ctx.send(f"Banned **{target}** (Case #{action._id}).")
         else:
-            await ctx.send(f"Banned **{target}** for **{time.human_timedelta(action.duration)}**.")
+            await ctx.send(f"Banned **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).")
 
     @commands.command()
     @commands.guild_only()
@@ -576,7 +576,7 @@ class Moderation(commands.Cog):
             guild_id=ctx.guild.id,
         )
         await action.execute(ctx)
-        await ctx.send(f"Unbanned **{target.user}**.")
+        await ctx.send(f"Unbanned **{target.user}** (Case #{action._id}).")
 
     @commands.group(invoke_without_command=True, usage="<target> [expires_at] [reason]")
     @commands.guild_only()
@@ -609,9 +609,9 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         if action.duration is None:
-            await ctx.send(f"Muted **{target}**.")
+            await ctx.send(f"Muted **{target}** (Case #{action._id}).")
         else:
-            await ctx.send(f"Muted **{target}** for **{time.human_timedelta(action.duration)}**.")
+            await ctx.send(f"Muted **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).")
 
     @commands.command()
     @commands.guild_only()
@@ -630,7 +630,7 @@ class Moderation(commands.Cog):
         )
         await action.execute(ctx)
         await action.notify()
-        await ctx.send(f"Unmuted **{target}**.")
+        await ctx.send(f"Unmuted **{target}** (Case #{action._id}).")
 
     @mute.command(aliases=("sync",))
     @checks.is_community_manager()
@@ -683,10 +683,10 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         if action.duration is None:
-            await ctx.send(f"Muted **{target}** in trading channels.")
+            await ctx.send(f"Muted **{target}** in trading channels (Case #{action._id}).")
         else:
             await ctx.send(
-                f"Muted **{target}** in trading channels for **{time.human_timedelta(action.duration)}**."
+                f"Muted **{target}** in trading channels for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
             )
 
     @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
@@ -706,7 +706,7 @@ class Moderation(commands.Cog):
         )
         await action.execute(ctx)
         await action.notify()
-        await ctx.send(f"Unmuted **{target}** in trading channels.")
+        await ctx.send(f"Unmuted **{target}** in trading channels (Case #{action._id}).")
 
     async def reverse_raw_action(self, raw_action):
         action = Action.build_from_mongo(self.bot, raw_action)
@@ -818,11 +818,18 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
+        
         result = await self.bot.mongo.db.action.find_one_and_update(
             {"_id": id, "guild_id": ctx.guild.id}, {"$set": {"note": note}}
         )
         if result is None:
             return await ctx.send("Could not find an entry with that ID.")
+        if note.lower() == "reset":
+            await self.bot.mongo.db.action.find_one_and_update(
+            {"_id": id, "guild_id": ctx.guild.id}, {"$set": {"note": None}}
+        )
+            return await ctx.send(f"Successfully removed note of entry **{id}**.")
+        
         await ctx.send(f"Successfully added a note to that entry.")
 
     @history.command(aliases=("show",))
