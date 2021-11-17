@@ -18,7 +18,7 @@ class SubmissionStatus(Enum):
 CHANNEL_ID = 888320631890931732
 
 COLORS = {
-    SubmissionStatus.UNDER_REVIEW.value: None,
+    SubmissionStatus.UNDER_REVIEW.value: discord.Embed.Empty,
     SubmissionStatus.REJECTED.value: discord.Color.red(),
     SubmissionStatus.ACCEPTED.value: discord.Color.green(),
     SubmissionStatus.MARKED.value: discord.Color.blurple(),
