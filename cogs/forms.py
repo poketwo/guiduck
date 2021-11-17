@@ -51,7 +51,7 @@ class Forms(commands.Cog):
             url=f"https://forms.poketwo.net/a/{submission['form_id']}/submissions/{submission['_id']}",
             color=COLORS[status],
         )
-        embed.set_author(name=str(user), icon_url=user.display_avatar.url)
+        embed.set_author(name=submission["user_tag"], icon_url=user.display_avatar.url)
         embed.set_footer(text=f"User ID • {user.id}")
 
         if embedded_id := submission.get("embedded_id"):
