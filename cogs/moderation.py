@@ -10,6 +10,7 @@ from discord.channel import CategoryChannel
 from discord.ext import commands, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from discord.ext.menus.views import ViewMenuPages
+from discord.ui import button
 from helpers import checks, time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
@@ -413,6 +414,27 @@ class Moderation(commands.Cog):
         await self.save_action(action)
 
     async def run_purge(self, ctx, limit, check):
+        class ConfirmPurgeView(discord.ui.View):
+            @button(label=f"Purge up to {limit} messages", style=discord.ButtonStyle.danger)
+            async def confirm(_self, button: discord.ui.Button, interaction: discord.Interaction):
+                _self.stop()
+                await interaction.message.delete()
+                await self._purge(ctx, limit, check)
+
+            @button(label="Cancel")
+            async def cancel(_self, button: discord.ui.Button, interaction: discord.Interaction):
+                _self.stop()
+                await interaction.message.edit("The operation has been canceled.", view=None)
+
+        if limit > 10000:
+            await ctx.send("Too many messages to purge.")
+        elif limit > 100:
+            view = ConfirmPurgeView()
+            await ctx.send(f"Are you sure you want to purge up to {limit} messages?", view=view)
+        else:
+            await self._purge(ctx, limit, check)
+
+    async def _purge(self, ctx, limit, check):
         await ctx.message.delete()
         deleted = await ctx.channel.purge(limit=limit, check=check, before=ctx.message)
         spammers = Counter(m.author.display_name for m in deleted)
