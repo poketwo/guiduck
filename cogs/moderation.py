@@ -417,12 +417,16 @@ class Moderation(commands.Cog):
         class ConfirmPurgeView(discord.ui.View):
             @button(label=f"Purge up to {limit} messages", style=discord.ButtonStyle.danger)
             async def confirm(_self, button: discord.ui.Button, interaction: discord.Interaction):
+                if interaction.user != ctx.author:
+                    return
                 _self.stop()
                 await interaction.message.delete()
                 await self._purge(ctx, limit, check)
 
             @button(label="Cancel")
             async def cancel(_self, button: discord.ui.Button, interaction: discord.Interaction):
+                if interaction.user != ctx.author:
+                    return
                 _self.stop()
                 await interaction.message.edit("The operation has been canceled.", view=None)
 
