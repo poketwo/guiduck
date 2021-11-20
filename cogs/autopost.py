@@ -79,7 +79,7 @@ class PriceCheck(commands.Cog):
 
             channel_id = next(post.channels)
             if self.updated[channel_id]:
-                channel = self.bot.get_channel_or_thread(channel_id)
+                channel = self.bot.get_channel(channel_id)
                 await channel.send(post.message)
                 self.updated[channel_id] = False
 

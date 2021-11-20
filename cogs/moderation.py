@@ -358,7 +358,7 @@ class Moderation(commands.Cog):
         await self.bot.mongo.db.action.insert_one({"_id": action._id, **action.to_dict()})
 
         data = await self.bot.mongo.db.guild.find_one({"_id": action.guild_id})
-        channel = self.bot.get_channel_or_thread(data["logs_channel_id"])
+        channel = self.bot.get_channel(data["logs_channel_id"])
         if channel is not None:
             await channel.send(embed=action.to_log_embed())
 
