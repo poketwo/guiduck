@@ -200,16 +200,17 @@ class Reminders(commands.Cog):
             f"Reminder from {discord.utils.format_dt(reminder.created_at, 'R')}: {reminder.event}"
         )
 
-        try:
-            message = await channel.fetch_message(reminder.message_id)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            text = f"{reminder.user.mention} {text}"
-            message = None
+        if channel is not None:
+            try:
+                message = await channel.fetch_message(reminder.message_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                text = f"{reminder.user.mention} {text}"
+                message = None
 
-        await channel.send(
-            f"Reminder from {discord.utils.format_dt(reminder.created_at, 'R')}: {reminder.event}",
-            reference=message,
-        )
+            await channel.send(
+                f"Reminder from {discord.utils.format_dt(reminder.created_at, 'R')}: {reminder.event}",
+                reference=message,
+            )
 
         self.bot.loop.create_task(self.update_current())
 
