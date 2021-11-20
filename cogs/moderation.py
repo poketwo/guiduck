@@ -473,7 +473,7 @@ class Moderation(commands.Cog):
     async def contains(self, ctx, *text):
         """Purges messages that contain a substring."""
         search = 100
-        if text[-1].isdigit():
+        if text[-1].isdigit() and len(text) > 1:
             text, search = text[:-1], int(text[-1])
         await self.run_purge(
             ctx, search, lambda m: " ".join(text).casefold() in m.content.casefold()
