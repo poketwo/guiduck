@@ -121,7 +121,9 @@ class ReactionRoles(commands.Cog):
         except commands.BadArgument:
             pass
 
-        message = await self.bot.get_channel(menu["channel_id"]).fetch_message(menu["_id"])
+        message = await self.bot.get_channel_or_thread(menu["channel_id"]).fetch_message(
+            menu["_id"]
+        )
 
         try:
             await message.add_reaction(emoji)
@@ -154,7 +156,9 @@ class ReactionRoles(commands.Cog):
         except commands.BadArgument:
             pass
 
-        message = await self.bot.get_channel(menu["channel_id"]).fetch_message(menu["_id"])
+        message = await self.bot.get_channel_or_thread(menu["channel_id"]).fetch_message(
+            menu["_id"]
+        )
 
         try:
             await message.clear_reaction(emoji)

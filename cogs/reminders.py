@@ -195,7 +195,7 @@ class Reminders(commands.Cog):
             {"_id": reminder._id}, {"$set": {"resolved": True}}
         )
         guild = self.bot.get_guild(reminder.guild_id)
-        channel = guild.get_channel(reminder.channel_id)
+        channel = guild.get_channel_or_thread(reminder.channel_id)
         text = (
             f"Reminder from {discord.utils.format_dt(reminder.created_at, 'R')}: {reminder.event}"
         )

@@ -71,7 +71,7 @@ class Forms(commands.Cog):
 
     async def watch_submissions(self):
         await self.bot.wait_until_ready()
-        channel = self.bot.get_channel(CHANNEL_ID)
+        channel = self.bot.get_channel_or_thread(CHANNEL_ID)
         while True:
             try:
                 await self._watch_submissions(channel)

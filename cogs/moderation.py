@@ -358,7 +358,7 @@ class Moderation(commands.Cog):
         await self.bot.mongo.db.action.insert_one({"_id": action._id, **action.to_dict()})
 
         data = await self.bot.mongo.db.guild.find_one({"_id": action.guild_id})
-        channel = self.bot.get_channel(data["logs_channel_id"])
+        channel = self.bot.get_channel_or_thread(data["logs_channel_id"])
         if channel is not None:
             await channel.send(embed=action.to_log_embed())
 
@@ -558,7 +558,9 @@ class Moderation(commands.Cog):
         if action.duration is None:
             await ctx.send(f"Banned **{target}** (Case #{action._id}).")
         else:
-            await ctx.send(f"Banned **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).")
+            await ctx.send(
+                f"Banned **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
+            )
 
     @commands.command()
     @commands.guild_only()
@@ -611,7 +613,9 @@ class Moderation(commands.Cog):
         if action.duration is None:
             await ctx.send(f"Muted **{target}** (Case #{action._id}).")
         else:
-            await ctx.send(f"Muted **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).")
+            await ctx.send(
+                f"Muted **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
+            )
 
     @commands.command()
     @commands.guild_only()
@@ -818,7 +822,6 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        
         result = await self.bot.mongo.db.action.find_one_and_update(
             {"_id": id, "guild_id": ctx.guild.id}, {"$set": {"note": note}}
         )
@@ -829,7 +832,7 @@ class Moderation(commands.Cog):
                 {"_id": id, "guild_id": ctx.guild.id}, {"$unset": {"note": 1}}
             )
             return await ctx.send(f"Successfully removed note of entry **{id}**.")
-        
+
         await ctx.send(f"Successfully added a note to entry **{id}**.")
 
     @history.command(aliases=("show",))
@@ -854,7 +857,7 @@ class Moderation(commands.Cog):
         """Reports a user to server moderators."""
 
         data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
-        channel = ctx.guild.get_channel(data["report_channel_id"])
+        channel = ctx.guild.get_channel_or_thread(data["report_channel_id"])
 
         await channel.send(
             f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}"
