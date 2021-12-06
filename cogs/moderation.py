@@ -808,7 +808,7 @@ class Moderation(commands.Cog):
                 lines.insert(1, f"– **Duration:** {time.human_timedelta(x.duration)}")
             if x.note is not None:
                 lines.insert(1, f"– **Note:** {x.note}")
-            return {"name": name, "value": "\n".join(lines), "inline": False}
+            return {"name": name, "value": "\n".join(lines)[:1024], "inline": False}
 
         pages = ViewMenuPages(
             source=AsyncEmbedFieldsPageSource(
