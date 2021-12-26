@@ -99,7 +99,7 @@ class Collectors(commands.Cog):
                 continue
             yield user
 
-    @collect.command()
+    @collect.command(aliases=['s'])
     async def search(self, ctx, *, species: SpeciesConverter):
         """Lists the collectors of a pokémon species."""
 
