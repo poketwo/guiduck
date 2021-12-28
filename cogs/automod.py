@@ -88,12 +88,12 @@ class MassMention(AutomodModule):
             return f"Sending too many mentions."
 
 
-class ServerInvites(AutomodModule):
+class Server(AutomodModule):
     bucket = "server_invites"
     punishments = {
         3: ("ban", None),
-        2: ("mute", timedelta(days=3)),
-        1: ("mute", timedelta(hours=2)),
+        2: ("mute", timedelta(days=1)),
+        1: ("mute", timedelta(hours=3)),
         0: ("warn", None),
     }
 
@@ -112,8 +112,10 @@ class ServerInvites(AutomodModule):
 class Spamming(AutomodModule):
     bucket = "spamming"
     punishments = {
-        1: ("ban", None),
-        0: ("mute", timedelta(days=1)),
+        3: ("ban", None),
+        2: ("mute", timedelta(days=1)),
+        1: ("mute", timedelta(hours=5)),
+        0: ("mute", timedelta(hours=1)),
     }
 
     def __init__(self):
