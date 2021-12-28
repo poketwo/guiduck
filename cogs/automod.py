@@ -88,7 +88,7 @@ class MassMention(AutomodModule):
             return f"Sending too many mentions."
 
 
-class Server(AutomodModule):
+class ServerInvites(AutomodModule):
     bucket = "server_invites"
     punishments = {
         3: ("ban", None),
