@@ -263,7 +263,7 @@ class Tags(commands.Cog):
             return await ctx.send("Tag not found.")
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": member.id}})
-        await ctx.send(f"Successfully transferred tag.")
+        await ctx.send(f"Successfully force transferred tag.")
 
     @tag.command()
     async def claim(self, ctx, *, name):
