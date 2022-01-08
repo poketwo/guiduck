@@ -632,7 +632,7 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await ctx.send(f"Unbanned **{target.user}** (Case #{action._id}).")
 
-    @commands.command(aliases=("mute",), usage="<target> [expires_at] [reason]")
+    @commands.command(aliases=("mute",), usage="<target> <expires_at> [reason]")
     @commands.guild_only()
     @checks.is_moderator()
     async def timeout(self, ctx, target: discord.Member, *, reason: ModerationUserFriendlyTime):
