@@ -2,7 +2,7 @@ import abc
 from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Union
 
 import discord
@@ -635,8 +635,12 @@ class Moderation(commands.Cog):
     @commands.command(aliases=("mute",), usage="<target> <expires_at> [reason]")
     @commands.guild_only()
     @checks.is_moderator()
-    async def timeout(self, ctx, target: discord.Member, *, reason: ModerationUserFriendlyTime):
+    async def timeout(
+        self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
+    ):
         """Places a member in timeout within the server.
+
+        If duration is longer than 28 days, falls back to a mute.
 
         You must have the Moderator role to use this.
         """
@@ -644,21 +648,37 @@ class Moderation(commands.Cog):
         if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
-        action = Timeout(
+        if isinstance(reason, time.UserFriendlyTime):
+            expires_at = reason.dt
+            reason = reason.arg
+            if expires_at > ctx.message.created_at + timedelta(days=28):
+                action_cls = Mute
+            else:
+                action_cls = Timeout
+        else:
+            expires_at = None
+            action_cls = Mute
+
+        action = action_cls(
             target=target,
             user=ctx.author,
-            reason=reason.arg,
+            reason=reason,
             guild_id=ctx.guild.id,
             created_at=ctx.message.created_at,
-            expires_at=reason.dt,
+            expires_at=expires_at,
         )
         await action.execute(ctx)
         await action.notify()
-        if action.duration is None:
-            await ctx.send(f"Placed **{target}** in timeout (Case #{action._id}).")
-        else:
+
+        if action_cls is Timeout:
             await ctx.send(
                 f"Placed **{target}** in timeout for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
+            )
+        elif action.duration is None:
+            await ctx.send(f"Muted **{target}** (Case #{action._id}).")
+        else:
+            await ctx.send(
+                f"Muted **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
             )
 
     @commands.command(aliases=("unmute",))
@@ -667,10 +687,12 @@ class Moderation(commands.Cog):
     async def untimeout(self, ctx, target: discord.Member, *, reason=None):
         """Removes a member from timeout within the server.
 
+        If the member is muted, unmutes instead.
+
         You must have the Moderator role to use this.
         """
 
-        if ctx.invoked_with == "unmute" and any(x.name == "Muted" for x in target.roles):
+        if any(x.name == "Muted" for x in target.roles):
             action_cls = Unmute
         else:
             action_cls = Untimeout
