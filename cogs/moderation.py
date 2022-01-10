@@ -398,9 +398,9 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
-        print(before.communication_disabled_until, after.communication_disabled_until)
         if after.communication_disabled_until == before.communication_disabled_until:
             return
+
         entry = await fetch_recent_audit_log_entry(
             self.bot,
             after.guild,
