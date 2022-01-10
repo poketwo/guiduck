@@ -424,7 +424,6 @@ class Moderation(commands.Cog):
             created_at=entry.created_at,
             expires_at=after.communication_disabled_until,
         )
-        print(action)
         await self.save_action(action)
 
     @commands.Cog.listener()
