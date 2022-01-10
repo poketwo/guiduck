@@ -227,15 +227,22 @@ class Timeout(Action):
         await super().execute(ctx)
 
 
-class Untimeout(Action):
+class _Untimeout(Action):
     type = "untimeout"
     past_tense = "removed from timeout"
     emoji = "\N{SPEAKER}"
     color = discord.Color.green()
 
+
+class Untimeout(_Untimeout):
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         await self.target.edit(communication_disabled_until=None, reason=reason)
+        await super().execute(ctx)
+
+
+class SymbolicUntimeout(_Untimeout):
+    async def execute(self, ctx):
         await super().execute(ctx)
 
 
@@ -388,6 +395,37 @@ class Moderation(commands.Cog):
         channel = self.bot.get_channel(data["logs_channel_id"])
         if channel is not None:
             await channel.send(embed=action.to_log_embed())
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        print(before.communication_disabled_until, after.communication_disabled_until)
+        if after.communication_disabled_until == before.communication_disabled_until:
+            return
+        entry = await fetch_recent_audit_log_entry(
+            self.bot,
+            after.guild,
+            target=after,
+            action=discord.AuditLogAction.member_update,
+            retry=3,
+        )
+        if entry.user == self.bot.user:
+            return
+
+        if after.communication_disabled_until is None:
+            action_cls = SymbolicUntimeout
+        else:
+            action_cls = Timeout
+
+        action = action_cls(
+            target=after,
+            user=entry.user,
+            reason=entry.reason,
+            guild_id=after.guild.id,
+            created_at=entry.created_at,
+            expires_at=after.communication_disabled_until,
+        )
+        print(action)
+        await self.save_action(action)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, target):
@@ -782,6 +820,8 @@ class Moderation(commands.Cog):
             target = ban.user
         elif action.type == "mute":
             action_type = Unmute
+        elif action.type == "timeout":
+            action_type = SymbolicUntimeout
         elif action.type == "trading_mute":
             action_type = TradingUnmute
         else:
