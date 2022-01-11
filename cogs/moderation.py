@@ -749,7 +749,7 @@ class Moderation(commands.Cog):
             await ctx.send(f"Removed **{target}** from timeout (Case #{action._id}).")
 
     @commands.command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
-    @commands.guild_only()
+    @checks.community_server_only()
     @checks.is_moderator()
     async def tradingmute(
         self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
@@ -786,7 +786,7 @@ class Moderation(commands.Cog):
             )
 
     @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
-    @commands.guild_only()
+    @checks.community_server_only()
     @checks.is_moderator()
     async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
         """Unmutes a member in trading channels.
@@ -947,6 +947,7 @@ class Moderation(commands.Cog):
 
     @commands.command(cooldown_after_parsing=True)
     @commands.cooldown(1, 20, commands.BucketType.user)
+    @checks.community_server_only()
     async def report(self, ctx, user: discord.Member, *, reason):
         """Reports a user to server moderators."""
 
