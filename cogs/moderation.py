@@ -10,7 +10,7 @@ from discord.ext import commands, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from discord.ext.menus.views import ViewMenuPages
 from discord.ui import button
-from helpers import checks, time
+from helpers import checks, constants, time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
 
@@ -578,7 +578,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         action = Warn(
@@ -601,7 +601,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         action = Kick(
@@ -626,7 +626,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
@@ -683,7 +683,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
@@ -760,7 +760,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
