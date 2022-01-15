@@ -884,7 +884,7 @@ class Moderation(commands.Cog):
 
         data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
         channel = ctx.guild.get_channel_or_thread(data["report_channel_id"])
-
+        await ctx.message.delete()
         await channel.send(
             f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}"
         )
