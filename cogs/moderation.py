@@ -2,16 +2,15 @@ import abc
 from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Union
 
 import discord
-from discord.channel import CategoryChannel
 from discord.ext import commands, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from discord.ext.menus.views import ViewMenuPages
 from discord.ui import button
-from helpers import checks, time
+from helpers import checks, constants, time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
 
@@ -216,6 +215,37 @@ class Warn(Action):
         await super().execute(ctx)
 
 
+class Timeout(Action):
+    type = "timeout"
+    past_tense = "placed in timeout"
+    emoji = "\N{SPEAKER WITH CANCELLATION STROKE}"
+    color = discord.Color.blue()
+
+    async def execute(self, ctx):
+        reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
+        await self.target.edit(communication_disabled_until=self.expires_at, reason=reason)
+        await super().execute(ctx)
+
+
+class _Untimeout(Action):
+    type = "untimeout"
+    past_tense = "removed from timeout"
+    emoji = "\N{SPEAKER}"
+    color = discord.Color.green()
+
+
+class Untimeout(_Untimeout):
+    async def execute(self, ctx):
+        reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
+        await self.target.edit(communication_disabled_until=None, reason=reason)
+        await super().execute(ctx)
+
+
+class SymbolicUntimeout(_Untimeout):
+    async def execute(self, ctx):
+        await super().execute(ctx)
+
+
 class Mute(Action):
     type = "mute"
     past_tense = "muted"
@@ -288,7 +318,10 @@ class FakeContext:
     guild: discord.Guild
 
 
-cls_dict = {x.type: x for x in (Kick, Ban, Unban, Warn, Mute, Unmute, TradingMute, TradingUnmute)}
+cls_dict = {
+    x.type: x
+    for x in (Kick, Ban, Unban, Warn, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute)
+}
 
 
 class BanConverter(commands.Converter):
@@ -341,7 +374,7 @@ class Moderation(commands.Cog):
             guild_id=member.guild.id,
         )
         if data.get("muted", False):
-            await Mute(**kwargs).execute(ctx)
+            await Timeout(**kwargs).execute(ctx)
         if data.get("trading_muted", False):
             await TradingMute(**kwargs).execute(ctx)
 
@@ -362,6 +395,37 @@ class Moderation(commands.Cog):
         channel = self.bot.get_channel(data["logs_channel_id"])
         if channel is not None:
             await channel.send(embed=action.to_log_embed())
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        if after.communication_disabled_until == before.communication_disabled_until:
+            return
+
+        entry = await fetch_recent_audit_log_entry(
+            self.bot,
+            after.guild,
+            target=after,
+            action=discord.AuditLogAction.member_update,
+            retry=3,
+        )
+        if entry.user == self.bot.user:
+            return
+
+        if after.communication_disabled_until is None:
+            action_cls = SymbolicUntimeout
+        else:
+            action_cls = Timeout
+
+        action = action_cls(
+            target=after,
+            user=entry.user,
+            reason=entry.reason,
+            guild_id=after.guild.id,
+            created_at=entry.created_at,
+            expires_at=after.communication_disabled_until,
+        )
+        await action.notify()
+        await self.save_action(action)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, target):
@@ -514,7 +578,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         action = Warn(
@@ -537,7 +601,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         action = Kick(
@@ -562,7 +626,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
@@ -606,27 +670,34 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await ctx.send(f"Unbanned **{target.user}** (Case #{action._id}).")
 
-    @commands.group(invoke_without_command=True, usage="<target> [expires_at] [reason]")
+    @commands.command(aliases=("mute",), usage="<target> <expires_at> [reason]")
     @commands.guild_only()
     @checks.is_moderator()
-    async def mute(
+    async def timeout(
         self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
     ):
-        """Mutes a member in the server.
+        """Places a member in timeout within the server.
+
+        If duration is longer than 28 days, falls back to a mute.
 
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
             expires_at = reason.dt
             reason = reason.arg
+            if expires_at > ctx.message.created_at + timedelta(days=28):
+                action_cls = Mute
+            else:
+                action_cls = Timeout
         else:
             expires_at = None
+            action_cls = Mute
 
-        action = Mute(
+        action = action_cls(
             target=target,
             user=ctx.author,
             reason=reason,
@@ -636,23 +707,35 @@ class Moderation(commands.Cog):
         )
         await action.execute(ctx)
         await action.notify()
-        if action.duration is None:
+
+        if action_cls is Timeout:
+            await ctx.send(
+                f"Placed **{target}** in timeout for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
+            )
+        elif action.duration is None:
             await ctx.send(f"Muted **{target}** (Case #{action._id}).")
         else:
             await ctx.send(
                 f"Muted **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
             )
 
-    @commands.command()
+    @commands.command(aliases=("unmute",))
     @commands.guild_only()
     @checks.is_moderator()
-    async def unmute(self, ctx, target: discord.Member, *, reason=None):
-        """Unmutes a member in the server.
+    async def untimeout(self, ctx, target: discord.Member, *, reason=None):
+        """Removes a member from timeout within the server.
+
+        If the member is muted, unmutes instead.
 
         You must have the Moderator role to use this.
         """
 
-        action = Unmute(
+        if any(x.name == "Muted" for x in target.roles):
+            action_cls = Unmute
+        else:
+            action_cls = Untimeout
+
+        action = action_cls(
             target=target,
             user=ctx.author,
             reason=reason,
@@ -660,30 +743,14 @@ class Moderation(commands.Cog):
         )
         await action.execute(ctx)
         await action.notify()
-        await ctx.send(f"Unmuted **{target}** (Case #{action._id}).")
 
-    @mute.command(aliases=("sync",))
-    @checks.is_community_manager()
-    async def setup(self, ctx):
-        """Sets up the Muted role's permissions.
-
-        You must have the Community Manager role to use this.
-        """
-
-        role = discord.utils.get(ctx.guild.roles, name="Muted")
-        if role is None:
-            return await ctx.send("Please create a role named Muted first.")
-
-        for channel in ctx.guild.channels:
-            if isinstance(channel, CategoryChannel) or not channel.permissions_synced:
-                await channel.set_permissions(
-                    role, send_messages=False, add_reactions=False, speak=False, stream=False
-                )
-
-        await ctx.send("Set up permissions for the Muted role.")
+        if action_cls is Unmute:
+            await ctx.send(f"Unmuted **{target}** (Case #{action._id}).")
+        else:
+            await ctx.send(f"Removed **{target}** from timeout (Case #{action._id}).")
 
     @commands.command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
-    @commands.guild_only()
+    @checks.community_server_only()
     @checks.is_moderator()
     async def tradingmute(
         self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
@@ -693,7 +760,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        if any(role.id in checks.MODERATOR_ROLES for role in getattr(target, "roles", [])):
+        if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
         if isinstance(reason, time.UserFriendlyTime):
@@ -720,7 +787,7 @@ class Moderation(commands.Cog):
             )
 
     @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
-    @commands.guild_only()
+    @checks.community_server_only()
     @checks.is_moderator()
     async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
         """Unmutes a member in trading channels.
@@ -753,6 +820,8 @@ class Moderation(commands.Cog):
             target = ban.user
         elif action.type == "mute":
             action_type = Unmute
+        elif action.type == "timeout":
+            action_type = SymbolicUntimeout
         elif action.type == "trading_mute":
             action_type = TradingUnmute
         else:
@@ -879,6 +948,7 @@ class Moderation(commands.Cog):
 
     @commands.command(cooldown_after_parsing=True)
     @commands.cooldown(1, 20, commands.BucketType.user)
+    @checks.community_server_only()
     async def report(self, ctx, user: discord.Member, *, reason):
         """Reports a user to server moderators."""
 

@@ -28,9 +28,9 @@ class BannedWords(AutomodModule):
     bucket = "banned_words"
     punishments = {
         4: ("ban", None),
-        3: ("mute", timedelta(days=4)),
-        2: ("mute", timedelta(days=1)),
-        1: ("mute", timedelta(hours=2)),
+        3: ("timeout", timedelta(days=4)),
+        2: ("timeout", timedelta(days=1)),
+        1: ("timeout", timedelta(hours=2)),
         0: ("warn", None),
     }
 
@@ -75,8 +75,8 @@ class MassMention(AutomodModule):
     bucket = "mass_mention"
     punishments = {
         2: ("ban", None),
-        1: ("mute", timedelta(days=3)),
-        0: ("mute", timedelta(hours=2)),
+        1: ("timeout", timedelta(days=3)),
+        0: ("timeout", timedelta(hours=2)),
     }
 
     async def check(self, ctx):
@@ -90,8 +90,8 @@ class ServerInvites(AutomodModule):
     bucket = "server_invites"
     punishments = {
         3: ("ban", None),
-        2: ("mute", timedelta(days=3)),
-        1: ("mute", timedelta(hours=2)),
+        2: ("timeout", timedelta(days=3)),
+        1: ("timeout", timedelta(hours=2)),
         0: ("warn", None),
     }
 
@@ -111,7 +111,7 @@ class Spamming(AutomodModule):
     bucket = "spamming"
     punishments = {
         1: ("ban", None),
-        0: ("mute", timedelta(days=1)),
+        0: ("timeout", timedelta(days=1)),
     }
 
     def __init__(self):

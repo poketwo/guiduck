@@ -193,6 +193,22 @@ class Tags(commands.Cog):
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"content": content}})
         await ctx.send(f"Successfully edited tag.")
 
+    @tag.command(aliases=("fe",))
+    @checks.is_community_manager()
+    async def forceedit(self, ctx, name, *, content):
+        """Edits a tag by force.
+
+        You must have the Community Manager role to do this."""
+
+        tag = await self.get_tag(name)
+        if tag is None:
+            return await ctx.send("Tag not found.")
+        if tag.alias:
+            return await ctx.send("You cannot edit an alias.")
+
+        await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"content": content}})
+        await ctx.send(f"Successfully force edited tag.")
+
     @tag.command()
     async def delete(self, ctx, *, name):
         """Removes a tag that you own."""
@@ -222,21 +238,47 @@ class Tags(commands.Cog):
         await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully force deleted.")
 
-    @tag.command(aliases=("fe",))
+    @tag.command()
+    async def transfer(self, ctx, member: discord.Member, *, name):
+        """Transfers a tag that you own to another user."""
+
+        tag = await self.get_tag(name)
+        if tag is None:
+            return await ctx.send("Tag not found.")
+        if tag.owner_id != ctx.author.id:
+            return await ctx.send("You do not own that tag.")
+
+        await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": member.id}})
+        await ctx.send(f"Successfully transferred tag.")
+
+    @tag.command()
     @checks.is_community_manager()
-    async def forceedit(self, ctx, name, *, content):
-        """Edits a tag by force.
+    async def forcetransfer(self, ctx, member: discord.Member, *, name):
+        """Transfers a tag to another user by force.
 
         You must have the Community Manager role to do this."""
 
         tag = await self.get_tag(name)
         if tag is None:
             return await ctx.send("Tag not found.")
-        if tag.alias:
-            return await ctx.send("You cannot edit an alias.")
 
-        await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"content": content}})
-        await ctx.send(f"Successfully force edited tag.")
+        await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": member.id}})
+        await ctx.send(f"Successfully force transferred tag.")
+
+    @tag.command()
+    async def claim(self, ctx, *, name):
+        """Claims a tag whose owner is no longer in the server."""
+
+        tag = await self.get_tag(name)
+        if tag is None:
+            return await ctx.send("Tag not found.")
+        if ctx.guild.get_member(tag.owner_id) is not None:
+            return await ctx.send("Tag owner is still in server.")
+
+        await self.bot.mongo.db.tag.update_one(
+            {"_id": tag.id}, {"$set": {"owner_id": ctx.author.id}}
+        )
+        await ctx.send(f"Successfully claimed tag.")
 
 
 def setup(bot):

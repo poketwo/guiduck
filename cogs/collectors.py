@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
+from helpers import checks
 from helpers.pagination import AsyncEmbedListPageSource
 
 
@@ -32,6 +33,7 @@ class Collectors(commands.Cog):
             yield self.bot.data.species_by_number(int(x))
 
     @commands.group(aliases=("col",), invoke_without_command=True)
+    @checks.community_server_only()
     async def collect(self, ctx, *, member: discord.Member = None):
         """Allows members to keep track of the collectors for a pokémon species.
 
@@ -57,6 +59,7 @@ class Collectors(commands.Cog):
             await ctx.send("No pokémon found.")
 
     @collect.command()
+    @checks.community_server_only()
     async def add(self, ctx, *, species: SpeciesConverter):
         """Adds a pokémon species to your collecting list."""
 
@@ -72,6 +75,7 @@ class Collectors(commands.Cog):
             return await ctx.send(f"**{species}** is already on your collecting list!")
 
     @collect.command()
+    @checks.community_server_only()
     async def remove(self, ctx, *, species: SpeciesConverter):
         """Remove a pokémon species from your collecting list."""
 
@@ -86,6 +90,7 @@ class Collectors(commands.Cog):
             return await ctx.send(f"**{species}** is not on your collecting list!")
 
     @collect.command()
+    @checks.community_server_only()
     async def clear(self, ctx):
         """Clear your collecting list."""
 
@@ -100,6 +105,7 @@ class Collectors(commands.Cog):
             yield user
 
     @collect.command(aliases=("s",))
+    @checks.community_server_only()
     async def search(self, ctx, *, species: SpeciesConverter):
         """Lists the collectors of a pokémon species."""
 
@@ -120,6 +126,7 @@ class Collectors(commands.Cog):
             await ctx.send("No users found.")
 
     @commands.command()
+    @checks.community_server_only()
     async def collectors(self, ctx, *, species: SpeciesConverter):
         """An alias for the collect search command."""
 
