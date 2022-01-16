@@ -104,7 +104,7 @@ class Collectors(commands.Cog):
                 continue
             yield user
 
-    @collect.command()
+    @collect.command(aliases=("s",))
     @checks.community_server_only()
     async def search(self, ctx, *, species: SpeciesConverter):
         """Lists the collectors of a pokémon species."""
