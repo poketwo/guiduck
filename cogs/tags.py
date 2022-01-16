@@ -207,7 +207,7 @@ class Tags(commands.Cog):
         await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully deleted.")
 
-    @tag.command(aliases=['fd'])
+    @tag.command(aliases=("fd",))
     @checks.is_community_manager()
     async def forcedelete(self, ctx, *, name):
         """Removes a tag by force.
@@ -222,7 +222,7 @@ class Tags(commands.Cog):
         await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully force deleted.")
 
-    @tag.command(aliases=['fe'])
+    @tag.command(aliases=("fe",))
     @checks.is_community_manager()
     async def forceedit(self, ctx, name, *, content):
         """Edits a tag by force.
