@@ -781,7 +781,7 @@ class Moderation(commands.Cog):
         async for action in self.bot.mongo.db.action.find(query):
             self.bot.loop.create_task(self.reverse_raw_action(action))
 
-    @commands.group(invoke_without_command=True)
+    @commands.group(aliases=("his",), invoke_without_command=True)
     @commands.guild_only()
     @checks.is_moderator()
     async def history(self, ctx, *, target: Union[discord.Member, FetchUserConverter]):
