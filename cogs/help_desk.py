@@ -136,6 +136,7 @@ class CloseTicketButton(discord.ui.Button):
             label="Close",
             emoji="\N{LOCK}",
             custom_id=f"persistent:ticket:close:{ticket._id}",
+            disabled=ticket.closed_at is not None,
         )
         self.ticket = ticket
 
@@ -192,6 +193,7 @@ class NotifyView(discord.ui.View):
         self.stop()
         self.add_item(ClaimTicketButton(ticket))
         self.add_item(JoinTicketButton(ticket))
+        self.add_item(CloseTicketButton(ticket))
 
 
 class HelpDeskCategory(abc.ABC):
