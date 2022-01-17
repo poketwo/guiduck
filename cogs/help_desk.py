@@ -85,25 +85,36 @@ class Ticket(abc.ABC):
                 "If you created this ticket on accident or no longer need assistance, please close the ticket by clicking the :lock: **Close Ticket** button below this message."
             ),
             color=discord.Color.blurple(),
-            timestamp=self.created_at,
         )
         embed.add_field(name="Category", value=self.category.label)
         return embed
 
     def to_notify_embed(self):
-        embed = discord.Embed(
-            title=f"Opened {self._id} ({self.category.label})",
-            color=discord.Color.blurple(),
-        )
+        embed = discord.Embed(title=f"Opened {self._id}", color=discord.Color.blurple())
         embed.set_author(name=str(self.user), icon_url=self.user.display_avatar.url)
+        embed.add_field(name="Category", value=self.category.label)
         if self.agent is not None:
-            embed.color = discord.Color.gold()
+            embed.color = discord.Color.green()
             embed.add_field(name="Agent", value=self.agent.mention)
         if self.closed_at is not None:
             embed.color = discord.Embed.Empty
             embed.set_footer(text="Ticket Closed")
             embed.timestamp = self.closed_at
         return embed
+
+    def to_claim_embed(self):
+        return discord.Embed(
+            title="Ticket Claimed",
+            color=discord.Color.green(),
+            description=f"Ticket has been claimed by {self.agent.mention}. You will be assisted shortly.",
+        )
+
+    def to_closed_embed(self):
+        return discord.Embed(
+            title="Ticket Closed",
+            color=discord.Color.red(),
+            description="The ticket has been closed, and the thread has been archived. Please open another support ticket if you require further assistance.",
+        )
 
     async def save(self):
         channel = self.guild.get_channel(NOTIFY_CHANNEL)
@@ -118,25 +129,45 @@ class Ticket(abc.ABC):
 
     async def close(self):
         self.closed_at = datetime.now(timezone.utc)
+        await self.thread.send(embed=self.to_closed_embed())
         await self.thread.edit(archived=True, locked=True)
         await self.save()
 
     async def claim(self, user: discord.Member):
         self.agent = user
         await self.thread.add_user(user)
+        await self.thread.send(embed=self.to_claim_embed())
         await self.save()
 
     async def add(self, user: discord.Member):
         await self.thread.add_user(user)
 
 
+class ClaimTicketButton(discord.ui.Button):
+    def __init__(self, ticket: Ticket, *, style=discord.ButtonStyle.secondary):
+        super().__init__(
+            label="Claim",
+            emoji="\N{WAVING WHITE FLAG}\ufe0f",
+            custom_id=f"persistent:ticket:claim:{ticket._id}",
+            style=style,
+            disabled=ticket.closed_at is not None or ticket.agent is not None,
+        )
+        self.ticket = ticket
+
+    async def callback(self, interaction: discord.Interaction):
+        if any(x.id in constants.MODERATOR_ROLES for x in interaction.user.roles):
+            await self.ticket.claim(interaction.user)
+            await interaction.response.defer()
+
+
 class CloseTicketButton(discord.ui.Button):
-    def __init__(self, ticket: Ticket):
+    def __init__(self, ticket: Ticket, *, style=discord.ButtonStyle.secondary):
         super().__init__(
             label="Close",
             emoji="\N{LOCK}",
             custom_id=f"persistent:ticket:close:{ticket._id}",
             disabled=ticket.closed_at is not None,
+            style=style,
         )
         self.ticket = ticket
 
@@ -148,52 +179,30 @@ class CloseTicketButton(discord.ui.Button):
             await interaction.response.defer()
 
 
-class ClaimTicketButton(discord.ui.Button):
+class JumpToTicketButton(discord.ui.Button):
     def __init__(self, ticket: Ticket):
         super().__init__(
-            label="Claim",
-            emoji="\N{TRIANGULAR FLAG ON POST}",
-            custom_id=f"persistent:ticket:claim:{ticket._id}",
-            style=discord.ButtonStyle.primary,
-            disabled=ticket.closed_at is not None or ticket.agent is not None,
+            label="Jump to Thread",
+            url=f"https://discord.com/channels/930339868503048202/{ticket.thread_id}",
         )
         self.ticket = ticket
-
-    async def callback(self, interaction: discord.Interaction):
-        if any(x.id in constants.MODERATOR_ROLES for x in interaction.user.roles):
-            await self.ticket.claim(interaction.user)
-            await interaction.response.defer()
-
-
-class JoinTicketButton(discord.ui.Button):
-    def __init__(self, ticket: Ticket):
-        super().__init__(
-            label="Join Thread",
-            custom_id=f"persistent:ticket:join:{ticket._id}",
-            disabled=ticket.closed_at is not None,
-        )
-        self.ticket = ticket
-
-    async def callback(self, interaction: discord.Interaction):
-        if any(x.id in constants.MODERATOR_ROLES for x in interaction.user.roles):
-            await self.ticket.add(interaction.user)
-            await interaction.response.defer()
 
 
 class FirstView(discord.ui.View):
     def __init__(self, ticket: Ticket):
         super().__init__()
         self.stop()
-        self.add_item(CloseTicketButton(ticket))
+        self.add_item(CloseTicketButton(ticket, style=discord.ButtonStyle.danger))
+        self.add_item(ClaimTicketButton(ticket))
 
 
 class NotifyView(discord.ui.View):
     def __init__(self, ticket: Ticket):
         super().__init__()
         self.stop()
-        self.add_item(ClaimTicketButton(ticket))
-        self.add_item(JoinTicketButton(ticket))
-        self.add_item(CloseTicketButton(ticket))
+        self.add_item(ClaimTicketButton(ticket, style=discord.ButtonStyle.primary))
+        self.add_item(CloseTicketButton(ticket, style=discord.ButtonStyle.danger))
+        self.add_item(JumpToTicketButton(ticket))
 
 
 class HelpDeskCategory(abc.ABC):
@@ -383,9 +392,6 @@ class HelpDesk(commands.Cog):
         elif custom_id.startswith("persistent:ticket:claim"):
             button_cls = ClaimTicketButton
             ticket_id = custom_id.removeprefix("persistent:ticket:claim:")
-        elif custom_id.startswith("persistent:ticket:join"):
-            button_cls = JoinTicketButton
-            ticket_id = custom_id.removeprefix("persistent:ticket:join:")
         else:
             return
 
@@ -403,7 +409,6 @@ class HelpDesk(commands.Cog):
             return await ctx.send("Could not find a ticket in this channel!")
 
         if ctx.author == ticket.user or any(x.id in constants.MODERATOR_ROLES for x in ctx.author.roles):
-            await ctx.send("Closing ticket...")
             await ticket.close()
         else:
             await ctx.send("You do not have permission to do that!")
