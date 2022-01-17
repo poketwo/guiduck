@@ -413,6 +413,16 @@ class HelpDesk(commands.Cog):
         else:
             await ctx.send("You do not have permission to do that!")
 
+    @commands.command()
+    @checks.support_server_only()
+    @checks.is_moderator()
+    async def claim(self, ctx):
+        ticket = await self.fetch_ticket_by_thread(ctx.channel.id)
+        if ticket is None:
+            return await ctx.send("Could not find a ticket in this channel!")
+
+        await ticket.claim(ctx.author)
+
     def cog_unload(self):
         self.view.stop()
 
