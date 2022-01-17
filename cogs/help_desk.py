@@ -144,6 +144,7 @@ class CloseTicketButton(discord.ui.Button):
             x.id in constants.MODERATOR_ROLES for x in interaction.user.roles
         ):
             await self.ticket.close()
+            await interaction.response.defer()
 
 
 class ClaimTicketButton(discord.ui.Button):
@@ -218,6 +219,7 @@ class HelpDeskCategory(abc.ABC):
         thread = await channel.create_thread(
             name=_id,
             type=discord.ChannelType.private_thread,
+            invitable=False,
             reason=f"Created support ticket for {interaction.user}",
         )
         ticket = Ticket(
@@ -388,7 +390,6 @@ class HelpDesk(commands.Cog):
         ticket = await self.fetch_ticket_by_id(ticket_id)
         if ticket is not None:
             await button_cls(ticket).callback(interaction)
-            await interaction.response.defer()
         else:
             await interaction.response.send_message("Could not find that ticket!")
 
