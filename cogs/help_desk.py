@@ -4,14 +4,14 @@ import abc
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import cached_property
-from typing import Optional, Sequence, Type
+from typing import Optional, Type
 
 import discord
 from discord.ext import commands
 from helpers import checks, constants
 from helpers.utils import FakeUser
 
-ALL_CATEGORIES: Sequence[Type[HelpDeskCategory]] = {}
+ALL_CATEGORIES: dict[str, Type[HelpDeskCategory]] = {}
 TICKETS_CHANNEL_ID = 932520611564122153
 NOTIFY_CHANNEL = 932520629087899658
 
