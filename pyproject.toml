@@ -5,7 +5,7 @@ description = ""
 authors = ["Oliver Ni <oliver.ni@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 motor = "^2.3.0"
 jishaku = "^1.19.2"
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus.git" }
