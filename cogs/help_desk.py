@@ -12,8 +12,8 @@ from helpers import checks, constants
 from helpers.utils import FakeUser
 
 ALL_CATEGORIES: Sequence[Type[HelpDeskCategory]] = {}
-TICKETS_CHANNEL_ID = 932513779122597919
-NOTIFY_CHANNEL = 932513767428878416
+TICKETS_CHANNEL_ID = 932520611564122153
+NOTIFY_CHANNEL = 932520629087899658
 
 
 @dataclass
