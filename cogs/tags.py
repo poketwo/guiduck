@@ -123,8 +123,14 @@ class Tags(commands.Cog):
         """Gets the raw content of the tag, with markdown escaped."""
 
         tag = await self.get_tag(name, original=True)
-        first_step = discord.utils.escape_markdown(tag.content)
-        await ctx.send(first_step.replace("<", "\\<"), reference=ctx.message.reference)
+        escaped = discord.utils.escape_markdown(tag.content)
+        escaped = discord.utils.escape_mentions(escaped)
+
+        await ctx.send(
+            escaped,
+            allowed_mentions=discord.AllowedMentions.none(),
+            reference=ctx.message.reference,
+        )
 
     # Searching tags
 
@@ -172,9 +178,7 @@ class Tags(commands.Cog):
         tag = Tag(name=name, owner_id=ctx.author.id, alias=True, original=original.name)
         try:
             await self.bot.mongo.db.tag.insert_one(tag.to_dict())
-            await ctx.send(
-                f'Tag alias "{tag.name}" pointing to "{original.name}" successfully created.'
-            )
+            await ctx.send(f'Tag alias "{tag.name}" pointing to "{original.name}" successfully created.')
         except pymongo.errors.DuplicateKeyError:
             await ctx.send(f'A tag with the name "{tag.name}" already exists.')
 
@@ -275,9 +279,7 @@ class Tags(commands.Cog):
         if ctx.guild.get_member(tag.owner_id) is not None:
             return await ctx.send("Tag owner is still in server.")
 
-        await self.bot.mongo.db.tag.update_one(
-            {"_id": tag.id}, {"$set": {"owner_id": ctx.author.id}}
-        )
+        await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": ctx.author.id}})
         await ctx.send(f"Successfully claimed tag.")
 
 
