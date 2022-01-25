@@ -54,6 +54,10 @@ class Forms(commands.Cog):
         embed.set_author(name=submission["user_tag"], icon_url=user.display_avatar.url)
         embed.set_footer(text=f"User ID • {user.id}")
 
+        if reviewer_id := submission.get("reviewer_id"):
+            reviewer = self.bot.get_user(reviewer_id) or FakeUser(reviewer_id)
+            embed.set_footer(text=embed.footer.text + f"\nReviewed by • {reviewer}")
+
         if embedded_id := submission.get("embedded_id"):
             message = await channel.fetch_message(embedded_id)
             return await message.edit(embed=embed)
