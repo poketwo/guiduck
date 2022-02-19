@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import abc
-from dataclasses import dataclass, field
+import contextlib
+from dataclasses import MISSING, dataclass, field
 from datetime import datetime, timezone
 from functools import cached_property
 from typing import Optional, Type
@@ -12,8 +13,13 @@ from helpers import checks, constants
 from helpers.utils import FakeUser
 
 ALL_CATEGORIES: dict[str, Type[HelpDeskCategory]] = {}
+
 TICKETS_CHANNEL_ID = 932520611564122153
-NOTIFY_CHANNEL = 932520629087899658
+
+STATUS_CATEGORY_ID = 934619199047864330
+STATUS_CHANNEL_ID_NEW = 932520629087899658
+STATUS_CHANNEL_ID_OPEN = 944431717492600862
+STATUS_CHANNEL_ID_CLOSED = 938621530190008401
 
 
 @dataclass
@@ -28,7 +34,9 @@ class Ticket(abc.ABC):
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     closed_at: Optional[datetime] = None
     agent: Optional[discord.Member] = None
-    embedded_id: Optional[int] = None
+
+    status_channel_id: Optional[int] = STATUS_CHANNEL_ID_NEW
+    status_message_id: Optional[int] = None
 
     @property
     def guild(self):
@@ -37,6 +45,12 @@ class Ticket(abc.ABC):
     @property
     def thread(self):
         return self.guild.get_thread(self.thread_id)
+
+    @property
+    def status_channel(self):
+        if self.status_channel_id is None:
+            return None
+        return self.guild.get_channel(self.status_channel_id)
 
     @classmethod
     def build_from_mongo(cls, bot, x):
@@ -52,7 +66,8 @@ class Ticket(abc.ABC):
             "thread_id": x["thread_id"],
             "created_at": x["created_at"],
             "closed_at": x.get("closed_at"),
-            "embedded_id": x.get("embedded_id"),
+            "status_channel_id": x.get("status_channel_id"),
+            "status_message_id": x.get("status_message_id"),
         }
         if "agent_id" in x:
             kwargs["agent"] = guild.get_member(x["agent_id"]) or FakeUser(x["agent_id"])
@@ -65,15 +80,16 @@ class Ticket(abc.ABC):
             "guild_id": self.guild_id,
             "channel_id": self.channel_id,
             "thread_id": self.thread_id,
-            "embedded_id": self.embedded_id,
             "created_at": self.created_at,
         }
         if self.closed_at is not None:
             base["closed_at"] = self.closed_at
         if self.agent is not None:
             base["agent_id"] = self.agent.id
-        if self.embedded_id is not None:
-            base["embedded_id"] = self.embedded_id
+        if self.status_channel_id is not None:
+            base["status_channel_id"] = self.status_channel_id
+        if self.status_message_id is not None:
+            base["status_message_id"] = self.status_message_id
         return base
 
     def to_first_embed(self):
@@ -89,7 +105,7 @@ class Ticket(abc.ABC):
         embed.add_field(name="Category", value=self.category.label)
         return embed
 
-    def to_notify_embed(self):
+    def to_status_embed(self):
         embed = discord.Embed(title=f"Opened {self._id}", color=discord.Color.blurple())
         embed.set_author(name=str(self.user), icon_url=self.user.display_avatar.url)
         embed.add_field(name="Category", value=self.category.label)
@@ -106,7 +122,7 @@ class Ticket(abc.ABC):
         return discord.Embed(
             title="Ticket Claimed",
             color=discord.Color.green(),
-            description=f"Ticket has been claimed by {self.agent.mention}. You will be assisted shortly.",
+            description=f"The ticket has been claimed by {self.agent.mention}. You will be assisted shortly.",
         )
 
     def to_closed_embed(self):
@@ -116,28 +132,59 @@ class Ticket(abc.ABC):
             description="The ticket has been closed, and the thread has been archived. Please open another support ticket if you require further assistance.",
         )
 
-    async def save(self):
-        channel = self.guild.get_channel(NOTIFY_CHANNEL)
-        if self.embedded_id is None:
-            embedded = await channel.send(embed=self.to_notify_embed(), view=NotifyView(self))
-            self.embedded_id = embedded.id
-        else:
-            embedded = await channel.fetch_message(self.embedded_id)
-            await embedded.edit(embed=self.to_notify_embed(), view=NotifyView(self))
+    async def edit(
+        self,
+        *,
+        closed_at: Optional[datetime] = MISSING,
+        agent: Optional[discord.Member] = MISSING,
+        status_channel_id: Optional[int] = MISSING,
+    ):
+        status_message = await self.fetch_status_message()
 
+        if closed_at is not MISSING:
+            self.closed_at = closed_at
+        if agent is not MISSING:
+            self.agent = agent
+        if status_channel_id is not MISSING:
+            self.status_channel_id = status_channel_id
+
+        await self.update_status_message(status_message)
         await self.bot.mongo.db.ticket.update_one({"_id": self._id}, {"$set": self.to_dict()}, upsert=True)
 
+    async def fetch_status_message(self):
+        if self.status_channel is None or self.status_message_id is None:
+            return None
+        try:
+            return await self.status_channel.fetch_message(self.status_message_id)
+        except discord.NotFound:
+            return None
+
+    async def update_status_message(self, original=None):
+        if original is not None and original.channel.id != self.status_channel_id:
+            await original.delete()
+            original = None
+
+        if self.status_channel is not None:
+            if original is None:
+                status_message = await self.status_channel.send(embed=self.to_status_embed(), view=StatusView(self))
+                self.status_message_id = status_message.id
+            else:
+                await original.edit(embed=self.to_status_embed(), view=StatusView(self))
+
     async def close(self):
-        self.closed_at = datetime.now(timezone.utc)
-        await self.thread.send(embed=self.to_closed_embed())
+        await self.edit(closed_at=datetime.now(timezone.utc), status_channel_id=STATUS_CHANNEL_ID_CLOSED)
+        with contextlib.suppress(discord.HTTPException):
+            await self.thread.send(embed=self.to_closed_embed())
         await self.thread.edit(archived=True, locked=True)
-        await self.save()
 
     async def claim(self, user: discord.Member):
-        self.agent = user
+        if self.status_channel_id == STATUS_CHANNEL_ID_NEW:
+            await self.edit(agent=user, status_channel_id=STATUS_CHANNEL_ID_OPEN)
+        else:
+            await self.edit(agent=user)
+
         await self.thread.add_user(user)
         await self.thread.send(embed=self.to_claim_embed())
-        await self.save()
 
     async def add(self, user: discord.Member):
         await self.thread.add_user(user)
@@ -196,7 +243,7 @@ class FirstView(discord.ui.View):
         self.add_item(ClaimTicketButton(ticket))
 
 
-class NotifyView(discord.ui.View):
+class StatusView(discord.ui.View):
     def __init__(self, ticket: Ticket):
         super().__init__()
         self.stop()
@@ -244,7 +291,7 @@ class HelpDeskCategory(abc.ABC):
             created_at=discord.utils.snowflake_time(interaction.id),
         )
 
-        await ticket.save()
+        await ticket.edit()
 
         first_view = FirstView(ticket)
         await thread.add_user(interaction.user)
@@ -254,9 +301,7 @@ class HelpDeskCategory(abc.ABC):
 class SetupHelp(HelpDeskCategory):
     id = "setup"
     label = "Setup Help"
-    description = (
-        "Help with setting up the bot, configuring spawn channels, changing the prefix, permissions, etc."
-    )
+    description = "Help with setting up the bot, configuring spawn channels, changing the prefix, permissions, etc."
     emoji = "\N{GEAR}\ufe0f"
 
 
@@ -305,9 +350,7 @@ class Punishments(HelpDeskCategory):
 class Miscellaneous(HelpDeskCategory):
     id = "misc"
     label = "Other Support Inquiries"
-    description = (
-        "For questions that do not fit the above categories, choose this option to talk to a staff member."
-    )
+    description = "For questions that do not fit the above categories, choose this option to talk to a staff member."
     emoji = "\N{BLACK QUESTION MARK ORNAMENT}"
 
 
@@ -317,10 +360,7 @@ class HelpDeskSelect(discord.ui.Select):
         super().__init__(
             placeholder="Select Option",
             custom_id="persistent:help_desk_select",
-            options=[
-                discord.SelectOption(label=cat.label, value=cat.id, emoji=cat.emoji)
-                for cat in self.categories
-            ],
+            options=[discord.SelectOption(label=cat.label, value=cat.id, emoji=cat.emoji) for cat in self.categories],
         )
         self.bot = bot
 
@@ -422,6 +462,23 @@ class HelpDesk(commands.Cog):
             return await ctx.send("Could not find a ticket in this channel!")
 
         await ticket.claim(ctx.author)
+
+    @commands.command()
+    @checks.support_server_only()
+    @checks.is_moderator()
+    async def move(self, ctx, status_channel: discord.TextChannel):
+        ticket = await self.fetch_ticket_by_thread(ctx.channel.id)
+        if ticket is None:
+            return await ctx.send("Could not find a ticket in this channel!")
+
+        if status_channel.category_id != STATUS_CATEGORY_ID or status_channel.id in (
+            STATUS_CHANNEL_ID_NEW,
+            STATUS_CHANNEL_ID_CLOSED,
+        ):
+            return await ctx.send("You cannot move the ticket to this channel!")
+
+        await ticket.edit(status_channel_id=status_channel.id)
+        await ctx.send(f"Successfully moved ticket to {status_channel.mention}.")
 
     def cog_unload(self):
         self.view.stop()
