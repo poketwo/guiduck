@@ -200,7 +200,7 @@ class ClaimTicketButton(discord.ui.Button):
             emoji="\N{WAVING WHITE FLAG}\ufe0f",
             custom_id=f"persistent:ticket:claim:{ticket._id}",
             style=style,
-            disabled=ticket.closed_at is not None or ticket.agent is not None,
+            disabled=ticket.closed_at is not None,
         )
         self.ticket = ticket
 
