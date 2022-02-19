@@ -106,9 +106,11 @@ class Ticket(abc.ABC):
         return embed
 
     def to_status_embed(self):
-        embed = discord.Embed(title=f"Opened {self._id}", color=discord.Color.blurple())
+        embed = discord.Embed(title=self._id, color=discord.Color.blurple())
         embed.set_author(name=str(self.user), icon_url=self.user.display_avatar.url)
         embed.add_field(name="Category", value=self.category.label)
+        if self.status_channel is not None:
+            embed.add_field(name="Status", value=self.status_channel.mention)
         if self.agent is not None:
             embed.color = discord.Color.green()
             embed.add_field(name="Agent", value=self.agent.mention)
@@ -443,33 +445,52 @@ class HelpDesk(commands.Cog):
 
     @commands.command()
     @checks.support_server_only()
-    async def close(self, ctx):
-        ticket = await self.fetch_ticket_by_thread(ctx.channel.id)
+    async def close(self, ctx, *, ticket_thread: discord.Thread = None):
+        """Marks a ticket as closed.
+
+        You must be the ticket author, or have the Moderator role, to use this."""
+
+        ticket_thread = ticket_thread or ctx.channel
+        ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
         if ticket is None:
-            return await ctx.send("Could not find a ticket in this channel!")
+            return await ctx.send("Could not find ticket!")
 
         if ctx.author == ticket.user or any(x.id in constants.MODERATOR_ROLES for x in ctx.author.roles):
             await ticket.close()
+            if ctx.channel != ticket_thread:
+                await ctx.send(f"Successfully closed ticket.")
         else:
             await ctx.send("You do not have permission to do that!")
 
     @commands.command()
     @checks.support_server_only()
     @checks.is_moderator()
-    async def claim(self, ctx):
-        ticket = await self.fetch_ticket_by_thread(ctx.channel.id)
+    async def claim(self, ctx, *, ticket_thread: discord.Thread = None):
+        """Claims a ticket, marking you as the agent.
+
+        You must have the Moderator role to use this."""
+
+        ticket_thread = ticket_thread or ctx.channel
+        ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
         if ticket is None:
-            return await ctx.send("Could not find a ticket in this channel!")
+            return await ctx.send("Could not find ticket!")
 
         await ticket.claim(ctx.author)
+        if ctx.channel != ticket_thread:
+            await ctx.send(f"Successfully claimed ticket.")
 
     @commands.command()
     @checks.support_server_only()
     @checks.is_moderator()
-    async def move(self, ctx, status_channel: discord.TextChannel):
-        ticket = await self.fetch_ticket_by_thread(ctx.channel.id)
+    async def move(self, ctx, ticket_thread: Optional[discord.Thread], status_channel: discord.TextChannel):
+        """Moves a ticket to a given status channel.
+
+        You must have the Moderator role to use this."""
+
+        ticket_thread = ticket_thread or ctx.channel
+        ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
         if ticket is None:
-            return await ctx.send("Could not find a ticket in this channel!")
+            return await ctx.send("Could not find ticket!")
 
         if status_channel.category_id != STATUS_CATEGORY_ID or status_channel.id in (
             STATUS_CHANNEL_ID_NEW,
@@ -479,6 +500,21 @@ class HelpDesk(commands.Cog):
 
         await ticket.edit(status_channel_id=status_channel.id)
         await ctx.send(f"Successfully moved ticket to {status_channel.mention}.")
+
+    @commands.command()
+    @checks.support_server_only()
+    @checks.is_moderator()
+    async def status(self, ctx, *, ticket_thread: Optional[discord.Thread]):
+        """Displays the status for a given ticket.
+
+        You must have the Moderator role to use this."""
+
+        ticket_thread = ticket_thread or ctx.channel
+        ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
+        if ticket is None:
+            return await ctx.send("Could not find ticket!")
+
+        await ctx.send(embed=ticket.to_status_embed())
 
     def cog_unload(self):
         self.view.stop()
