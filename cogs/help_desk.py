@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import contextlib
+import textwrap
 from dataclasses import MISSING, dataclass, field
 from datetime import datetime, timezone
 from functools import cached_property
@@ -237,6 +238,15 @@ class JumpToTicketButton(discord.ui.Button):
         self.ticket = ticket
 
 
+class OpenTicketButton(discord.ui.Button):
+    def __init__(self, category: HelpDeskCategory):
+        super().__init__(label="Open Ticket", style=discord.ButtonStyle.primary)
+        self.category = category
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.category.open_ticket(interaction)
+
+
 class FirstView(discord.ui.View):
     def __init__(self, ticket: Ticket):
         super().__init__()
@@ -254,6 +264,12 @@ class StatusView(discord.ui.View):
         self.add_item(JumpToTicketButton(ticket))
 
 
+class OpenTicketView(discord.ui.View):
+    def __init__(self, category: HelpDeskCategory):
+        super().__init__()
+        self.add_item(OpenTicketButton(category))
+
+
 class HelpDeskCategory(abc.ABC):
     bot: commands.Bot
     id: str
@@ -267,9 +283,14 @@ class HelpDeskCategory(abc.ABC):
     def __init_subclass__(cls):
         ALL_CATEGORIES[cls.id] = cls
 
-    # @abc.abstractmethod
     async def callback(self, interaction: discord.Interaction):
         await self.open_ticket(interaction)
+
+    async def respond(self, interaction: discord.Interaction, response: str):
+        await interaction.response.send_message(textwrap.dedent(response), ephemeral=True)
+
+    async def respond_then_open_ticket(self, interaction: discord.Interaction, response: str):
+        await interaction.response.send_message(textwrap.dedent(response), ephemeral=True, view=OpenTicketView(self))
 
     async def open_ticket(self, interaction: discord.Interaction):
         guild = self.bot.get_guild(constants.SUPPORT_SERVER_ID)
@@ -306,6 +327,24 @@ class SetupHelp(HelpDeskCategory):
     description = "Help with setting up the bot, configuring spawn channels, changing the prefix, permissions, etc."
     emoji = "\N{GEAR}\ufe0f"
 
+    async def callback(self, interaction: discord.Interaction):
+        await self.respond(
+            interaction,
+            """
+            Welcome to Pokétwo! For some common configuration options, use the commands listed below:
+
+            • `p!prefix <new_prefix>` to change prefix.
+            • `p!serversilence` to silence level up messages server-wide.
+            • `p!location <new_location>` to change location of server (used for day/night calculation).
+            • `p!redirect #channel` to redirect to a certain channel
+            • `p!redirect #channel1 #channel2 #channel3` etc to redirect to multiple channels.
+
+            Unfortunately, we're not able to handle setup questions in the support server at this time.
+            Feel free to check out our Documentation site at <https://docs.poketwo.net/> for common information. However, note that this site is currently an early work in progress.
+            If you still have questions, you can ask in our **community server** at discord.gg/poketwo in the #questions-help channel.
+            """,
+        )
+
 
 class GeneralQuestions(HelpDeskCategory):
     id = "gen"
@@ -313,12 +352,34 @@ class GeneralQuestions(HelpDeskCategory):
     description = "Questions about command usage, trading, or how the bot works in general."
     emoji = "\N{INFORMATION SOURCE}\ufe0f"
 
+    async def callback(self, interaction: discord.Interaction):
+        await self.respond(
+            interaction,
+            """
+            Hi! Unfortunately, we're not able to handle general questions in the support server at this time.
+            Feel free to check out our Documentation site at <https://docs.poketwo.net/> for common information. However, note that this site is currently an early work in progress.
+            If you still have questions, you can ask in our **community server** at discord.gg/poketwo in the #questions-help channel.
+            """,
+        )
+
 
 class BugReports(HelpDeskCategory):
     id = "bug"
     label = "Bug Reports"
-    description = "Report issues that looks like bugs or unintended behavior."
+    description = "Report issues that look like bugs or unintended behavior."
     emoji = "\N{BUG}"
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.respond_then_open_ticket(
+            interaction,
+            """
+            Before reporting a bug, please check the #bot-outages and #bot-news channels as well as our GitHub repository at <https://github.com/poketwo/poketwo/issues> to make sure the "bug" is not intended behavior. Note that the bot simply being down does not constitute a bug—bugs are **specific unintended or problematic behaviors**.
+
+            If you have done the above and would still like to report your bug, please press the button below to open a ticket.
+            
+            Note that abusing the ticket feature will result in a ban from the support server.
+            """,
+        )
 
 
 class Reports(HelpDeskCategory):
@@ -327,12 +388,36 @@ class Reports(HelpDeskCategory):
     description = "Report users violating the Pokétwo Terms of Service."
     emoji = "\N{NO ENTRY SIGN}"
 
+    async def callback(self, interaction: discord.Interaction):
+        await self.respond_then_open_ticket(
+            interaction,
+            """
+            This category is for reporting users who you believe have violated the Pokétwo Terms of Service, e.g., through autocatching, crosstrading, or related behaviors. Before making a report, please make sure that the user you are reporting has actually violated a rule. Remember that all reports must have appropriate evidence to back them up.
+
+            If you have checked the above and would still like to file a report, press the button below to open a ticket.
+
+            Note that abusing the ticket feature will result in a ban from the support server.
+            """,
+        )
+
 
 class IncenseRefunds(HelpDeskCategory):
     id = "inc"
     label = "Incense Refunds"
     description = "Bot went down in the middle of an incense? Request a refund here."
     emoji = "\N{CANDLE}\ufe0f"
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.respond_then_open_ticket(
+            interaction,
+            """
+            The bot occasionally restarts its shards to stay healthy. If this happens, incenses will briefly pause for 1-2 minutes before automatically resuming. Please wait a few minutes before opening a ticket here in case the incense comes back.
+
+            If you have done so and still need an incense refund, press the button below to open a ticket.
+
+            Note that abusing the ticket feature will result in a ban from the support server.
+            """,
+        )
 
 
 class StorePurchases(HelpDeskCategory):
@@ -341,12 +426,36 @@ class StorePurchases(HelpDeskCategory):
     description = "Payment methods, unreceived items, refunds, disputes, etc."
     emoji = "\N{MONEY WITH WINGS}"
 
+    async def callback(self, interaction: discord.Interaction):
+        await self.respond_then_open_ticket(
+            interaction,
+            """
+            This category is for inquiries related to **real-money transactions** on our online store. Most purchases will be fulfilled immediately; however, in certain cases, such as bot outages, rewards may take a few hours to show up in your account. If you are inquiring about missing rewards, please wait a few hours before opening a ticket.
+
+            If you have checked the above, press the button below to open a ticket.
+
+            Note that abusing the ticket feature will result in a ban from the support server.
+            """,
+        )
+
 
 class Punishments(HelpDeskCategory):
     id = "pun"
     label = "Bans & Suspensions"
     description = "Ban lengths, ban reasons, how to appeal, etc."
     emoji = "\N{HAMMER}"
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.respond_then_open_ticket(
+            interaction,
+            """
+            We do not accept appeals through this server. If you would like to appeal a punishment, please do so via our appeals site at https://forms.poketwo.net/.
+
+            If you would still like to open a ticket, please press the button below.
+
+            Note that abusing the ticket feature will result in a ban from the support server.
+            """,
+        )
 
 
 class Miscellaneous(HelpDeskCategory):
@@ -355,6 +464,18 @@ class Miscellaneous(HelpDeskCategory):
     description = "For questions that do not fit the above categories, choose this option to talk to a staff member."
     emoji = "\N{BLACK QUESTION MARK ORNAMENT}"
 
+    async def callback(self, interaction: discord.Interaction):
+        await self.respond_then_open_ticket(
+            interaction,
+            """
+            Most general questions can be answered in our **community server** at discord.gg/poketwo in the #questions-help channel. If your inquiry is not a special situation relating to your account, please consider asking there first, before opening a ticket.
+
+            If you have already asked in our community server or would like to open a ticket anyway, please press the button below.
+
+            Note that abusing the ticket feature will result in a ban from the support server.
+            """,
+        )
+
 
 class HelpDeskSelect(discord.ui.Select):
     def __init__(self, bot):
@@ -362,7 +483,15 @@ class HelpDeskSelect(discord.ui.Select):
         super().__init__(
             placeholder="Select Option",
             custom_id="persistent:help_desk_select",
-            options=[discord.SelectOption(label=cat.label, value=cat.id, emoji=cat.emoji) for cat in self.categories],
+            options=[
+                discord.SelectOption(
+                    label=category.label,
+                    value=category.id,
+                    emoji=category.emoji,
+                    description=category.description[:100],
+                )
+                for category in self.categories
+            ],
         )
         self.bot = bot
 
