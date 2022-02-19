@@ -266,7 +266,7 @@ class StatusView(discord.ui.View):
 
 class OpenTicketView(discord.ui.View):
     def __init__(self, category: HelpDeskCategory):
-        super().__init__()
+        super().__init__(timeout=600)
         self.add_item(OpenTicketButton(category))
 
 

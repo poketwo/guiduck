@@ -11,6 +11,7 @@ COGS = [
     "collectors",
     "data",
     "forms",
+    "help_desk",
     "help",
     "logging",
     "moderation",
