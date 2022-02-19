@@ -142,6 +142,9 @@ class Ticket(abc.ABC):
         agent: Optional[discord.Member] = MISSING,
         status_channel_id: Optional[int] = MISSING,
     ):
+        if self.closed_at is not None:
+            return False
+
         status_message = await self.fetch_status_message()
 
         if closed_at is not MISSING:
@@ -153,6 +156,8 @@ class Ticket(abc.ABC):
 
         await self.update_status_message(status_message)
         await self.bot.mongo.db.ticket.update_one({"_id": self._id}, {"$set": self.to_dict()}, upsert=True)
+
+        return True
 
     async def fetch_status_message(self):
         if self.status_channel is None or self.status_message_id is None:
@@ -175,12 +180,20 @@ class Ticket(abc.ABC):
                 await original.edit(embed=self.to_status_embed(), view=StatusView(self))
 
     async def close(self):
+        if self.closed_at is not None:
+            return False
+
         await self.edit(closed_at=datetime.now(timezone.utc), status_channel_id=STATUS_CHANNEL_ID_CLOSED)
         with contextlib.suppress(discord.HTTPException):
             await self.thread.send(embed=self.to_closed_embed())
         await self.thread.edit(archived=True, locked=True)
 
+        return True
+
     async def claim(self, user: discord.Member):
+        if self.closed_at is not None:
+            return False
+
         if self.status_channel_id == STATUS_CHANNEL_ID_NEW:
             await self.edit(agent=user, status_channel_id=STATUS_CHANNEL_ID_OPEN)
         else:
@@ -188,6 +201,8 @@ class Ticket(abc.ABC):
 
         await self.thread.add_user(user)
         await self.thread.send(embed=self.to_claim_embed())
+
+        return True
 
     async def add(self, user: discord.Member):
         await self.thread.add_user(user)
@@ -585,9 +600,12 @@ class HelpDesk(commands.Cog):
             return await ctx.send("Could not find ticket!")
 
         if ctx.author == ticket.user or any(x.id in constants.MODERATOR_ROLES for x in ctx.author.roles):
-            await ticket.close()
+            result = await ticket.close()
             if ctx.channel != ticket_thread:
-                await ctx.send(f"Successfully closed ticket.")
+                if result:
+                    await ctx.send("Successfully closed ticket.")
+                else:
+                    await ctx.send("Could not close ticket.")
         else:
             await ctx.send("You do not have permission to do that!")
 
@@ -604,9 +622,13 @@ class HelpDesk(commands.Cog):
         if ticket is None:
             return await ctx.send("Could not find ticket!")
 
-        await ticket.claim(ctx.author)
+        result = await ticket.claim(ctx.author)
+
         if ctx.channel != ticket_thread:
-            await ctx.send(f"Successfully claimed ticket.")
+            if result:
+                await ctx.send(f"Successfully claimed ticket.")
+            else:
+                await ctx.send("Could not claim ticket.")
 
     @commands.command()
     @checks.support_server_only()
@@ -627,8 +649,10 @@ class HelpDesk(commands.Cog):
         ):
             return await ctx.send("You cannot move the ticket to this channel!")
 
-        await ticket.edit(status_channel_id=status_channel.id)
-        await ctx.send(f"Successfully moved ticket to {status_channel.mention}.")
+        if await ticket.edit(status_channel_id=status_channel.id):
+            await ctx.send(f"Successfully moved ticket to {status_channel.mention}.")
+        else:
+            await ctx.send("Could not move ticket.")
 
     @commands.command()
     @checks.support_server_only()
