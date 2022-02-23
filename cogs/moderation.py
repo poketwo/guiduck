@@ -374,7 +374,7 @@ class Moderation(commands.Cog):
             guild_id=member.guild.id,
         )
         if data.get("muted", False):
-            await Timeout(**kwargs).execute(ctx)
+            await Mute(**kwargs).execute(ctx)
         if data.get("trading_muted", False):
             await TradingMute(**kwargs).execute(ctx)
 
