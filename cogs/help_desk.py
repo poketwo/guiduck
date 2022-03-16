@@ -29,6 +29,8 @@ class Ticket(abc.ABC):
     _id: str
     user: discord.Member
     category: HelpDeskCategory
+    subject: str
+    description: str
     guild_id: int
     channel_id: int
     thread_id: int
@@ -62,6 +64,8 @@ class Ticket(abc.ABC):
             "_id": x["_id"],
             "user": user,
             "category": ALL_CATEGORIES[x["category"]],
+            "subject": x["subject"],
+            "description": x["description"],
             "guild_id": x["guild_id"],
             "channel_id": x["channel_id"],
             "thread_id": x["thread_id"],
@@ -78,6 +82,8 @@ class Ticket(abc.ABC):
         base = {
             "user_id": self.user.id,
             "category": self.category.id,
+            "subject": self.subject,
+            "description": self.description,
             "guild_id": self.guild_id,
             "channel_id": self.channel_id,
             "thread_id": self.thread_id,
@@ -97,13 +103,13 @@ class Ticket(abc.ABC):
         embed = discord.Embed(
             title="Ticket Created",
             description=(
-                "Please explain your query in detail so that our team can assist you promptly and effectively. Our support team has been notified and an agent will assist you soon.\n\n"
-                "We usually respond to support tickets within 24 hours; however, note that responses may be delayed during busy intervals. Thank you for your patience.\n\n"
-                "If you created this ticket on accident or no longer need assistance, please close the ticket by clicking the :lock: **Close Ticket** button below this message."
+                "Our support team has been notified and an agent will assist you soon. We usually respond to support tickets within 24 hours; however, note that responses may be delayed during busy intervals. If you no longer need assistance, please close the ticket by clicking the :lock: **Close Ticket** button below this message."
             ),
             color=discord.Color.blurple(),
         )
+        embed.add_field(name="Subject", value=self.subject)
         embed.add_field(name="Category", value=self.category.label)
+        embed.add_field(name="Description", value=self.description, inline=False)
         return embed
 
     def to_status_embed(self):
@@ -119,6 +125,7 @@ class Ticket(abc.ABC):
             embed.color = None
             embed.set_footer(text="Ticket Closed")
             embed.timestamp = self.closed_at
+        embed.add_field(name="Subject", value=self.subject, inline=False)
         return embed
 
     def to_claim_embed(self):
@@ -262,6 +269,51 @@ class OpenTicketButton(discord.ui.Button):
         await self.category.open_ticket(interaction)
 
 
+class OpenTicketModal(discord.ui.Modal):
+    subject = discord.ui.TextInput(label="Subject", min_length=5, max_length=200)
+    description = discord.ui.TextInput(
+        label="Description", style=discord.TextStyle.paragraph, min_length=100, max_length=2000
+    )
+
+    def __init__(self, category: HelpDeskCategory):
+        super().__init__(title=f"Open Ticket: {category.label}")
+        self.category = category
+        self.bot = category.bot
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = self.bot.get_guild(constants.SUPPORT_SERVER_ID)
+        channel = guild.get_channel(TICKETS_CHANNEL_ID)
+
+        await self.bot.redis.set(f"ticket:{interaction.user.id}", 1, expire=1200)
+
+        _id = f"{self.category.id.upper()} {await self.bot.mongo.reserve_id(f'ticket_{self.category.id}'):03}"
+        thread = await channel.create_thread(
+            name=_id,
+            type=discord.ChannelType.private_thread,
+            invitable=False,
+            reason=f"Created support ticket for {interaction.user}",
+        )
+        ticket = Ticket(
+            bot=self.bot,
+            _id=_id,
+            user=interaction.user,
+            category=self.category,
+            subject=self.subject.value,
+            description=self.description.value,
+            guild_id=guild.id,
+            channel_id=channel.id,
+            thread_id=thread.id,
+            created_at=discord.utils.snowflake_time(interaction.id),
+        )
+
+        await ticket.edit()
+
+        first_view = FirstView(ticket)
+        await thread.add_user(interaction.user)
+        await thread.send(embed=ticket.to_first_embed(), view=first_view)
+        await interaction.response.send_message(f"Opened ticket {thread.mention}.", ephemeral=True)
+
+
 class FirstView(discord.ui.View):
     def __init__(self, ticket: Ticket):
         super().__init__()
@@ -308,39 +360,11 @@ class HelpDeskCategory(abc.ABC):
         await interaction.response.send_message(textwrap.dedent(response), ephemeral=True, view=OpenTicketView(self))
 
     async def open_ticket(self, interaction: discord.Interaction):
-        guild = self.bot.get_guild(constants.SUPPORT_SERVER_ID)
-        channel = guild.get_channel(TICKETS_CHANNEL_ID)
-
-        cd = await self.bot.redis.pttl(key := f"ticket:{interaction.user.id}")
+        cd = await self.bot.redis.pttl(f"ticket:{interaction.user.id}")
         if cd >= 0:
             msg = f"You can open a ticket again in **{time.human_timedelta(timedelta(seconds=cd / 1000))}**."
             return await interaction.response.send_message(msg, ephemeral=True)
-
-        await self.bot.redis.set(key, 1, expire=1200)
-
-        _id = f"{self.id.upper()} {await self.bot.mongo.reserve_id(f'ticket_{self.id}'):03}"
-        thread = await channel.create_thread(
-            name=_id,
-            type=discord.ChannelType.private_thread,
-            invitable=False,
-            reason=f"Created support ticket for {interaction.user}",
-        )
-        ticket = Ticket(
-            bot=self.bot,
-            _id=_id,
-            user=interaction.user,
-            category=self,
-            guild_id=guild.id,
-            channel_id=channel.id,
-            thread_id=thread.id,
-            created_at=discord.utils.snowflake_time(interaction.id),
-        )
-
-        await ticket.edit()
-
-        first_view = FirstView(ticket)
-        await thread.add_user(interaction.user)
-        await thread.send(embed=ticket.to_first_embed(), view=first_view)
+        await interaction.response.send_modal(OpenTicketModal(self))
 
 
 class SetupHelp(HelpDeskCategory):
