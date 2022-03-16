@@ -122,9 +122,7 @@ class Action(abc.ABC):
             reason += f" ([Logs]({self.logs_url}))"
 
         embed = discord.Embed(color=self.color)
-        embed.set_author(
-            name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.display_avatar.url
-        )
+        embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.display_avatar.url)
         embed.set_thumbnail(url=self.target.display_avatar.url)
         embed.add_field(
             name=f"{self.emoji} {self.past_tense.title()} {self.target} (ID: {self.target.id})",
@@ -137,9 +135,7 @@ class Action(abc.ABC):
 
     def to_info_embed(self):
         reason = self.reason or "No reason provided"
-        embed = discord.Embed(
-            color=self.color, title=f"{self.emoji} {self.past_tense.title()} {self.target}"
-        )
+        embed = discord.Embed(color=self.color, title=f"{self.emoji} {self.past_tense.title()} {self.target}")
         embed.set_author(name=f"{self.user}", icon_url=self.user.display_avatar.url)
         embed.set_thumbnail(url=self.target.display_avatar.url)
         embed.add_field(name="Reason", value=reason, inline=False)
@@ -223,7 +219,7 @@ class Timeout(Action):
 
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
-        await self.target.edit(communication_disabled_until=self.expires_at, reason=reason)
+        await self.target.edit(timed_out_until=self.expires_at, reason=reason)
         await super().execute(ctx)
 
 
@@ -237,7 +233,7 @@ class _Untimeout(Action):
 class Untimeout(_Untimeout):
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
-        await self.target.edit(communication_disabled_until=None, reason=reason)
+        await self.target.edit(timed_out_until=None, reason=reason)
         await super().execute(ctx)
 
 
@@ -256,9 +252,7 @@ class Mute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Muted")
         await self.target.add_roles(role, reason=reason)
-        await ctx.bot.mongo.db.member.update_one(
-            {"_id": self.target.id}, {"$set": {"muted": True}}, upsert=True
-        )
+        await ctx.bot.mongo.db.member.update_one({"_id": self.target.id}, {"$set": {"muted": True}}, upsert=True)
         await super().execute(ctx)
 
 
@@ -272,9 +266,7 @@ class Unmute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Muted")
         await self.target.remove_roles(role, reason=reason)
-        await ctx.bot.mongo.db.member.update_one(
-            {"_id": self.target.id}, {"$set": {"muted": False}}, upsert=True
-        )
+        await ctx.bot.mongo.db.member.update_one({"_id": self.target.id}, {"$set": {"muted": False}}, upsert=True)
         await super().execute(ctx)
 
 
@@ -318,10 +310,7 @@ class FakeContext:
     guild: discord.Guild
 
 
-cls_dict = {
-    x.type: x
-    for x in (Kick, Ban, Unban, Warn, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute)
-}
+cls_dict = {x.type: x for x in (Kick, Ban, Unban, Warn, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute)}
 
 
 class BanConverter(commands.Converter):
@@ -361,9 +350,7 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        data = await self.bot.mongo.db.member.find_one(
-            {"_id": member.id, "guild_id": member.guild.id}
-        )
+        data = await self.bot.mongo.db.member.find_one({"_id": member.id, "guild_id": member.guild.id})
         if data is None:
             return
         ctx = FakeContext(self.bot, member.guild)
@@ -398,7 +385,7 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
-        if after.communication_disabled_until == before.communication_disabled_until:
+        if after.timed_out_until == before.timed_out_until:
             return
 
         entry = await fetch_recent_audit_log_entry(
@@ -411,7 +398,7 @@ class Moderation(commands.Cog):
         if entry.user == self.bot.user:
             return
 
-        if after.communication_disabled_until is None:
+        if after.timed_out_until is None:
             action_cls = SymbolicUntimeout
         else:
             action_cls = Timeout
@@ -422,7 +409,7 @@ class Moderation(commands.Cog):
             reason=entry.reason,
             guild_id=after.guild.id,
             created_at=entry.created_at,
-            expires_at=after.communication_disabled_until,
+            expires_at=after.timed_out_until,
         )
         await action.notify()
         await self.save_action(action)
@@ -525,9 +512,7 @@ class Moderation(commands.Cog):
         You must have the Moderator Role to use this.
         """
 
-        await self.run_purge(
-            ctx, search, lambda m: m.author == ctx.me or m.content.startswith(ctx.prefix)
-        )
+        await self.run_purge(ctx, search, lambda m: m.author == ctx.me or m.content.startswith(ctx.prefix))
 
     @commands.group(invoke_without_command=True, aliases=("remove", "clean", "clear"))
     @commands.guild_only()
@@ -565,9 +550,7 @@ class Moderation(commands.Cog):
         search = 100
         if text[-1].isdigit() and len(text) > 1:
             text, search = text[:-1], int(text[-1])
-        await self.run_purge(
-            ctx, search, lambda m: " ".join(text).casefold() in m.content.casefold()
-        )
+        await self.run_purge(ctx, search, lambda m: " ".join(text).casefold() in m.content.casefold())
 
     @commands.command()
     @commands.guild_only()
@@ -618,9 +601,7 @@ class Moderation(commands.Cog):
     @commands.command(usage="<target> [expires_at] [reason]")
     @commands.guild_only()
     @checks.is_moderator()
-    async def ban(
-        self, ctx, target: MemberOrIdConverter, *, reason: Union[ModerationUserFriendlyTime, str]
-    ):
+    async def ban(self, ctx, target: MemberOrIdConverter, *, reason: Union[ModerationUserFriendlyTime, str]):
         """Bans a member from the server.
 
         You must have the Moderator role to use this.
@@ -648,9 +629,7 @@ class Moderation(commands.Cog):
         if action.duration is None:
             await ctx.send(f"Banned **{target}** (Case #{action._id}).")
         else:
-            await ctx.send(
-                f"Banned **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
-            )
+            await ctx.send(f"Banned **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).")
 
     @commands.command()
     @commands.guild_only()
@@ -673,9 +652,7 @@ class Moderation(commands.Cog):
     @commands.command(aliases=("mute",), usage="<target> <expires_at> [reason]")
     @commands.guild_only()
     @checks.is_moderator()
-    async def timeout(
-        self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
-    ):
+    async def timeout(self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]):
         """Places a member in timeout within the server.
 
         If duration is longer than 28 days, falls back to a mute.
@@ -715,9 +692,7 @@ class Moderation(commands.Cog):
         elif action.duration is None:
             await ctx.send(f"Muted **{target}** (Case #{action._id}).")
         else:
-            await ctx.send(
-                f"Muted **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
-            )
+            await ctx.send(f"Muted **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).")
 
     @commands.command(aliases=("unmute",))
     @commands.guild_only()
@@ -752,9 +727,7 @@ class Moderation(commands.Cog):
     @commands.command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
     @checks.community_server_only()
     @checks.is_moderator()
-    async def tradingmute(
-        self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]
-    ):
+    async def tradingmute(self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]):
         """Mutes a member in trading channels.
 
         You must have the Moderator role to use this.
@@ -838,9 +811,7 @@ class Moderation(commands.Cog):
         await new_action.execute(FakeContext(self.bot, guild))
         await new_action.notify()
 
-        await self.bot.mongo.db.action.update_one(
-            {"_id": raw_action["_id"]}, {"$set": {"resolved": True}}
-        )
+        await self.bot.mongo.db.action.update_one({"_id": raw_action["_id"]}, {"$set": {"resolved": True}})
 
     @tasks.loop(seconds=30)
     async def check_actions(self):
@@ -902,9 +873,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        result = await self.bot.mongo.db.action.delete_many(
-            {"_id": {"$in": ids}, "guild_id": ctx.guild.id}
-        )
+        result = await self.bot.mongo.db.action.delete_many({"_id": {"$in": ids}, "guild_id": ctx.guild.id})
         word = "entry" if result.deleted_count == 1 else "entries"
         await ctx.send(f"Successfully deleted {result.deleted_count} {word}.")
 
@@ -923,9 +892,7 @@ class Moderation(commands.Cog):
         if result is None:
             return await ctx.send("Could not find an entry with that ID.")
         if note.lower() == "reset":
-            await self.bot.mongo.db.action.update_one(
-                {"_id": id, "guild_id": ctx.guild.id}, {"$unset": {"note": 1}}
-            )
+            await self.bot.mongo.db.action.update_one({"_id": id, "guild_id": ctx.guild.id}, {"$unset": {"note": 1}})
             return await ctx.send(f"Successfully removed note of entry **{id}**.")
 
         await ctx.send(f"Successfully added a note to entry **{id}**.")
@@ -955,9 +922,7 @@ class Moderation(commands.Cog):
         data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
         channel = ctx.guild.get_channel_or_thread(data["report_channel_id"])
 
-        await channel.send(
-            f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}"
-        )
+        await channel.send(f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}")
         await ctx.send(f"Reported **{user}**.")
 
     def cog_unload(self):
