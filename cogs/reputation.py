@@ -29,9 +29,7 @@ class Reputation(commands.Cog):
     async def get_rep(self, user):
         member = await self.bot.mongo.db.member.find_one({"_id": user.id})
         rep = member.get("reputation", 0)
-        rank = await self.bot.mongo.db.member.count_documents(
-            {"reputation": {"$gt": rep}, "_id": {"$ne": user.id}}
-        )
+        rank = await self.bot.mongo.db.member.count_documents({"reputation": {"$gt": rep}, "_id": {"$ne": user.id}})
         return rep, rank
 
     async def update_rep(self, user, set=None, inc=None):
@@ -117,7 +115,9 @@ class Reputation(commands.Cog):
         count = await self.bot.mongo.db.member.count_documents({"reputation": {"$gt": 0}})
 
         def format_embed(e):
-            e.description += f"\nUse `{ctx.prefix}rep` to view your reputation, and `{ctx.prefix}giverep` to give rep to others."
+            e.description += (
+                f"\nUse `{ctx.prefix}rep` to view your reputation, and `{ctx.prefix}giverep` to give rep to others."
+            )
 
         def format_item(x):
             name = f"{x['name']}#{x['discriminator']}"
@@ -136,5 +136,5 @@ class Reputation(commands.Cog):
         await pages.start(ctx)
 
 
-def setup(bot):
-    bot.add_cog(Reputation(bot))
+async def setup(bot):
+    await bot.add_cog(Reputation(bot))

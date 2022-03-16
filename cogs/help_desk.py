@@ -116,7 +116,7 @@ class Ticket(abc.ABC):
             embed.color = discord.Color.green()
             embed.add_field(name="Agent", value=self.agent.mention)
         if self.closed_at is not None:
-            embed.color = discord.Embed.Empty
+            embed.color = None
             embed.set_footer(text="Ticket Closed")
             embed.timestamp = self.closed_at
         return embed
@@ -676,9 +676,9 @@ class HelpDesk(commands.Cog):
 
         await ctx.send(embed=ticket.to_status_embed())
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.view.stop()
 
 
-def setup(bot):
-    bot.add_cog(HelpDesk(bot))
+async def setup(bot):
+    await bot.add_cog(HelpDesk(bot))

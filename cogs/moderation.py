@@ -925,9 +925,9 @@ class Moderation(commands.Cog):
         await channel.send(f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}")
         await ctx.send(f"Reported **{user}**.")
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.check_actions.cancel()
 
 
-def setup(bot):
-    bot.add_cog(Moderation(bot))
+async def setup(bot):
+    await bot.add_cog(Moderation(bot))

@@ -33,7 +33,9 @@ class Bot(commands.Cog):
                 for perm in error.missing_permissions
             ]
             fmt = "\n".join(missing)
-            message = f"💥 Err, I need the following permissions to run this command:\n{fmt}\nPlease fix this and try again."
+            message = (
+                f"💥 Err, I need the following permissions to run this command:\n{fmt}\nPlease fix this and try again."
+            )
             if ctx.channel.permissions_for(ctx.me).send_messages:
                 await ctx.send(message)
         elif isinstance(error, commands.MissingRequiredArgument):
@@ -106,5 +108,5 @@ class Bot(commands.Cog):
         await ctx.send(embed=embed)
 
 
-def setup(bot):
-    bot.add_cog(Bot(bot))
+async def setup(bot):
+    await bot.add_cog(Bot(bot))

@@ -7,7 +7,7 @@ authors = ["Oliver Ni <oliver.ni@gmail.com>"]
 [tool.poetry.dependencies]
 python = "^3.9"
 motor = "^2.3.0"
-jishaku = "^1.19.2"
+jishaku = {git = "https://github.com/Gorialis/jishaku.git"}
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus.git" }
 dnspython = "^2.0.0"
 discord-ext-events = { git = "https://github.com/oliver-ni/discord-ext-events", rev = "patch-1" }

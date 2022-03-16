@@ -234,5 +234,5 @@ class Automod(commands.Cog):
         await ctx.send(f"Removed {words_msg} from the banned words list.")
 
 
-def setup(bot):
-    bot.add_cog(Automod(bot))
+async def setup(bot):
+    await bot.add_cog(Automod(bot))

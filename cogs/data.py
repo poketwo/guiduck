@@ -11,5 +11,5 @@ class Data(commands.Cog):
         self.instance = DataManager()
 
 
-def setup(bot):
-    bot.add_cog(Data(bot))
+async def setup(bot):
+    await bot.add_cog(Data(bot))

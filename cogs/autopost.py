@@ -87,9 +87,9 @@ class PriceCheck(commands.Cog):
     async def before_autopost(self):
         await self.bot.wait_until_ready()
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.autopost.cancel()
 
 
-def setup(bot):
-    bot.add_cog(PriceCheck(bot))
+async def setup(bot):
+    await bot.add_cog(PriceCheck(bot))

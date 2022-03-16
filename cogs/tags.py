@@ -283,5 +283,5 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully claimed tag.")
 
 
-def setup(bot):
-    bot.add_cog(Tags(bot))
+async def setup(bot):
+    await bot.add_cog(Tags(bot))

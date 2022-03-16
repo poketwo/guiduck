@@ -73,13 +73,9 @@ class Reminders(commands.Cog):
         self._current = None
         self.bot.loop.create_task(self.update_current())
 
-    @commands.group(
-        invoke_without_command=True, aliases=("remindme", "reminder"), usage="<when> [event]"
-    )
+    @commands.group(invoke_without_command=True, aliases=("remindme", "reminder"), usage="<when> [event]")
     @commands.guild_only()
-    async def remind(
-        self, ctx, *, when: time.UserFriendlyTime(commands.clean_content, default="\u2026")
-    ):
+    async def remind(self, ctx, *, when: time.UserFriendlyTime(commands.clean_content, default="\u2026")):
         """Sets a reminder for a date or duration of time, e.g.:
 
         • in two hours catch some pokemon
@@ -105,9 +101,7 @@ class Reminders(commands.Cog):
         reminder._id = id
         self.bot.loop.create_task(self.update_current(reminder))
 
-        await ctx.send(
-            f"Alright, I'll remind you in **{time.human_timedelta(reminder.duration)}**: {when.arg}"
-        )
+        await ctx.send(f"Alright, I'll remind you in **{time.human_timedelta(reminder.duration)}**: {when.arg}")
 
     @remind.command()
     @commands.guild_only()
@@ -160,9 +154,7 @@ class Reminders(commands.Cog):
     async def get_next_reminder(self):
         return Reminder.build_from_mongo(
             self.bot,
-            await self.bot.mongo.db.reminder.find_one(
-                {"resolved": False}, sort=(("expires_at", 1),)
-            ),
+            await self.bot.mongo.db.reminder.find_one({"resolved": False}, sort=(("expires_at", 1),)),
         )
 
     def clear_current(self):
@@ -191,14 +183,10 @@ class Reminders(commands.Cog):
         except asyncio.CancelledError:
             return
 
-        await self.bot.mongo.db.reminder.update_one(
-            {"_id": reminder._id}, {"$set": {"resolved": True}}
-        )
+        await self.bot.mongo.db.reminder.update_one({"_id": reminder._id}, {"$set": {"resolved": True}})
         guild = self.bot.get_guild(reminder.guild_id)
         channel = guild.get_channel_or_thread(reminder.channel_id)
-        text = (
-            f"Reminder from {discord.utils.format_dt(reminder.created_at, 'R')}: {reminder.event}"
-        )
+        text = f"Reminder from {discord.utils.format_dt(reminder.created_at, 'R')}: {reminder.event}"
 
         if channel is not None:
             try:
@@ -215,5 +203,5 @@ class Reminders(commands.Cog):
         self.bot.loop.create_task(self.update_current())
 
 
-def setup(bot):
-    bot.add_cog(Reminders(bot))
+async def setup(bot):
+    await bot.add_cog(Reminders(bot))

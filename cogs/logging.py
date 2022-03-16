@@ -49,12 +49,8 @@ class Logging(commands.Cog):
 
     async def full_sync_guild(self, guild):
         await self.bot.mongo.db.guild.bulk_write([self.make_sync_guild(guild)])
-        await self.bot.mongo.db.channel.bulk_write(
-            [self.make_sync_channel(channel) for channel in guild.channels]
-        )
-        await self.bot.mongo.db.member.bulk_write(
-            [self.make_sync_member(member) for member in guild.members]
-        )
+        await self.bot.mongo.db.channel.bulk_write([self.make_sync_channel(channel) for channel in guild.channels])
+        await self.bot.mongo.db.member.bulk_write([self.make_sync_member(member) for member in guild.members])
 
     def make_sync_guild(self, guild):
         return UpdateOne(
@@ -146,8 +142,7 @@ class Logging(commands.Cog):
                 "guild_id": message.guild.id,
                 "history": {str(time): message.content},
                 "attachments": [
-                    {"id": attachment.id, "filename": attachment.filename}
-                    for attachment in message.attachments
+                    {"id": attachment.id, "filename": attachment.filename} for attachment in message.attachments
                 ],
                 "deleted_at": None,
             }
@@ -204,9 +199,7 @@ class Logging(commands.Cog):
         """
 
         channel = channel or ctx.channel
-        await self.bot.mongo.db.channel.update_one(
-            {"_id": channel.id}, {"$set": {"restricted": True}}
-        )
+        await self.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"restricted": True}})
         await ctx.send(f"Restricted logs for **#{channel}** to Admins.")
 
     @commands.command()
@@ -215,9 +208,9 @@ class Logging(commands.Cog):
         await self.full_sync_guild(ctx.guild)
         await ctx.send("Completed full guild resync.")
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.sync_all.cancel()
 
 
-def setup(bot):
-    bot.add_cog(Logging(bot))
+async def setup(bot):
+    await bot.add_cog(Logging(bot))
