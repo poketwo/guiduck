@@ -70,7 +70,6 @@ class Reputation(commands.Cog):
             await self.process_giverep(ctx, message.mentions[0])
 
     @commands.command()
-    @checks.community_server_only()
     async def rep(self, ctx, *, user: discord.Member = None):
         """Shows the reputation of a given user."""
 
@@ -86,7 +85,6 @@ class Reputation(commands.Cog):
 
     @commands.command(aliases=("gr", "+"), cooldown_after_parsing=True)
     @commands.cooldown(1, 120, commands.BucketType.user)
-    @checks.community_server_only()
     async def giverep(self, ctx, *, user: discord.Member):
         """Gives a reputation point to a user.
 
@@ -97,7 +95,6 @@ class Reputation(commands.Cog):
 
     @commands.command()
     @checks.is_community_manager()
-    @checks.community_server_only()
     async def setrep(self, ctx, user: discord.Member, value: int):
         """Sets a user's reputation to a given value.
 
@@ -107,7 +104,6 @@ class Reputation(commands.Cog):
         await ctx.send(f"Set **{user}**'s rep to **{value}**")
 
     @commands.command()
-    @checks.community_server_only()
     async def toprep(self, ctx):
         """Displays the server reputation leaderboard."""
 

@@ -3,6 +3,10 @@ from discord.ext import commands
 from . import constants
 
 
+class NotInGuild(commands.CheckFailure):
+    pass
+
+
 def is_community_manager():
     return commands.has_any_role(*constants.COMMUNITY_MANAGER_ROLES)
 
@@ -13,7 +17,9 @@ def is_moderator():
 
 def in_guilds(*guild_ids):
     def predicate(ctx):
-        return ctx.guild is not None and ctx.guild.id in guild_ids
+        if ctx.guild is None or ctx.guild.id not in guild_ids:
+            raise NotInGuild("This command is not available in this guild.")
+        return True
 
     return commands.check(predicate)
 
