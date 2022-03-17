@@ -34,10 +34,7 @@ class AsyncEmbedCodeBlockTablePageSource(menus.AsyncIteratorPageSource):
             for i, x in enumerate(entries, start=menu.current_page * self.per_page)
         ]
         col_lens = [max(len(x) for x in col) for col in zip(*table)]
-        lines = [
-            "  ".join(self.justify(x, col_lens[i]) for i, x in enumerate(line)).rstrip()
-            for line in table
-        ]
+        lines = ["  ".join(self.justify(x, col_lens[i]) for i, x in enumerate(line)).rstrip() for line in table]
         embed = discord.Embed(
             title=self.title,
             color=discord.Color.blurple(),
@@ -73,7 +70,7 @@ class EmbedListPageSource(menus.ListPageSource):
 class AsyncEmbedListPageSource(menus.AsyncIteratorPageSource):
     def __init__(self, data, title=None, count=None, show_index=False, format_item=str):
         super().__init__(data, per_page=20)
-        self.title = title or discord.Embed.Empty
+        self.title = title or None
         self.show_index = show_index
         self.format_item = format_item
         self.count = count

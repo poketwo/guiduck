@@ -12,9 +12,7 @@ class Redis(commands.Cog):
         self._connect_task = self.bot.loop.create_task(self.connect())
 
     async def connect(self):
-        self.pool = await aioredis.create_redis_pool(
-            self.bot.config.REDIS_URI, password=self.bot.config.REDIS_PASSWORD
-        )
+        self.pool = await aioredis.create_redis_pool(self.bot.config.REDIS_URI, password=self.bot.config.REDIS_PASSWORD)
 
     async def close(self):
         self.pool.close()
@@ -23,9 +21,9 @@ class Redis(commands.Cog):
     async def wait_until_ready(self):
         await self._connect_task
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.bot.loop.create_task(self.close())
 
 
-def setup(bot):
-    bot.add_cog(Redis(bot))
+async def setup(bot):
+    await bot.add_cog(Redis(bot))

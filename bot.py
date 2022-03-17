@@ -37,9 +37,10 @@ class Bot(commands.Bot, events.EventsMixin):
 
         self.config = config
 
-        self.load_extension("jishaku")
+    async def setup_hook(self):
+        await self.load_extension("jishaku")
         for i in COGS:
-            self.load_extension(f"cogs.{i}")
+            await self.load_extension(f"cogs.{i}")
 
     @property
     def mongo(self):

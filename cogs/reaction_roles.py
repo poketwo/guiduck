@@ -69,9 +69,7 @@ class ReactionRoles(commands.Cog):
         You must have the Community Manager role to use this.
         """
 
-        result = await self.bot.mongo.db.rolemenu.delete_one(
-            {"name": name, "guild_id": ctx.guild.id}
-        )
+        result = await self.bot.mongo.db.rolemenu.delete_one({"name": name, "guild_id": ctx.guild.id})
         if result.deleted_count > 0:
             await ctx.send(f"Deleted role menu **{name}**.")
         else:
@@ -129,12 +127,8 @@ class ReactionRoles(commands.Cog):
             return await ctx.send("Please enter a valid emoji.")
 
         key = str(emoji.id) if isinstance(emoji, discord.Emoji) else emoji
-        await self.bot.mongo.db.rolemenu.update_one(
-            {"_id": menu["_id"]}, {"$set": {f"options.{key}": role.id}}
-        )
-        await ctx.send(
-            f"Added {emoji} linking to role **{role}** to role menu in {message.channel.mention}."
-        )
+        await self.bot.mongo.db.rolemenu.update_one({"_id": menu["_id"]}, {"$set": {f"options.{key}": role.id}})
+        await ctx.send(f"Added {emoji} linking to role **{role}** to role menu in {message.channel.mention}.")
 
     @rolemenu.command(name="remove")
     @checks.is_community_manager()
@@ -163,12 +157,8 @@ class ReactionRoles(commands.Cog):
 
         key = str(emoji.id) if isinstance(emoji, discord.Emoji) else emoji
         role = ctx.guild.get_role(menu["options"][key])
-        await self.bot.mongo.db.rolemenu.update_one(
-            {"_id": menu["_id"]}, {"$unset": {f"options.{key}": 1}}
-        )
-        await ctx.send(
-            f"Removed {emoji} linking to role **{role}** to role menu in {message.channel.mention}."
-        )
+        await self.bot.mongo.db.rolemenu.update_one({"_id": menu["_id"]}, {"$unset": {f"options.{key}": 1}})
+        await ctx.send(f"Removed {emoji} linking to role **{role}** to role menu in {message.channel.mention}.")
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
@@ -205,5 +195,5 @@ class ReactionRoles(commands.Cog):
             await member.send(f"Took away the **{role}** role!")
 
 
-def setup(bot):
-    bot.add_cog(ReactionRoles(bot))
+async def setup(bot):
+    await bot.add_cog(ReactionRoles(bot))

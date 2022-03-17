@@ -4,13 +4,13 @@ import abc
 import contextlib
 import textwrap
 from dataclasses import MISSING, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from typing import Optional, Type
 
 import discord
 from discord.ext import commands
-from helpers import checks, constants
+from helpers import checks, constants, time
 from helpers.utils import FakeUser
 
 ALL_CATEGORIES: dict[str, Type[HelpDeskCategory]] = {}
@@ -116,7 +116,7 @@ class Ticket(abc.ABC):
             embed.color = discord.Color.green()
             embed.add_field(name="Agent", value=self.agent.mention)
         if self.closed_at is not None:
-            embed.color = discord.Embed.Empty
+            embed.color = None
             embed.set_footer(text="Ticket Closed")
             embed.timestamp = self.closed_at
         return embed
@@ -310,6 +310,13 @@ class HelpDeskCategory(abc.ABC):
     async def open_ticket(self, interaction: discord.Interaction):
         guild = self.bot.get_guild(constants.SUPPORT_SERVER_ID)
         channel = guild.get_channel(TICKETS_CHANNEL_ID)
+
+        cd = await self.bot.redis.pttl(key := f"ticket:{interaction.user.id}")
+        if cd >= 0:
+            msg = f"You can open a ticket again in **{time.human_timedelta(timedelta(seconds=cd / 1000))}**."
+            return await interaction.response.send_message(msg, ephemeral=True)
+
+        await self.bot.redis.set(key, 1, expire=1200)
 
         _id = f"{self.id.upper()} {await self.bot.mongo.reserve_id(f'ticket_{self.id}'):03}"
         thread = await channel.create_thread(
@@ -669,9 +676,9 @@ class HelpDesk(commands.Cog):
 
         await ctx.send(embed=ticket.to_status_embed())
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.view.stop()
 
 
-def setup(bot):
-    bot.add_cog(HelpDesk(bot))
+async def setup(bot):
+    await bot.add_cog(HelpDesk(bot))

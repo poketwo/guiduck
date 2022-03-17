@@ -4,9 +4,7 @@ import re
 from discord.ext import commands
 
 LAST_RESORT = "User"
-URL_REGEX = re.compile(
-    r"(([a-z]{3,6}://)|(^|\s))([a-zA-Z0-9\-]+\.)+[a-z]{2,13}[\.\?\=\&\%\/\w\-]*\b([^@]|$)"
-)
+URL_REGEX = re.compile(r"(([a-z]{3,6}://)|(^|\s))([a-zA-Z0-9\-]+\.)+[a-z]{2,13}[\.\?\=\&\%\/\w\-]*\b([^@]|$)")
 
 
 class Names(commands.Cog):
@@ -52,5 +50,5 @@ class Names(commands.Cog):
         await self.normalize_member(member)
 
 
-def setup(bot):
-    bot.add_cog(Names(bot))
+async def setup(bot):
+    await bot.add_cog(Names(bot))

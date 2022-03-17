@@ -133,5 +133,5 @@ class Collectors(commands.Cog):
         await ctx.invoke(self.search, species=species)
 
 
-def setup(bot):
-    bot.add_cog(Collectors(bot))
+async def setup(bot):
+    await bot.add_cog(Collectors(bot))

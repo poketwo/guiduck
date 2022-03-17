@@ -18,7 +18,7 @@ class SubmissionStatus(Enum):
 CHANNEL_ID = 888320631890931732
 
 COLORS = {
-    SubmissionStatus.UNDER_REVIEW.value: discord.Embed.Empty,
+    SubmissionStatus.UNDER_REVIEW.value: None,
     SubmissionStatus.REJECTED.value: discord.Color.red(),
     SubmissionStatus.ACCEPTED.value: discord.Color.green(),
     SubmissionStatus.MARKED.value: discord.Color.blurple(),
@@ -39,7 +39,7 @@ class Forms(commands.Cog):
         self.bot = bot
         self._task = bot.loop.create_task(self.watch_submissions())
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self._task.cancel()
 
     async def send_submission(self, channel, submission):
@@ -86,5 +86,5 @@ class Forms(commands.Cog):
                 traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
 
 
-def setup(bot):
-    bot.add_cog(Forms(bot))
+async def setup(bot):
+    await bot.add_cog(Forms(bot))

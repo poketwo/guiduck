@@ -7,21 +7,17 @@ from helpers import pagination
 
 class CustomHelpCommand(commands.HelpCommand):
     def __init__(self):
-        super().__init__(
-            command_attrs={"help": "Show help about the bot, a command, or a category."}
-        )
+        super().__init__(command_attrs={"help": "Show help about the bot, a command, or a category."})
 
     async def on_help_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError):
             await ctx.send(str(error.original))
 
-    def make_page_embed(self, commands, title="Help", description=discord.Embed.Empty):
+    def make_page_embed(self, commands, title="Help", description=None):
         embed = discord.Embed(color=discord.Color.blurple())
         embed.title = title
         embed.description = description
-        embed.set_footer(
-            text=f'Use "{self.context.clean_prefix}help command" for more info on a command.'
-        )
+        embed.set_footer(text=f'Use "{self.context.clean_prefix}help command" for more info on a command.')
 
         for command in commands:
             signature = self.context.clean_prefix + command.qualified_name + " " + command.signature
@@ -35,7 +31,7 @@ class CustomHelpCommand(commands.HelpCommand):
 
         return embed
 
-    def make_default_embed(self, cogs, title="Command Categories", description=discord.Embed.Empty):
+    def make_default_embed(self, cogs, title="Command Categories", description=None):
         embed = discord.Embed(color=discord.Color.blurple())
         embed.title = title
         embed.description = description
@@ -70,11 +66,7 @@ class CustomHelpCommand(commands.HelpCommand):
 
             total += len(commands)
             cog = bot.get_cog(cog_name)
-            description = (
-                (cog and cog.description)
-                if (cog and cog.description) is not None
-                else discord.Embed.Empty
-            )
+            description = (cog and cog.description) if (cog and cog.description) is not None else None
             pages.append((cog, description, commands))
 
         async def get_page(pidx):
@@ -104,7 +96,7 @@ class CustomHelpCommand(commands.HelpCommand):
         embed = self.make_page_embed(
             filtered,
             title=(cog and cog.qualified_name or "Other") + " Commands",
-            description=discord.Embed.Empty if cog is None else cog.description,
+            description=None if cog is None else cog.description,
         )
 
         await ctx.send(embed=embed)
@@ -140,7 +132,7 @@ class CustomHelpCommand(commands.HelpCommand):
         await self.context.send(embed=embed)
 
 
-def setup(bot):
+async def setup(bot):
     bot.old_help_command = bot.help_command
     bot.help_command = CustomHelpCommand()
 
