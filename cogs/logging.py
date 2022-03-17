@@ -81,10 +81,9 @@ class Logging(commands.Cog):
 
     def make_sync_member(self, member):
         return UpdateOne(
-            {"_id": member.id},
+            {"_id": member.id, "guild_id": member.guild.id},
             {
                 "$set": {
-                    "guild_id": member.guild.id,
                     "name": member.name,
                     "discriminator": member.discriminator,
                     "nick": member.nick,
