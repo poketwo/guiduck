@@ -321,6 +321,7 @@ class HelpDeskCategory(abc.ABC):
         _id = f"{self.id.upper()} {await self.bot.mongo.reserve_id(f'ticket_{self.id}'):03}"
         thread = await channel.create_thread(
             name=_id,
+            auto_archive_duration=10080,
             type=discord.ChannelType.private_thread,
             invitable=False,
             reason=f"Created support ticket for {interaction.user}",
