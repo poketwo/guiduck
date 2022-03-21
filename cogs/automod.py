@@ -8,7 +8,7 @@ from typing import Dict, Optional, Tuple
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
-from helpers import checks
+from helpers import checks, constants
 from helpers.pagination import EmbedListPageSource
 
 INVITE_REGEX = r"(?:https?://)?discord(?:app)?\.(?:com/invite|gg)/([a-zA-Z0-9]+)/?"
@@ -140,6 +140,7 @@ class Automod(commands.Cog):
 
         if (
             message.guild is None
+            or message.guild.id == constants.SUPPORT_SERVER_ID
             or not isinstance(message.author, discord.Member)
             or message.author.bot
             or message.channel.permissions_for(message.author).manage_messages
