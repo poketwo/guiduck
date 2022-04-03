@@ -104,6 +104,7 @@ class Ticket(abc.ABC):
             color=discord.Color.blurple(),
         )
         embed.add_field(name="Category", value=self.category.label)
+        embed.set_footer(text=self._id)
         return embed
 
     def to_status_embed(self):
