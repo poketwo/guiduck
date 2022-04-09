@@ -94,7 +94,7 @@ class Tags(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none(),
             reference=ctx.message.reference,
         )
-        if ctx.guild:
+        if ctx.guild is not None:
             await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
 
     @tag.command()
