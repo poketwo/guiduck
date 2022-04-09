@@ -94,7 +94,8 @@ class Tags(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none(),
             reference=ctx.message.reference,
         )
-        await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
+        if ctx.guild:
+            await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
 
     @tag.command()
     async def info(self, ctx, *, name):
