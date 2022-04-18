@@ -31,8 +31,8 @@ POSTS = [
     AutoPost(
         [741712512113967214],
         """
-        **Reminder:** Please put a price on your <#741712512113967214> listing.
-        The price must be a single price that you will sell to other users at. "C/O" is not a thing—use auctions for that.
+        **Reminder:** No auction advertisements in your <#741712512113967214> listing.
+        Faking "C/O"s will result in severe punishment. Buyers are advised to use <#722244899767844866> to evaluate the Pokemon.
         Check pins for full rules. Advertisements in violation will be removed.
         """,
         each=6,
