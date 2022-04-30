@@ -127,7 +127,8 @@ class Ticket(abc.ABC):
             embed.color = None
             embed.set_footer(text="Ticket Closed")
             embed.timestamp = self.closed_at
-        embed.add_field(name="Subject", value=self.subject, inline=False)
+        if self.subject is not None:
+            embed.add_field(name="Subject", value=self.subject, inline=False)
         return embed
 
     def to_claim_embed(self):
