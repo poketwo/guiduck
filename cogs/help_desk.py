@@ -29,13 +29,13 @@ class Ticket(abc.ABC):
     _id: str
     user: discord.Member
     category: HelpDeskCategory
-    subject: str
-    description: str
     guild_id: int
     channel_id: int
     thread_id: int
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     closed_at: Optional[datetime] = None
+    subject: Optional[str] = None
+    description: Optional[str] = None
     agent: Optional[discord.Member] = None
 
     status_channel_id: Optional[int] = STATUS_CHANNEL_ID_NEW
@@ -64,13 +64,13 @@ class Ticket(abc.ABC):
             "_id": x["_id"],
             "user": user,
             "category": ALL_CATEGORIES[x["category"]],
-            "subject": x["subject"],
-            "description": x["description"],
             "guild_id": x["guild_id"],
             "channel_id": x["channel_id"],
             "thread_id": x["thread_id"],
             "created_at": x["created_at"],
             "closed_at": x.get("closed_at"),
+            "subject": x.get("subject"),
+            "description": x.get("description"),
             "status_channel_id": x.get("status_channel_id"),
             "status_message_id": x.get("status_message_id"),
         }
@@ -82,8 +82,6 @@ class Ticket(abc.ABC):
         base = {
             "user_id": self.user.id,
             "category": self.category.id,
-            "subject": self.subject,
-            "description": self.description,
             "guild_id": self.guild_id,
             "channel_id": self.channel_id,
             "thread_id": self.thread_id,
@@ -91,6 +89,10 @@ class Ticket(abc.ABC):
         }
         if self.closed_at is not None:
             base["closed_at"] = self.closed_at
+        if self.subject is not None:
+            base["subject"] = self.subject
+        if self.description is not None:
+            base["description"] = self.description
         if self.agent is not None:
             base["agent_id"] = self.agent.id
         if self.status_channel_id is not None:
