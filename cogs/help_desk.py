@@ -274,7 +274,7 @@ class OpenTicketButton(discord.ui.Button):
 class OpenTicketModal(discord.ui.Modal):
     subject = discord.ui.TextInput(label="Subject", min_length=5, max_length=200)
     description = discord.ui.TextInput(
-        label="Description", style=discord.TextStyle.paragraph, min_length=100, max_length=2000
+        label="Description", style=discord.TextStyle.paragraph, min_length=100, max_length=1024
     )
 
     def __init__(self, category: HelpDeskCategory):
