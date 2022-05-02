@@ -388,6 +388,9 @@ class Moderation(commands.Cog):
         if after.timed_out_until == before.timed_out_until:
             return
 
+        if after.timed_out_until is not None and after.timed_out_until < datetime.now():
+            return
+
         entry = await fetch_recent_audit_log_entry(
             self.bot,
             after.guild,
