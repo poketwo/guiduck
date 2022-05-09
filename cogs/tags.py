@@ -199,7 +199,7 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully edited tag.")
 
     @tag.command(aliases=("fe",))
-    @checks.is_community_manager()
+    @checks.is_moderator()
     async def forceedit(self, ctx, name, *, content):
         """Edits a tag by force.
 
@@ -229,7 +229,7 @@ class Tags(commands.Cog):
         await ctx.send(f"Tag and corresponding aliases successfully deleted.")
 
     @tag.command(aliases=("fd",))
-    @checks.is_community_manager()
+    @checks.is_moderator()
     async def forcedelete(self, ctx, *, name):
         """Removes a tag by force.
 
@@ -257,7 +257,7 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully transferred tag.")
 
     @tag.command()
-    @checks.is_community_manager()
+    @checks.is_moderator()
     async def forcetransfer(self, ctx, member: discord.Member, *, name):
         """Transfers a tag to another user by force.
 
