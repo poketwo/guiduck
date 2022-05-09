@@ -17,6 +17,7 @@ COGS = [
     "moderation",
     "mongo",
     "names",
+    "poketwo_administration",
     "reaction_roles",
     "redis",
     "reminders",

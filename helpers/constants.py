@@ -10,3 +10,31 @@ MODERATOR_ROLES = (
 
 COMMUNITY_SERVER_ID = 716390832034414685
 SUPPORT_SERVER_ID = 930339868503048202
+
+POKEMON_NATURES = [
+    "Adamant",
+    "Bashful",
+    "Bold",
+    "Brave",
+    "Calm",
+    "Careful",
+    "Docile",
+    "Gentle",
+    "Hardy",
+    "Hasty",
+    "Impish",
+    "Jolly",
+    "Lax",
+    "Lonely",
+    "Mild",
+    "Modest",
+    "Naive",
+    "Naughty",
+    "Quiet",
+    "Quirky",
+    "Rash",
+    "Relaxed",
+    "Sassy",
+    "Serious",
+    "Timid",
+]
