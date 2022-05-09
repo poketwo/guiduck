@@ -17,6 +17,11 @@ if os.getenv("API_BASE") is not None:
 
 PREFIX = os.environ["PREFIX"].split()
 DATABASE_NAME = os.environ["DATABASE_NAME"]
+POKETWO_DATABASE_NAME = os.environ["POKETWO_DATABASE_NAME"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+
 REDIS_URI = os.environ["REDIS_URI"]
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
+
+POKETWO_REDIS_URI = os.environ["REDIS_URI"]
+POKETWO_REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")

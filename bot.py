@@ -51,6 +51,10 @@ class Bot(commands.Bot, events.EventsMixin):
         return self.get_cog("Redis").pool
 
     @property
+    def poketwo_redis(self):
+        return self.get_cog("Redis").poketwo_pool
+
+    @property
     def log(self):
         return self.get_cog("Logging").log
 
