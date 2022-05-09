@@ -19,7 +19,7 @@ parsedatetime = "^2.6"
 "discord.py" = { git = "https://github.com/Rapptz/discord.py.git", rev = "b2929513cc63626f03b1c993b5a9b0109d60240b" }
 
 [tool.poetry.dev-dependencies]
-black = { version = "^21.12b0", allow-prereleases = true }
+black = "^22.3.0"
 
 [tool.black]
 line-length = 110
