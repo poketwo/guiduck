@@ -2,7 +2,6 @@ import collections
 import random
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pprint import pformat, pprint
 from typing import Any, Dict, List, Literal, Optional
 
 import discord
@@ -214,6 +213,8 @@ class PoketwoAdministration(commands.Cog):
     @checks.support_server_only()
     @checks.is_moderator()
     async def refund(self, ctx):
+        """Manages refunds of items and currencies to users."""
+
         await ctx.send_help(ctx.command)
 
     @refund.command(aliases=("incense", "inc"))
@@ -279,11 +280,17 @@ class PoketwoAdministration(commands.Cog):
         await self.save_refund(refund)
         await ctx.send(embed=refund.to_embed(self.bot))
 
-    @refund.command(aliases=("box",))
+    @refund.command(aliases=("box",), usage="<member> <type> <number> [notes=None]")
     @checks.support_server_only()
     @checks.is_moderator()
     async def boxes(
-        self, ctx, member: discord.Member, box_type: Literal["normal", "great", "ultra"], number: int, *, notes=None
+        self,
+        ctx,
+        member: discord.Member,
+        box_type: Literal["normal", "great", "ultra", "master"],
+        number: int,
+        *,
+        notes=None,
     ):
         """Refunds a given number of a given type of box to a user.
 
