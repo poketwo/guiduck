@@ -125,7 +125,7 @@ class Ticket(abc.ABC):
             embed.add_field(name="Agent", value=self.agent.mention)
         if self.closed_at is not None:
             embed.color = None
-            embed.set_footer(text="Ticket Closed")
+            embed.set_footer(text=f"Ticket Closed | {self.user.id} ")
             embed.timestamp = self.closed_at
         if self.subject is not None:
             embed.add_field(name="Subject", value=self.subject, inline=False)
