@@ -123,13 +123,16 @@ class Ticket(abc.ABC):
         if self.agent is not None:
             embed.color = discord.Color.green()
             embed.add_field(name="Agent", value=self.agent.mention)
-        if self.closed_at is not None:
-            embed.color = None
-            embed.set_footer(text="Ticket Closed")
-            embed.timestamp = self.closed_at
         if self.subject is not None:
             embed.add_field(name="Subject", value=self.subject, inline=False)
-        embed.set_footer(f"User ID • {self.user.id}")
+
+        footer = [f"User ID • {self.user.id}"]
+        if self.closed_at is not None:
+            embed.color = None
+            footer.append("Ticket Closed")
+            embed.timestamp = self.closed_at
+        embed.set_footer(text="\n".join(footer))
+
         return embed
 
     def to_claim_embed(self):
