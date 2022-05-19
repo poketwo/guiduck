@@ -129,6 +129,7 @@ class Ticket(abc.ABC):
             embed.timestamp = self.closed_at
         if self.subject is not None:
             embed.add_field(name="Subject", value=self.subject, inline=False)
+        embed.set_footer(f"User ID • {self.user.id}")
         return embed
 
     def to_claim_embed(self):
