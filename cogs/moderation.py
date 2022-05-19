@@ -508,25 +508,25 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def cleanup(self, ctx, search=100):
         """Cleans up the bot's messages from the channel.
 
-        You must have the Moderator Role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         await self.run_purge(ctx, search, lambda m: m.author == ctx.me or m.content.startswith(ctx.prefix))
 
     @commands.group(invoke_without_command=True, aliases=("remove", "clean", "clear"))
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def purge(self, ctx, search: Union[discord.Member, int]):
         """Mass deletes messages that meet a certain criteria.
 
         If no subcommand is called, purges either all messages from a user or
         all messages, depending on the argument provided.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         if isinstance(search, discord.Member):
@@ -535,19 +535,19 @@ class Moderation(commands.Cog):
             await ctx.invoke(self.all, search=search)
 
     @purge.command()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def all(self, ctx, search: int = 100):
         """Purges all messages."""
         await self.run_purge(ctx, search, lambda m: True)
 
     @purge.command()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def user(self, ctx, user: discord.Member, search: int = 100):
         """Purges messages from a user."""
         await self.run_purge(ctx, search, lambda m: m.author == user)
 
     @purge.command()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def contains(self, ctx, *text):
         """Purges messages that contain a substring."""
         search = 100
@@ -557,11 +557,11 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def warn(self, ctx, target: discord.Member, *, reason):
         """Warns a member in the server.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
@@ -580,11 +580,11 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def kick(self, ctx, target: discord.Member, *, reason):
         """Kicks a member from the server.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
@@ -603,11 +603,11 @@ class Moderation(commands.Cog):
 
     @commands.command(usage="<target> [expires_at] [reason]")
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def ban(self, ctx, target: MemberOrIdConverter, *, reason: Union[ModerationUserFriendlyTime, str]):
         """Bans a member from the server.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
@@ -636,11 +636,11 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def unban(self, ctx, target: BanConverter, *, reason=None):
         """Unbans a member from the server.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         action = Unban(
@@ -654,13 +654,13 @@ class Moderation(commands.Cog):
 
     @commands.command(aliases=("mute",), usage="<target> <expires_at> [reason]")
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def timeout(self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]):
         """Places a member in timeout within the server.
 
         If duration is longer than 28 days, falls back to a mute.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
@@ -699,13 +699,13 @@ class Moderation(commands.Cog):
 
     @commands.command(aliases=("unmute",))
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def untimeout(self, ctx, target: discord.Member, *, reason=None):
         """Removes a member from timeout within the server.
 
         If the member is muted, unmutes instead.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         if any(x.name == "Muted" for x in target.roles):
@@ -729,11 +729,11 @@ class Moderation(commands.Cog):
 
     @commands.command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
     @checks.community_server_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def tradingmute(self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]):
         """Mutes a member in trading channels.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         if any(role.id in constants.MODERATOR_ROLES for role in getattr(target, "roles", [])):
@@ -764,11 +764,11 @@ class Moderation(commands.Cog):
 
     @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
     @checks.community_server_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
         """Unmutes a member in trading channels.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         action = TradingUnmute(
@@ -826,11 +826,11 @@ class Moderation(commands.Cog):
 
     @commands.group(aliases=("his",), invoke_without_command=True)
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def history(self, ctx, *, target: Union[discord.Member, FetchUserConverter]):
         """Views a member's punishment history.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         query = {"target_id": target.id, "guild_id": ctx.guild.id}
@@ -869,11 +869,11 @@ class Moderation(commands.Cog):
 
     @history.command(aliases=("del",))
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def delete(self, ctx, ids: commands.Greedy[int]):
         """Deletes one or more entries from punishment history.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         result = await self.bot.mongo.db.action.delete_many({"_id": {"$in": ids}, "guild_id": ctx.guild.id})
@@ -882,11 +882,11 @@ class Moderation(commands.Cog):
 
     @history.command()
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def note(self, ctx, id: int, *, note):
         """Adds a note to an entry from punishment history.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         result = await self.bot.mongo.db.action.find_one_and_update(
@@ -902,11 +902,11 @@ class Moderation(commands.Cog):
 
     @history.command(aliases=("show",))
     @commands.guild_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def info(self, ctx, id: int):
         """Shows an entry from punishment history.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         action = await self.bot.mongo.db.action.find_one({"_id": id, "guild_id": ctx.guild.id})

@@ -203,7 +203,7 @@ class Tags(commands.Cog):
     async def forceedit(self, ctx, name, *, content):
         """Edits a tag by force.
 
-        You must have the Moderator role to do this."""
+        You must have the Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -233,7 +233,7 @@ class Tags(commands.Cog):
     async def forcedelete(self, ctx, *, name):
         """Removes a tag by force.
 
-        You must have the Moderator role to do this."""
+        You must have the Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -261,7 +261,7 @@ class Tags(commands.Cog):
     async def forcetransfer(self, ctx, member: discord.Member, *, name):
         """Transfers a tag to another user by force.
 
-        You must have the Moderator role to do this."""
+        You must have the Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:

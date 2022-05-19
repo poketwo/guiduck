@@ -213,7 +213,9 @@ class PoketwoAdministration(commands.Cog):
     @checks.support_server_only()
     @checks.is_moderator()
     async def refund(self, ctx):
-        """Manages refunds of items and currencies to users."""
+        """Manages refunds of items and currencies to users.
+
+        You must have the Moderator role to use this."""
 
         await ctx.send_help(ctx.command)
 

@@ -179,11 +179,11 @@ class Logging(commands.Cog):
         )
 
     @commands.group(invoke_without_command=True)
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def logs(self, ctx, *, channel: discord.TextChannel = None):
         """Gets a link to the message logs for a channel.
 
-        You must have the Moderator role to use this.
+        You must have the Trial Moderator role to use this.
         """
 
         channel = channel or ctx.channel
