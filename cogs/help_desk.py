@@ -596,6 +596,15 @@ class HelpDesk(commands.Cog):
         if ticket is not None:
             return Ticket.build_from_mongo(self.bot, ticket)
 
+    @commands.Cog.listener()
+    async def on_thread_update(self, before: discord.Thread, after: discord.Thread):
+        if after.archived and not before.archived:
+            ticket = await self.fetch_ticket_by_thread(after.id)
+            if ticket is None:
+                return
+            if ticket.closed_at is None:
+                await after.edit(archived=False)
+
     @commands.command()
     @commands.is_owner()
     async def makedesk(self, ctx):
@@ -646,11 +655,11 @@ class HelpDesk(commands.Cog):
 
     @commands.command()
     @checks.support_server_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def claim(self, ctx, *, ticket_thread: discord.Thread = None):
         """Claims a ticket, marking you as the agent.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
@@ -667,11 +676,11 @@ class HelpDesk(commands.Cog):
 
     @commands.command()
     @checks.support_server_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def move(self, ctx, ticket_thread: Optional[discord.Thread], status_channel: discord.TextChannel):
         """Moves a ticket to a given status channel.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
@@ -691,11 +700,11 @@ class HelpDesk(commands.Cog):
 
     @commands.command()
     @checks.support_server_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def status(self, ctx, *, ticket_thread: Optional[discord.Thread]):
         """Displays the status for a given ticket.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
