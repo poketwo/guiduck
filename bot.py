@@ -5,6 +5,7 @@ from discord.ext.events import member_kick
 import config
 
 COGS = [
+    "1_mil_giveaway",
     "automod",
     "autopost",
     "bot",
