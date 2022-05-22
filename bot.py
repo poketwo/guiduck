@@ -17,6 +17,7 @@ COGS = [
     "moderation",
     "mongo",
     "names",
+    "poketwo_administration",
     "reaction_roles",
     "redis",
     "reminders",
@@ -49,6 +50,10 @@ class Bot(commands.Bot, events.EventsMixin):
     @property
     def redis(self):
         return self.get_cog("Redis").pool
+
+    @property
+    def poketwo_redis(self):
+        return self.get_cog("Redis").poketwo_pool
 
     @property
     def log(self):

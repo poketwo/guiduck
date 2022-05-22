@@ -34,6 +34,8 @@ class Ticket(abc.ABC):
     thread_id: int
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     closed_at: Optional[datetime] = None
+    subject: Optional[str] = None
+    description: Optional[str] = None
     agent: Optional[discord.Member] = None
 
     status_channel_id: Optional[int] = STATUS_CHANNEL_ID_NEW
@@ -67,6 +69,8 @@ class Ticket(abc.ABC):
             "thread_id": x["thread_id"],
             "created_at": x["created_at"],
             "closed_at": x.get("closed_at"),
+            "subject": x.get("subject"),
+            "description": x.get("description"),
             "status_channel_id": x.get("status_channel_id"),
             "status_message_id": x.get("status_message_id"),
         }
@@ -85,6 +89,10 @@ class Ticket(abc.ABC):
         }
         if self.closed_at is not None:
             base["closed_at"] = self.closed_at
+        if self.subject is not None:
+            base["subject"] = self.subject
+        if self.description is not None:
+            base["description"] = self.description
         if self.agent is not None:
             base["agent_id"] = self.agent.id
         if self.status_channel_id is not None:
@@ -97,13 +105,13 @@ class Ticket(abc.ABC):
         embed = discord.Embed(
             title="Ticket Created",
             description=(
-                "Please explain your query in detail so that our team can assist you promptly and effectively. Our support team has been notified and an agent will assist you soon.\n\n"
-                "We usually respond to support tickets within 24 hours; however, note that responses may be delayed during busy intervals. Thank you for your patience.\n\n"
-                "If you created this ticket on accident or no longer need assistance, please close the ticket by clicking the :lock: **Close Ticket** button below this message."
+                "Our support team has been notified and an agent will assist you soon. We usually respond to support tickets within 24 hours; however, note that responses may be delayed during busy intervals. If you no longer need assistance, please close the ticket by clicking the :lock: **Close Ticket** button below this message."
             ),
             color=discord.Color.blurple(),
         )
+        embed.add_field(name="Subject", value=self.subject)
         embed.add_field(name="Category", value=self.category.label)
+        embed.add_field(name="Description", value=self.description, inline=False)
         embed.set_footer(text=self._id)
         return embed
 
@@ -116,10 +124,16 @@ class Ticket(abc.ABC):
         if self.agent is not None:
             embed.color = discord.Color.green()
             embed.add_field(name="Agent", value=self.agent.mention)
+        if self.subject is not None:
+            embed.add_field(name="Subject", value=self.subject, inline=False)
+
+        footer = [f"User ID • {self.user.id}"]
         if self.closed_at is not None:
             embed.color = None
-            embed.set_footer(text="Ticket Closed")
+            footer.append("Ticket Closed")
             embed.timestamp = self.closed_at
+        embed.set_footer(text="\n".join(footer))
+
         return embed
 
     def to_claim_embed(self):
@@ -263,6 +277,52 @@ class OpenTicketButton(discord.ui.Button):
         await self.category.open_ticket(interaction)
 
 
+class OpenTicketModal(discord.ui.Modal):
+    subject = discord.ui.TextInput(label="Subject", min_length=5, max_length=200)
+    description = discord.ui.TextInput(
+        label="Description", style=discord.TextStyle.paragraph, min_length=100, max_length=1024
+    )
+
+    def __init__(self, category: HelpDeskCategory):
+        super().__init__(title=f"Open Ticket: {category.label}")
+        self.category = category
+        self.bot = category.bot
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = self.bot.get_guild(constants.SUPPORT_SERVER_ID)
+        channel = guild.get_channel(TICKETS_CHANNEL_ID)
+
+        await self.bot.redis.set(f"ticket:{interaction.user.id}", 1, expire=1200)
+
+        _id = f"{self.category.id.upper()} {await self.bot.mongo.reserve_id(f'ticket_{self.category.id}'):03}"
+        thread = await channel.create_thread(
+            name=_id,
+            auto_archive_duration=10080,
+            type=discord.ChannelType.private_thread,
+            invitable=False,
+            reason=f"Created support ticket for {interaction.user}",
+        )
+        ticket = Ticket(
+            bot=self.bot,
+            _id=_id,
+            user=interaction.user,
+            category=self.category,
+            subject=self.subject.value,
+            description=self.description.value,
+            guild_id=guild.id,
+            channel_id=channel.id,
+            thread_id=thread.id,
+            created_at=discord.utils.snowflake_time(interaction.id),
+        )
+
+        await ticket.edit()
+
+        first_view = FirstView(ticket)
+        await thread.add_user(interaction.user)
+        await thread.send(embed=ticket.to_first_embed(), view=first_view)
+        await interaction.response.send_message(f"Opened ticket {thread.mention}.", ephemeral=True)
+
+
 class FirstView(discord.ui.View):
     def __init__(self, ticket: Ticket):
         super().__init__()
@@ -309,40 +369,11 @@ class HelpDeskCategory(abc.ABC):
         await interaction.response.send_message(textwrap.dedent(response), ephemeral=True, view=OpenTicketView(self))
 
     async def open_ticket(self, interaction: discord.Interaction):
-        guild = self.bot.get_guild(constants.SUPPORT_SERVER_ID)
-        channel = guild.get_channel(TICKETS_CHANNEL_ID)
-
-        cd = await self.bot.redis.pttl(key := f"ticket:{interaction.user.id}")
+        cd = await self.bot.redis.pttl(f"ticket:{interaction.user.id}")
         if cd >= 0:
             msg = f"You can open a ticket again in **{time.human_timedelta(timedelta(seconds=cd / 1000))}**."
             return await interaction.response.send_message(msg, ephemeral=True)
-
-        await self.bot.redis.set(key, 1, expire=1200)
-
-        _id = f"{self.id.upper()} {await self.bot.mongo.reserve_id(f'ticket_{self.id}'):03}"
-        thread = await channel.create_thread(
-            name=_id,
-            auto_archive_duration=10080,
-            type=discord.ChannelType.private_thread,
-            invitable=False,
-            reason=f"Created support ticket for {interaction.user}",
-        )
-        ticket = Ticket(
-            bot=self.bot,
-            _id=_id,
-            user=interaction.user,
-            category=self,
-            guild_id=guild.id,
-            channel_id=channel.id,
-            thread_id=thread.id,
-            created_at=discord.utils.snowflake_time(interaction.id),
-        )
-
-        await ticket.edit()
-
-        first_view = FirstView(ticket)
-        await thread.add_user(interaction.user)
-        await thread.send(embed=ticket.to_first_embed(), view=first_view)
+        await interaction.response.send_modal(OpenTicketModal(self))
 
 
 class SetupHelp(HelpDeskCategory):
@@ -570,6 +601,15 @@ class HelpDesk(commands.Cog):
         if ticket is not None:
             return Ticket.build_from_mongo(self.bot, ticket)
 
+    @commands.Cog.listener()
+    async def on_thread_update(self, before: discord.Thread, after: discord.Thread):
+        if after.archived and not before.archived:
+            ticket = await self.fetch_ticket_by_thread(after.id)
+            if ticket is None:
+                return
+            if ticket.closed_at is None:
+                await after.edit(archived=False)
+
     @commands.command()
     @commands.is_owner()
     async def makedesk(self, ctx):
@@ -620,11 +660,11 @@ class HelpDesk(commands.Cog):
 
     @commands.command()
     @checks.support_server_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def claim(self, ctx, *, ticket_thread: discord.Thread = None):
         """Claims a ticket, marking you as the agent.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
@@ -641,11 +681,11 @@ class HelpDesk(commands.Cog):
 
     @commands.command()
     @checks.support_server_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def move(self, ctx, ticket_thread: Optional[discord.Thread], status_channel: discord.TextChannel):
         """Moves a ticket to a given status channel.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
@@ -665,11 +705,11 @@ class HelpDesk(commands.Cog):
 
     @commands.command()
     @checks.support_server_only()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def status(self, ctx, *, ticket_thread: Optional[discord.Thread]):
         """Displays the status for a given ticket.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)

@@ -94,7 +94,8 @@ class Tags(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none(),
             reference=ctx.message.reference,
         )
-        await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
+        if ctx.guild is not None:
+            await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
 
     @tag.command()
     async def info(self, ctx, *, name):
@@ -198,11 +199,11 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully edited tag.")
 
     @tag.command(aliases=("fe",))
-    @checks.is_community_manager()
+    @checks.is_moderator()
     async def forceedit(self, ctx, name, *, content):
         """Edits a tag by force.
 
-        You must have the Community Manager role to do this."""
+        You must have the Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -228,11 +229,11 @@ class Tags(commands.Cog):
         await ctx.send(f"Tag and corresponding aliases successfully deleted.")
 
     @tag.command(aliases=("fd",))
-    @checks.is_community_manager()
+    @checks.is_moderator()
     async def forcedelete(self, ctx, *, name):
         """Removes a tag by force.
 
-        You must have the Community Manager role to do this."""
+        You must have the Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -256,11 +257,11 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully transferred tag.")
 
     @tag.command()
-    @checks.is_community_manager()
+    @checks.is_moderator()
     async def forcetransfer(self, ctx, member: discord.Member, *, name):
         """Transfers a tag to another user by force.
 
-        You must have the Community Manager role to do this."""
+        You must have the Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:

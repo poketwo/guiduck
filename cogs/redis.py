@@ -13,6 +13,9 @@ class Redis(commands.Cog):
 
     async def connect(self):
         self.pool = await aioredis.create_redis_pool(self.bot.config.REDIS_URI, password=self.bot.config.REDIS_PASSWORD)
+        self.poketwo_pool = await aioredis.create_redis_pool(
+            self.bot.config.POKETWO_REDIS_URI, password=self.bot.config.POKETWO_REDIS_PASSWORD
+        )
 
     async def close(self):
         self.pool.close()
