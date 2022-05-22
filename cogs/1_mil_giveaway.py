@@ -28,6 +28,7 @@ class OneMilGiveaway(commands.Cog):
         self.view = EnterGiveawayView(self.bot)
         self.message = None
         self.bot.add_view(self.view)
+        self.edit_entrants.start()
 
     @commands.command()
     @commands.is_owner()
@@ -36,7 +37,7 @@ class OneMilGiveaway(commands.Cog):
         self.edit_entrants.cancel()
         self.edit_entrants.start()
 
-    @tasks.loop(seconds=10)
+    @tasks.loop(seconds=30)
     async def edit_entrants(self):
         if self.message is None:
             channel = self.bot.get_guild(716390832034414685).get_channel(717883936314753045)
