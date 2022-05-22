@@ -112,6 +112,7 @@ class Ticket(abc.ABC):
         embed.add_field(name="Subject", value=self.subject)
         embed.add_field(name="Category", value=self.category.label)
         embed.add_field(name="Description", value=self.description, inline=False)
+        embed.set_footer(text=self._id)
         return embed
 
     def to_status_embed(self):
