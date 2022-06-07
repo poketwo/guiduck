@@ -12,15 +12,11 @@ def is_community_manager():
 
 
 def is_moderator():
-    return commands.has_any_role(*constants.COMMUNITY_MANAGER_ROLES, *constants.MODERATOR_ROLES)
+    return commands.has_any_role(*constants.MODERATOR_ROLES)
 
 
 def is_trial_moderator():
-    return commands.has_any_role(
-        *constants.COMMUNITY_MANAGER_ROLES,
-        *constants.MODERATOR_ROLES,
-        *constants.TRIAL_MODERATOR_ROLES,
-    )
+    return commands.has_any_role(*constants.TRIAL_MODERATOR_ROLES)
 
 
 def in_guilds(*guild_ids):
