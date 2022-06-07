@@ -235,7 +235,7 @@ class ClaimTicketButton(discord.ui.Button):
         self.ticket = ticket
 
     async def callback(self, interaction: discord.Interaction):
-        if any(x.id in constants.MODERATOR_ROLES for x in interaction.user.roles):
+        if any(x.id in constants.TRIAL_MODERATOR_ROLES for x in interaction.user.roles):
             await self.ticket.claim(interaction.user)
             await interaction.response.defer()
 
@@ -253,7 +253,7 @@ class CloseTicketButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         if interaction.user == self.ticket.user or any(
-            x.id in constants.MODERATOR_ROLES for x in interaction.user.roles
+            x.id in constants.TRIAL_MODERATOR_ROLES for x in interaction.user.roles
         ):
             await self.ticket.close()
             await interaction.response.defer()
@@ -648,7 +648,7 @@ class HelpDesk(commands.Cog):
         if ticket is None:
             return await ctx.send("Could not find ticket!")
 
-        if ctx.author == ticket.user or any(x.id in constants.MODERATOR_ROLES for x in ctx.author.roles):
+        if ctx.author == ticket.user or any(x.id in constants.TRIAL_MODERATOR_ROLES for x in ctx.author.roles):
             result = await ticket.close()
             if ctx.channel != ticket_thread:
                 if result:
