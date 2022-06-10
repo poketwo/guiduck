@@ -58,6 +58,9 @@ class BannedWords(AutomodModule):
         await self.bot.redis.delete(f"banned_words:{guild.id}")
 
     async def check(self, ctx):
+        if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent.id == 984579960037576855:
+            return
+
         banned = set(await self.fetch(ctx.guild))
 
         words = ctx.message.content.casefold().split()
