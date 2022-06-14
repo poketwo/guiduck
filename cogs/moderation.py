@@ -924,16 +924,17 @@ class Moderation(commands.Cog):
 
         data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
         channel = ctx.guild.get_channel_or_thread(data["report_channel_id"])
-        logs_url = f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}"
+
+        message = await ctx.send(f"Reported **{user}**.")
+        logs_url = f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={message.id+1}"
 
         view = discord.ui.View(timeout=0)
-        view.add_item(discord.ui.Button(label="Jump", url=ctx.message.jump_url))
+        view.add_item(discord.ui.Button(label="Jump", url=message.jump_url))
         view.add_item(discord.ui.Button(label="Logs", url=logs_url))
 
         await channel.send(
             f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}", view=view
         )
-        await ctx.send(f"Reported **{user}**.")
 
     async def cog_unload(self):
         self.check_actions.cancel()
