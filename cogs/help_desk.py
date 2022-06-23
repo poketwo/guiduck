@@ -321,6 +321,7 @@ class OpenTicketModal(discord.ui.Modal):
         await thread.add_user(interaction.user)
         await thread.send(embed=ticket.to_first_embed(), view=first_view)
         await interaction.response.send_message(f"Opened ticket {thread.mention}.", ephemeral=True)
+        await ticket.category.on_open(ticket)
 
 
 class FirstView(discord.ui.View):
@@ -359,8 +360,11 @@ class HelpDeskCategory(abc.ABC):
     def __init_subclass__(cls):
         ALL_CATEGORIES[cls.id] = cls
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_select(self, interaction: discord.Interaction):
         await self.open_ticket(interaction)
+
+    async def on_open(self, ticket: Ticket):
+        pass
 
     async def respond(self, interaction: discord.Interaction, response: str):
         await interaction.response.send_message(textwrap.dedent(response), ephemeral=True)
@@ -382,7 +386,7 @@ class SetupHelp(HelpDeskCategory):
     description = "Help with setting up the bot, configuring spawn channels, changing the prefix, permissions, etc."
     emoji = "\N{GEAR}\ufe0f"
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_select(self, interaction: discord.Interaction):
         await self.respond(
             interaction,
             """
@@ -407,7 +411,7 @@ class GeneralQuestions(HelpDeskCategory):
     description = "Questions about command usage, trading, or how the bot works in general."
     emoji = "\N{INFORMATION SOURCE}\ufe0f"
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_select(self, interaction: discord.Interaction):
         await self.respond(
             interaction,
             """
@@ -424,7 +428,7 @@ class BugReports(HelpDeskCategory):
     description = "Report issues that look like bugs or unintended behavior."
     emoji = "\N{BUG}"
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_select(self, interaction: discord.Interaction):
         await self.respond_then_open_ticket(
             interaction,
             """
@@ -443,7 +447,7 @@ class Reports(HelpDeskCategory):
     description = "Report users violating the Pokétwo Terms of Service."
     emoji = "\N{NO ENTRY SIGN}"
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_select(self, interaction: discord.Interaction):
         await self.respond_then_open_ticket(
             interaction,
             """
@@ -462,7 +466,7 @@ class IncenseRefunds(HelpDeskCategory):
     description = "Bot went down in the middle of an incense? Request a refund here."
     emoji = "\N{CANDLE}\ufe0f"
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_select(self, interaction: discord.Interaction):
         await self.respond_then_open_ticket(
             interaction,
             """
@@ -474,6 +478,26 @@ class IncenseRefunds(HelpDeskCategory):
             """,
         )
 
+    async def on_open(self, ticket: Ticket):
+        if ticket.thread is None:
+            return
+        embed = discord.Embed(
+            title="Incense Refund Instructions",
+            color=discord.Color.blurple(),
+            description=textwrap.dedent(
+                """
+                Thank you for submitting an incense refund request. We're sorry for the trouble you've encountered with your incense. In order for us to process your request, please submit the following:
+
+                1) A screenshot of you purchasing the incense,
+                2) A screenshot of the bot malfunctioning—not sending spawns, not responding to commands, or something else—and
+                3) A screenshot of you running `p!stopincense`, and pressing Confirm if it asks (if you have not done so yet, please do this now).
+
+                After you submit these pieces of documentation, someone will come by to refund you shortly. Thank you!
+                """
+            ),
+        )
+        await ticket.thread.send(embed=embed)
+
 
 class StorePurchases(HelpDeskCategory):
     id = "store"
@@ -481,7 +505,7 @@ class StorePurchases(HelpDeskCategory):
     description = "Payment methods, unreceived items, refunds, disputes, etc."
     emoji = "\N{MONEY WITH WINGS}"
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_select(self, interaction: discord.Interaction):
         await self.respond_then_open_ticket(
             interaction,
             """
@@ -500,7 +524,7 @@ class Punishments(HelpDeskCategory):
     description = "Ban lengths, ban reasons, how to appeal, etc."
     emoji = "\N{HAMMER}"
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_select(self, interaction: discord.Interaction):
         await self.respond_then_open_ticket(
             interaction,
             """
@@ -519,7 +543,7 @@ class Miscellaneous(HelpDeskCategory):
     description = "For questions that do not fit the above categories, choose this option to talk to a staff member."
     emoji = "\N{BLACK QUESTION MARK ORNAMENT}"
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_select(self, interaction: discord.Interaction):
         await self.respond_then_open_ticket(
             interaction,
             """
@@ -555,7 +579,7 @@ class HelpDeskSelect(discord.ui.Select):
         return {x.id: x for x in self.categories}
 
     async def callback(self, interaction: discord.Interaction):
-        await self.categories_by_id[self.values[0]].callback(interaction)
+        await self.categories_by_id[self.values[0]].on_select(interaction)
 
 
 class HelpDeskView(discord.ui.View):
