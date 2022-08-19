@@ -18,7 +18,7 @@ class Names(commands.Cog):
         if text is None:
             return None
         text = unicodedata.normalize("NFKC", text)
-        text = re.sub(POKETWO_REGEX, "", text, flags=re.IGNORECASE)
+        text = re.sub(POKETWO_REGEX, "", text)
         text = re.sub(URL_REGEX, "", text)
         while len(text) > 0 and text[0] < "0":
             text = text[1:]
