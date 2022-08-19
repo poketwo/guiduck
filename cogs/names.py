@@ -1,10 +1,11 @@
-import unicodedata
 import re
+import unicodedata
 
 from discord.ext import commands
 
 LAST_RESORT = "User"
 URL_REGEX = re.compile(r"(([a-z]{3,6}://)|(^|\s))([a-zA-Z0-9\-]+\.)+[a-z]{2,13}[\.\?\=\&\%\/\w\-]*\b([^@]|$)")
+POKETWO_REGEX = re.compile(r"p[oòóôõö]k[eèéêë]tw[oòóôõö]", flags=re.IGNORECASE)
 
 
 class Names(commands.Cog):
@@ -17,6 +18,7 @@ class Names(commands.Cog):
         if text is None:
             return None
         text = unicodedata.normalize("NFKC", text)
+        text = re.sub(POKETWO_REGEX, "", text, flags=re.IGNORECASE)
         text = re.sub(URL_REGEX, "", text)
         while len(text) > 0 and text[0] < "0":
             text = text[1:]
@@ -25,6 +27,8 @@ class Names(commands.Cog):
         return text[:32]
 
     async def normalize_member(self, member):
+        if member.bot:
+            return
         normalized = self.normalized(member.nick) or self.normalized(member.name) or LAST_RESORT
         if normalized != member.display_name:
             await member.edit(nick=normalized)
