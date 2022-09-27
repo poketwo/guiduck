@@ -1,11 +1,10 @@
 import sys
 import traceback
 from datetime import timedelta
-from typing import Union
 
 import discord
 from discord.ext import commands
-from helpers import checks, time
+from helpers import time
 from helpers.utils import FetchUserConverter
 
 
@@ -62,7 +61,7 @@ class Bot(commands.Cog):
             print(f"Ignoring exception in event {event}:")
             traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def ping(self, ctx):
         """View the bot's latency."""
 
@@ -70,8 +69,8 @@ class Bot(commands.Cog):
         seconds = (message.created_at - ctx.message.created_at).total_seconds()
         await message.edit(content=f"Pong! **{seconds * 1000:.0f} ms**")
 
-    @commands.command(aliases=("whois",))
-    async def info(self, ctx, *, user: Union[discord.Member, FetchUserConverter] = None):
+    @commands.hybrid_command(aliases=("whois",))
+    async def info(self, ctx, *, user: FetchUserConverter = None):
         """Shows info about a user."""
 
         user = user or ctx.author

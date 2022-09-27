@@ -15,6 +15,7 @@ class Mongo(commands.Cog):
         self.db = self.client[bot.config.DATABASE_NAME].with_options(
             codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc)
         )
+        self.poketwo_client = AsyncIOMotorClient(bot.config.POKETWO_DATABASE_URI, io_loop=bot.loop)
         self.poketwo_db = self.client[bot.config.POKETWO_DATABASE_NAME]
 
     async def reserve_id(self, name, reserve=1):
