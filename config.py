@@ -16,9 +16,9 @@ POKETWO_DATABASE_URI = os.getenv("POKETWO_DATABASE_URI")
 
 if POKETWO_DATABASE_URI is None:
     POKETWO_DATABASE_URI = "mongodb://{}:{}@{}".format(
-        quote_plus(os.environ["DATABASE_USERNAME"]),
-        quote_plus(os.environ["DATABASE_PASSWORD"]),
-        os.environ["DATABASE_HOST"],
+        quote_plus(os.environ["POKETWO_DATABASE_USERNAME"]),
+        quote_plus(os.environ["POKETWO_DATABASE_PASSWORD"]),
+        os.environ["POKETWO_DATABASE_HOST"],
     )
 
 if os.getenv("API_BASE") is not None:
