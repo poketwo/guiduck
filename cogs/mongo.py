@@ -16,7 +16,7 @@ class Mongo(commands.Cog):
             codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc)
         )
         self.poketwo_client = AsyncIOMotorClient(bot.config.POKETWO_DATABASE_URI, io_loop=bot.loop)
-        self.poketwo_db = self.client[bot.config.POKETWO_DATABASE_NAME]
+        self.poketwo_db = self.poketwo_client[bot.config.POKETWO_DATABASE_NAME]
 
     async def reserve_id(self, name, reserve=1):
         result = await self.db.counter.find_one_and_update({"_id": name}, {"$inc": {"next": reserve}}, upsert=True)
