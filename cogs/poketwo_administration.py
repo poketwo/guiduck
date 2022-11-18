@@ -7,10 +7,10 @@ from typing import Any, Dict, List, Literal, Optional
 import discord
 from bson.objectid import ObjectId
 from discord.ext import commands
-from helpers import checks, constants
-from helpers.converters import SpeciesConverter
 
 from data.models import Species
+from helpers import checks, constants
+from helpers.converters import SpeciesConverter
 
 REFUND_CHANNEL_ID = 973239955784614008
 
@@ -218,6 +218,27 @@ class PoketwoAdministration(commands.Cog):
         You must have the Moderator role to use this."""
 
         await ctx.send_help(ctx.command)
+
+    @refund.command(aliases=("redeem", "deems", "deem"))
+    @checks.support_server_only()
+    @checks.is_moderator()
+    async def redeems(self, ctx, member: discord.Member, number: int = 1, *, notes=None):
+        """Refunds a given number of redeems to a user.
+
+        You must have the Moderator role to use this.
+        """
+
+        refund = Refund(
+            user=ctx.author,
+            target=member,
+            jump_url=ctx.message.jump_url,
+            notes=notes,
+            redeems=number,
+        )
+
+        await refund.execute(self.bot)
+        await self.save_refund(refund)
+        await ctx.send(embed=refund.to_embed(self.bot))
 
     @refund.command(aliases=("incense", "inc"))
     @checks.support_server_only()
