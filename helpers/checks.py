@@ -38,7 +38,9 @@ def support_server_only():
 
 def is_level(level):
     async def predicate(ctx):
-        user = await ctx.bot.mongo.db.member.find_one({"_id": ctx.author.id}, {"level": 1})
+        user = await ctx.bot.mongo.db.member.find_one(
+            {"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}}, {"level": 1}
+        )
         return user.get("level", 0) >= level
 
     return commands.check(predicate)

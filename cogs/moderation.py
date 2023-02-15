@@ -10,6 +10,7 @@ from discord.ext import commands, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from discord.ext.menus.views import ViewMenuPages
 from discord.ui import button
+
 from helpers import checks, constants, time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter
@@ -252,7 +253,11 @@ class Mute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Muted")
         await self.target.add_roles(role, reason=reason)
-        await ctx.bot.mongo.db.member.update_one({"_id": self.target.id}, {"$set": {"muted": True}}, upsert=True)
+        await ctx.bot.mongo.db.member.update_one(
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$set": {"muted": True}},
+            upsert=True,
+        )
         await super().execute(ctx)
 
 
@@ -266,7 +271,11 @@ class Unmute(Action):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
         role = discord.utils.get(ctx.guild.roles, name="Muted")
         await self.target.remove_roles(role, reason=reason)
-        await ctx.bot.mongo.db.member.update_one({"_id": self.target.id}, {"$set": {"muted": False}}, upsert=True)
+        await ctx.bot.mongo.db.member.update_one(
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$set": {"muted": False}},
+            upsert=True,
+        )
         await super().execute(ctx)
 
 
@@ -283,7 +292,9 @@ class TradingMute(Action):
         await self.target.add_roles(role, reason=reason)
         await self.target.remove_roles(role2, reason=reason)
         await ctx.bot.mongo.db.member.update_one(
-            {"_id": self.target.id}, {"$set": {"trading_muted": True}}, upsert=True
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$set": {"trading_muted": True}},
+            upsert=True,
         )
         await super().execute(ctx)
 
@@ -299,7 +310,9 @@ class TradingUnmute(Action):
         role = discord.utils.get(ctx.guild.roles, name="Trading Muted")
         await self.target.remove_roles(role, reason=reason)
         await ctx.bot.mongo.db.member.update_one(
-            {"_id": self.target.id}, {"$set": {"trading_muted": False}}, upsert=True
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$set": {"trading_muted": False}},
+            upsert=True,
         )
         await super().execute(ctx)
 
@@ -350,7 +363,7 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        data = await self.bot.mongo.db.member.find_one({"_id": member.id, "guild_id": member.guild.id})
+        data = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
         if data is None:
             return
         ctx = FakeContext(self.bot, member.guild)
