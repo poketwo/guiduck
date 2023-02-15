@@ -3,10 +3,9 @@ from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands, tasks
-from helpers import checks
 from pymongo import UpdateOne
 
-formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
+from helpers import checks
 
 
 class Logging(commands.Cog):
@@ -14,20 +13,7 @@ class Logging(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-
-        self.log = logging.getLogger(f"Support")
-        handler = logging.FileHandler(f"logs/support.log")
-        handler.setFormatter(formatter)
-        self.log.handlers = [handler]
-
-        dlog = logging.getLogger("discord")
-        dhandler = logging.FileHandler(f"logs/discord.log")
-        dhandler.setFormatter(formatter)
-        dlog.handlers = [dhandler]
-
-        self.log.setLevel(logging.DEBUG)
-        dlog.setLevel(logging.INFO)
-
+        self.log = logging.getLogger("support")
         self.sync_all.start()
 
     @tasks.loop(minutes=20)
