@@ -8,15 +8,15 @@ class NotInGuild(commands.CheckFailure):
 
 
 def is_community_manager():
-    return commands.has_any_role(*constants.COMMUNITY_MANAGER_ROLES)
+    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.COMMUNITY_MANAGER_ROLES))
 
 
 def is_moderator():
-    return commands.has_any_role(*constants.MODERATOR_ROLES)
+    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.MODERATOR_ROLES))
 
 
 def is_trial_moderator():
-    return commands.has_any_role(*constants.TRIAL_MODERATOR_ROLES)
+    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.TRIAL_MODERATOR_ROLES))
 
 
 def in_guilds(*guild_ids):
@@ -34,3 +34,11 @@ def community_server_only():
 
 def support_server_only():
     return in_guilds(constants.SUPPORT_SERVER_ID)
+
+
+def is_level(level):
+    async def predicate(ctx):
+        user = await ctx.bot.mongo.db.member.find_one({"_id": ctx.author.id}, {"level": 1})
+        return user.get("level", 0) >= level
+
+    return commands.check(predicate)
