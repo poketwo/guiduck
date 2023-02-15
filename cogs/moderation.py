@@ -665,7 +665,7 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await ctx.send(f"Unbanned **{target.user}** (Case #{action._id}).")
 
-    @commands.command(aliases=("mute",), usage="<target> <expires_at> [reason]")
+    @commands.group(invoke_without_command=True, aliases=("mute",), usage="<target> [expires_at] [reason]")
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def timeout(self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]):
@@ -739,6 +739,31 @@ class Moderation(commands.Cog):
             await ctx.send(f"Unmuted **{target}** (Case #{action._id}).")
         else:
             await ctx.send(f"Removed **{target}** from timeout (Case #{action._id}).")
+
+    @timeout.command(aliases=("sync",))
+    @checks.is_community_manager()
+    async def setup(self, ctx):
+        """Sets up the Muted role's permissions.
+
+        You must have the Community Manager role to use this.
+        """
+
+        role = discord.utils.get(ctx.guild.roles, name="Muted")
+        if role is None:
+            return await ctx.send("Please create a role named Muted first.")
+
+        for channel in ctx.guild.channels:
+            if isinstance(channel, discord.CategoryChannel) or not channel.permissions_synced:
+                await channel.set_permissions(
+                    role,
+                    send_messages=False,
+                    send_messages_in_threads=False,
+                    add_reactions=False,
+                    speak=False,
+                    stream=False,
+                )
+
+        await ctx.send("I've set up permissions for the Muted role.")
 
     @commands.command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
     @checks.community_server_only()

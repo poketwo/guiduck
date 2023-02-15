@@ -28,8 +28,8 @@ class Reputation(commands.Cog):
         self.bot = bot
 
     async def get_rep(self, member):
-        member = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
-        rep = member.get("reputation", 0)
+        member_data = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
+        rep = member_data.get("reputation", 0)
         rank = await self.bot.mongo.db.member.count_documents(
             {"reputation": {"$gt": rep}, "_id.id": {"$ne": member.id}}
         )
