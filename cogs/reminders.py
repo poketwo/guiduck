@@ -72,9 +72,6 @@ class Reminders(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._current = None
-
-    async def cog_load(self):
-        await self.bot.wait_until_ready()
         self.bot.loop.create_task(self.update_current())
 
     @commands.group(invoke_without_command=True, aliases=("remindme", "reminder"), usage="<when> [event]")
@@ -166,6 +163,8 @@ class Reminders(commands.Cog):
         self._current = None
 
     async def update_current(self, reminder=None):
+        await self.bot.wait_until_ready()
+
         if reminder is None:
             reminder = await self.get_next_reminder()
             if reminder is None:
