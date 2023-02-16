@@ -12,7 +12,10 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: true
-      - uses: nelonoel/branch-name@v1.0.1
+
+      - name: Prepare Environment
+        uses: nelonoel/branch-name@v1.0.1
+
       - name: Publish Image
         uses: whoan/docker-build-with-cache-action@v5
         with:
@@ -20,4 +23,4 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
           registry: ghcr.io
           image_name: helper-bot
-          image_tag: latest,${{ github.sha }}
+          image_tag: latest,${{ env.BRANCH_NAME }},${{ github.sha }}
