@@ -22,6 +22,7 @@ COGS = [
     "redis",
     "reminders",
     "reputation",
+    "role_sync",
     "tags",
 ]
 
