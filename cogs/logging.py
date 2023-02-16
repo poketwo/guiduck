@@ -140,7 +140,7 @@ class Logging(commands.Cog):
     async def on_raw_message_edit(self, payload):
         if "content" not in payload.data:
             return
-        time = int(datetime.now().timestamp()) - 3600
+        time = int(datetime.now(timezone.utc).timestamp()) - 3600
         await self.bot.mongo.db.message.update_one(
             {"_id": payload.message_id},
             {"$set": {f"history.{time}": payload.data["content"]}},
@@ -166,6 +166,7 @@ class Logging(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     @checks.is_trial_moderator()
+    @commands.guild_only()
     async def logs(self, ctx, *, channel: discord.TextChannel = None):
         """Gets a link to the message logs for a channel.
 
@@ -176,6 +177,7 @@ class Logging(commands.Cog):
         await ctx.send(f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}")
 
     @logs.command()
+    @commands.guild_only()
     @checks.is_community_manager()
     async def restrict(self, ctx, channel: discord.TextChannel = None):
         """Restricts the logs for a channel to Admins.
@@ -188,6 +190,7 @@ class Logging(commands.Cog):
         await ctx.send(f"Restricted logs for **#{channel}** to Admins.")
 
     @logs.command(name="sync-cache")
+    @commands.guild_only()
     @checks.is_community_manager()
     async def sync_cache(self, ctx):
         """Syncs all caches for the current server.

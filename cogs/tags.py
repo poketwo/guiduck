@@ -5,6 +5,7 @@ import pymongo
 from bson.objectid import ObjectId
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
+
 from helpers import checks
 from helpers.pagination import AsyncEmbedListPageSource
 from helpers.utils import FakeUser
@@ -161,6 +162,9 @@ class Tags(commands.Cog):
     async def create(self, ctx, name, *, content):
         """Creates a new tag owned by you."""
 
+        if len(content) > 1994:
+            await ctx.send("Tag content must be at most 1994 characters.")
+
         tag = Tag(name=name, owner_id=ctx.author.id, alias=False, content=content)
         try:
             await self.bot.mongo.db.tag.insert_one(tag.to_dict())
@@ -271,6 +275,7 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully force transferred tag.")
 
     @tag.command()
+    @checks.community_server_only()
     async def claim(self, ctx, *, name):
         """Claims a tag whose owner is no longer in the server."""
 

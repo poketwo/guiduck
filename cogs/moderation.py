@@ -401,7 +401,7 @@ class Moderation(commands.Cog):
         if after.timed_out_until == before.timed_out_until:
             return
 
-        if after.timed_out_until is not None and after.timed_out_until < datetime.now():
+        if after.timed_out_until is not None and after.timed_out_until < datetime.now(timezone.utc):
             return
 
         entry = await fetch_recent_audit_log_entry(
@@ -741,6 +741,7 @@ class Moderation(commands.Cog):
             await ctx.send(f"Removed **{target}** from timeout (Case #{action._id}).")
 
     @timeout.command(aliases=("sync",))
+    @commands.guild_only()
     @checks.is_community_manager()
     async def setup(self, ctx):
         """Sets up the Muted role's permissions.

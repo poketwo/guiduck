@@ -7,6 +7,7 @@ from typing import NamedTuple
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
+
 from helpers import time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser
@@ -27,7 +28,7 @@ class Reminder:
     @classmethod
     def build_from_mongo(cls, bot, x):
         guild = bot.get_guild(x["guild_id"])
-        user = guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
+        user = guild and guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
         return cls(
             _id=x["_id"],
             user=user,
@@ -71,6 +72,9 @@ class Reminders(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._current = None
+
+    async def cog_load(self):
+        await self.bot.wait_until_ready()
         self.bot.loop.create_task(self.update_current())
 
     @commands.group(invoke_without_command=True, aliases=("remindme", "reminder"), usage="<when> [event]")
