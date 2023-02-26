@@ -49,6 +49,14 @@ class Levels(commands.Cog):
             if not SILENT:
                 await message.channel.send(msg)
 
+            data = await self.bot.mongo.db.guild.find_one({"_id": message.guild.id})
+            try:
+                channel = self.bot.get_channel(data["level_logs_channel_id"])
+            except KeyError:
+                return
+            if channel is not None:
+                await channel.send(f"{message.author.mention} reached level **{user.get('level', 0) + 1}**.")
+
     @commands.command(aliases=("rank", "level"))
     async def xp(self, ctx):
         """Shows your server XP and level."""
