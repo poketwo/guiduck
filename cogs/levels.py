@@ -6,6 +6,8 @@ from discord.ext.menus.views import ViewMenuPages
 
 from helpers.pagination import AsyncEmbedFieldsPageSource
 
+SILENT = True
+
 
 class Levels(commands.Cog):
     """For XP and levels."""
@@ -13,7 +15,7 @@ class Levels(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def min_xp_at(cls, level):
+    def min_xp_at(self, level):
         return (2 * level * level + 27 * level + 91) * level * 5 // 6
 
     @commands.Cog.listener()
@@ -44,7 +46,8 @@ class Levels(commands.Cog):
                 {"$inc": {"level": 1}},
             )
             msg = f"Congratulations {message.author.mention}, you are now level **{user.get('level', 0) + 1}**!"
-            await message.channel.send(msg)
+            if not SILENT:
+                await message.channel.send(msg)
 
     @commands.command(aliases=("rank", "level"))
     async def xp(self, ctx):
@@ -91,6 +94,10 @@ class Levels(commands.Cog):
             )
         )
         await pages.start(ctx)
+
+    if SILENT:
+        del xp
+        del leaderboard
 
 
 async def setup(bot):
