@@ -28,10 +28,16 @@ class Levels(commands.Cog):
         if discord.utils.get(message.mentions, id=716390085896962058):
             return
 
-        # Set 60s timeout between messages
-        if await self.bot.redis.get(f"xp:{message.author.id}") is not None:
+        data = await self.bot.mongo.db.guild.find_one({"_id": message.guild.id})
+        try:
+            level_logs_channel = self.bot.get_channel(data["level_logs_channel_id"])
+        except KeyError:
             return
-        await self.bot.redis.set(f"xp:{message.author.id}", 1, expire=60)
+
+        # Set 60s timeout between messages
+        if await self.bot.redis.get(f"xp:{message.guild.id}:{message.author.id}") is not None:
+            return
+        await self.bot.redis.set(f"xp:{message.guild.id}:{message.author.id}", 1, expire=60)
 
         xp = random.randint(15, 25)
         user = await self.bot.mongo.db.member.find_one_and_update(
@@ -48,14 +54,8 @@ class Levels(commands.Cog):
             msg = f"Congratulations {message.author.mention}, you are now level **{user.get('level', 0) + 1}**!"
             if not SILENT:
                 await message.channel.send(msg)
-
-            data = await self.bot.mongo.db.guild.find_one({"_id": message.guild.id})
-            try:
-                channel = self.bot.get_channel(data["level_logs_channel_id"])
-            except KeyError:
-                return
-            if channel is not None:
-                await channel.send(f"{message.author.mention} reached level **{user.get('level', 0) + 1}**.")
+            if level_logs_channel is not None:
+                await level_logs_channel.send(f"{message.author.mention} reached level **{user.get('level', 0) + 1}**.")
 
     @commands.command(aliases=("rank", "level"))
     async def xp(self, ctx):

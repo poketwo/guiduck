@@ -13,6 +13,7 @@ COGS = [
     "forms",
     "help_desk",
     "help",
+    "levels",
     "logging",
     "moderation",
     "mongo",
