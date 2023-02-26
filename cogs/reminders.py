@@ -153,10 +153,10 @@ class Reminders(commands.Cog):
         self.bot.loop.create_task(self.update_current())
 
     async def get_next_reminder(self):
-        return Reminder.build_from_mongo(
-            self.bot,
-            await self.bot.mongo.db.reminder.find_one({"resolved": False}, sort=(("expires_at", 1),)),
-        )
+        reminder = await self.bot.mongo.db.reminder.find_one({"resolved": False}, sort=(("expires_at", 1),))
+        if reminder is None:
+            return None
+        return Reminder.build_from_mongo(self.bot, reminder)
 
     def clear_current(self):
         self._current.task.cancel()
