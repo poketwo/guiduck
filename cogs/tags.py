@@ -159,6 +159,7 @@ class Tags(commands.Cog):
     # Writing tags
 
     @tag.command()
+    @commands.has_role("Create Tags")
     async def create(self, ctx, name, *, content):
         """Creates a new tag owned by you."""
 
@@ -173,6 +174,7 @@ class Tags(commands.Cog):
             await ctx.send(f'A tag with the name "{tag.name}" already exists.')
 
     @tag.command()
+    @commands.has_role("Create Tags")
     async def alias(self, ctx, name, *, original):
         """Creates an alias for a pre-existing tag."""
 
