@@ -1,4 +1,5 @@
 import random
+from collections import defaultdict
 
 import discord
 from discord.ext import commands
@@ -7,6 +8,19 @@ from discord.ext.menus.views import ViewMenuPages
 from helpers.pagination import AsyncEmbedFieldsPageSource
 
 SILENT = True
+
+ROLES = defaultdict(
+    list,
+    {
+        5: [1089551162421813340],
+        10: [1089551264305664123],
+        15: [1089551412968566864],
+        25: [1089551687930351626],
+        20: [1089551242730160168],
+        35: [1089551721388331060],
+        50: [1089551989895090247],
+    },
+)
 
 
 class Levels(commands.Cog):
@@ -47,15 +61,22 @@ class Levels(commands.Cog):
         )
 
         if user.get("xp", 0) + xp > self.min_xp_at(user.get("level", 0) + 1):
+            new_level = user.get("level", 0) + 1
+
+            await message.author.add_roles(*[discord.Object(x) for x in ROLES[new_level]])
             await self.bot.mongo.db.member.update_one(
                 {"_id": {"id": message.author.id, "guild_id": message.guild.id}},
                 {"$inc": {"level": 1}},
             )
-            msg = f"Congratulations {message.author.mention}, you are now level **{user.get('level', 0) + 1}**!"
+
+            msg = f"Congratulations {message.author.mention}, you are now level **{new_level}**!"
+            for role in ROLES[new_level]:
+                msg += f" You have received the **{role}** role."
+
             if not SILENT:
                 await message.channel.send(msg)
             if level_logs_channel is not None:
-                await level_logs_channel.send(f"{message.author.mention} reached level **{user.get('level', 0) + 1}**.")
+                await level_logs_channel.send(f"{message.author.mention} reached level **{new_level}**.")
 
     @commands.command(aliases=("rank", "level"))
     async def xp(self, ctx):
