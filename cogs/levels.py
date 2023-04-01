@@ -7,7 +7,7 @@ from discord.ext.menus.views import ViewMenuPages
 
 from helpers.pagination import AsyncEmbedFieldsPageSource
 
-SILENT = True
+SILENT = False
 
 ROLES = defaultdict(
     list,
