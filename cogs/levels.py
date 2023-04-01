@@ -68,14 +68,15 @@ class Levels(commands.Cog):
         if user.get("xp", 0) + xp > self.min_xp_at(user.get("level", 0) + 1):
             new_level = user.get("level", 0) + 1
 
-            await message.author.add_roles(*[discord.Object(x) for x in ROLES[new_level]])
+            roles = [message.guild.get_role(x) for x in ROLES[new_level]]
+            await message.author.add_roles(*roles)
             await self.bot.mongo.db.member.update_one(
                 {"_id": {"id": message.author.id, "guild_id": message.guild.id}},
                 {"$inc": {"level": 1}},
             )
 
             msg = f"Congratulations {message.author.mention}, you are now level **{new_level}**!"
-            for role in ROLES[new_level]:
+            for role in roles:
                 msg += f" You have received the **{role.mention}** role."
 
             if not SILENT:
