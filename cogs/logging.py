@@ -148,10 +148,6 @@ class Logging(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload):
-        if payload.cached_message is not None:
-            for attachment in payload.cached_message.attachments:
-                fn = f"attachments/{attachment.id}_{attachment.filename}"
-                self.bot.loop.create_task(attachment.save(fn, use_cached=True))
         await self.bot.mongo.db.message.update_one(
             {"_id": payload.message_id},
             {"$set": {"deleted_at": datetime.now(timezone.utc)}},
