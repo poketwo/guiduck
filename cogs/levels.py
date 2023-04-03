@@ -37,6 +37,24 @@ class Levels(commands.Cog):
     def min_xp_at(self, level):
         return (2 * level * level + 27 * level + 91) * level * 5 // 6
 
+    async def sync_level_roles(self, member):
+        user = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
+        if user is None:
+            return
+        level_role_ids = {x for k, r in ROLES.items() if k <= user.get("level", 0) for x in r}
+        role_ids = {x.id for x in member.roles}
+        if level_role_ids <= role_ids:
+            return
+        await member.add_roles(*[discord.Object(x) for x in level_role_ids])
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        await self.sync_level_roles(member)
+
+    @commands.Cog.listener()
+    async def on_command(self, ctx):
+        await self.sync_level_roles(ctx.author)
+
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.guild is None or message.author.bot:
