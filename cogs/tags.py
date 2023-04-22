@@ -11,6 +11,9 @@ from helpers.pagination import AsyncEmbedListPageSource
 from helpers.utils import FakeUser
 
 
+CHAR_LIMIT = 1994
+
+
 @dataclass
 class Tag:
     name: str
@@ -167,8 +170,8 @@ class Tags(commands.Cog):
             if attachment.content_type.split("/")[0] in ("image", "video"):
                 content += f"\n{attachment.url}"
 
-        if len(content) > 1994:
-            await ctx.send("Tag content (including attachment urls) must be at most 1994 characters.")
+        if len(content) > CHAR_LIMIT:
+            await ctx.send(f"Tag content (including attachment urls) must be at most {CHAR_LIMIT} characters.")
 
         tag = Tag(name=name, owner_id=ctx.author.id, alias=False, content=content)
         try:
@@ -201,8 +204,8 @@ class Tags(commands.Cog):
             if attachment.content_type.split("/")[0] in ("image", "video"):
                 content += f"\n{attachment.url}"
 
-        if len(content) > 1994:
-            await ctx.send("Tag content (including attachment urls) must be at most 1994 characters.")
+        if len(content) > CHAR_LIMIT:
+            await ctx.send(f"Tag content (including attachment urls) must be at most {CHAR_LIMIT} characters.")
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -226,8 +229,8 @@ class Tags(commands.Cog):
             if attachment.content_type.split("/")[0] in ("image", "video"):
                 content += f"\n{attachment.url}"
 
-        if len(content) > 1994:
-            await ctx.send("Tag content (including attachment urls) must be at most 1994 characters.")
+        if len(content) > CHAR_LIMIT:
+            await ctx.send(f"Tag content (including attachment urls) must be at most {CHAR_LIMIT} characters.")
 
         tag = await self.get_tag(name)
         if tag is None:
