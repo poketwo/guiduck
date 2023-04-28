@@ -164,7 +164,7 @@ class Tags(commands.Cog):
     @tag.command()
     @commands.check_any(checks.is_moderator(), commands.has_role("Create Tags"))
     async def create(self, ctx, name, *, content):
-        """Creates a new tag owned by you. Attach images/gifs/videos to automatically append their urls to the tag."""
+        """Creates a new tag owned by you. Attachments will have their URLs appended to the tag."""
 
         for attachment in ctx.message.attachments:
             if attachment.content_type.split("/")[0] in ("image", "video"):
@@ -198,7 +198,7 @@ class Tags(commands.Cog):
 
     @tag.command()
     async def edit(self, ctx, name, *, content):
-        """Modifies an existing tag that you own. Attach images/gifs/videos to automatically append their urls to the tag."""
+        """Modifies an existing tag that you own. Attachments will have their URLs appended to the tag."""
 
         for attachment in ctx.message.attachments:
             if attachment.content_type.split("/")[0] in ("image", "video"):
@@ -221,7 +221,7 @@ class Tags(commands.Cog):
     @tag.command(aliases=("fe",))
     @checks.is_moderator()
     async def forceedit(self, ctx, name, *, content):
-        """Edits a tag by force. Attach images/gifs/videos to automatically append their urls to the tag.
+        """Edits a tag by force. Attachments will have their URLs appended to the tag.
 
         You must have the Moderator role to use this."""
 
