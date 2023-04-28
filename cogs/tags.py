@@ -164,8 +164,7 @@ class Tags(commands.Cog):
     @staticmethod
     def with_attachment_urls(content, attachments):
         for attachment in attachments:
-            if attachment.content_type.split("/")[0] in ("image", "video"):
-                content += f"\n{attachment.url}"
+            content += f"\n{attachment.url}"
         return content
 
     @tag.command()
