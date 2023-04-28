@@ -161,14 +161,19 @@ class Tags(commands.Cog):
 
     # Writing tags
 
+    @staticmethod
+    def with_attachment_urls(content, attachments):
+        for attachment in attachments:
+            if attachment.content_type.split("/")[0] in ("image", "video"):
+                content += f"\n{attachment.url}"
+        return content
+
     @tag.command()
     @commands.check_any(checks.is_moderator(), commands.has_role("Create Tags"))
     async def create(self, ctx, name, *, content):
         """Creates a new tag owned by you. Attachments will have their URLs appended to the tag."""
 
-        for attachment in ctx.message.attachments:
-            if attachment.content_type.split("/")[0] in ("image", "video"):
-                content += f"\n{attachment.url}"
+        content = self.with_attachment_urls(content, ctx.message.attachments)
 
         if len(content) > CHAR_LIMIT:
             return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
@@ -200,9 +205,7 @@ class Tags(commands.Cog):
     async def edit(self, ctx, name, *, content):
         """Modifies an existing tag that you own. Attachments will have their URLs appended to the tag."""
 
-        for attachment in ctx.message.attachments:
-            if attachment.content_type.split("/")[0] in ("image", "video"):
-                content += f"\n{attachment.url}"
+        content = self.with_attachment_urls(content, ctx.message.attachments)
 
         if len(content) > CHAR_LIMIT:
             return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
@@ -225,9 +228,7 @@ class Tags(commands.Cog):
 
         You must have the Moderator role to use this."""
 
-        for attachment in ctx.message.attachments:
-            if attachment.content_type.split("/")[0] in ("image", "video"):
-                content += f"\n{attachment.url}"
+        content = self.with_attachment_urls(content, ctx.message.attachments)
 
         if len(content) > CHAR_LIMIT:
             return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
