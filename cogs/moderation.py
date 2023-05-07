@@ -959,26 +959,6 @@ class Moderation(commands.Cog):
         action = Action.build_from_mongo(self.bot, action)
         await ctx.send(embed=action.to_info_embed())
 
-    @commands.hybrid_command(cooldown_after_parsing=True)
-    @commands.cooldown(1, 20, commands.BucketType.user)
-    @checks.community_server_only()
-    async def report(self, ctx, user: discord.Member, *, reason):
-        """Reports a user to server moderators."""
-
-        data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
-        channel = ctx.guild.get_channel_or_thread(data["report_channel_id"])
-
-        message = await ctx.send(f"Reported **{user}**.", ephemeral=True)
-        logs_url = f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={message.id+1}"
-
-        view = discord.ui.View(timeout=0)
-        view.add_item(discord.ui.Button(label="Jump", url=message.jump_url))
-        view.add_item(discord.ui.Button(label="Logs", url=logs_url))
-
-        await channel.send(
-            f"{ctx.author.mention} reported {user.mention} in {ctx.channel.mention} for:\n> {reason}", view=view
-        )
-
     async def cog_unload(self):
         self.check_actions.cancel()
 

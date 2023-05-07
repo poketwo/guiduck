@@ -6,7 +6,7 @@ import textwrap
 from dataclasses import MISSING, dataclass, field
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
-from typing import Optional, Type
+from typing import Optional, Type, Union
 
 import discord
 from discord.ext import commands
@@ -15,13 +15,6 @@ from helpers import checks, constants, time
 from helpers.utils import FakeUser
 
 ALL_CATEGORIES: dict[str, Type[HelpDeskCategory]] = {}
-
-TICKETS_CHANNEL_ID = 932520611564122153
-
-STATUS_CATEGORY_ID = 934619199047864330
-STATUS_CHANNEL_ID_NEW = 932520629087899658
-STATUS_CHANNEL_ID_OPEN = 944431717492600862
-STATUS_CHANNEL_ID_CLOSED = 938621530190008401
 
 
 @dataclass
@@ -37,9 +30,10 @@ class Ticket(abc.ABC):
     closed_at: Optional[datetime] = None
     subject: Optional[str] = None
     description: Optional[str] = None
+    extra_info: Optional[str] = None
     agent: Optional[discord.Member] = None
 
-    status_channel_id: Optional[int] = STATUS_CHANNEL_ID_NEW
+    status_channel_id: Optional[int] = None
     status_message_id: Optional[int] = None
 
     @property
@@ -72,6 +66,7 @@ class Ticket(abc.ABC):
             "closed_at": x.get("closed_at"),
             "subject": x.get("subject"),
             "description": x.get("description"),
+            "extra_info": x.get("extra_info"),
             "status_channel_id": x.get("status_channel_id"),
             "status_message_id": x.get("status_message_id"),
         }
@@ -94,6 +89,8 @@ class Ticket(abc.ABC):
             base["subject"] = self.subject
         if self.description is not None:
             base["description"] = self.description
+        if self.extra_info is not None:
+            base["extra_info"] = self.extra_info
         if self.agent is not None:
             base["agent_id"] = self.agent.id
         if self.status_channel_id is not None:
@@ -113,6 +110,8 @@ class Ticket(abc.ABC):
         embed.add_field(name="Subject", value=self.subject)
         embed.add_field(name="Category", value=self.category.label)
         embed.add_field(name="Description", value=self.description, inline=False)
+        if self.extra_info is not None:
+            embed.add_field(name="Extra Info", value=self.extra_info, inline=False)
         embed.set_footer(text=self._id)
         return embed
 
@@ -150,6 +149,60 @@ class Ticket(abc.ABC):
             color=discord.Color.red(),
             description="The ticket has been closed, and the thread has been archived. Please open another support ticket if you require further assistance.",
         )
+
+    @classmethod
+    async def open(
+        cls,
+        *,
+        bot: commands.Bot,
+        guild: discord.Guild,
+        user: Union[discord.Member, discord.User],
+        category: HelpDeskCategory,
+        subject: str,
+        description: str,
+        created_at: Optional[datetime] = None,
+        extra_info: Optional[str] = None,
+        ticket_channel_id: Optional[int] = None,
+        status_channel_id: Optional[int] = None,
+    ):
+        _id = await category.reserve_id()
+        guild_data = await bot.mongo.db.guild.find_one({"_id": guild.id})
+
+        if ticket_channel_id is None:
+            ticket_channel_id = guild_data["ticket_channel_id"]
+        if status_channel_id is None:
+            status_channel_id = guild_data["ticket_new_channel_id"]
+
+        ticket_channel = guild.get_channel(ticket_channel_id)
+
+        thread = await ticket_channel.create_thread(
+            name=_id,
+            auto_archive_duration=10080,
+            type=discord.ChannelType.private_thread,
+            invitable=False,
+            reason=f"Created support ticket for {user}",
+        )
+
+        ticket = cls(
+            bot=bot,
+            _id=_id,
+            user=user,
+            category=category,
+            subject=subject,
+            description=description,
+            extra_info=extra_info,
+            guild_id=guild.id,
+            channel_id=ticket_channel.id,
+            thread_id=thread.id,
+            created_at=created_at or datetime.now(timezone.utc),
+        )
+
+        await ticket.edit(status_channel_id=status_channel_id)
+        await thread.add_user(user)
+        await thread.send(embed=ticket.to_first_embed(), view=FirstView(ticket))
+        await category.on_open(ticket)
+
+        return ticket
 
     async def edit(
         self,
@@ -199,7 +252,9 @@ class Ticket(abc.ABC):
         if self.closed_at is not None:
             return False
 
-        await self.edit(closed_at=datetime.now(timezone.utc), status_channel_id=STATUS_CHANNEL_ID_CLOSED)
+        guild_data = await self.bot.mongo.db.guild.find_one({"_id": self.guild_id})
+
+        await self.edit(closed_at=datetime.now(timezone.utc), status_channel_id=guild_data["ticket_closed_channel_id"])
         with contextlib.suppress(discord.HTTPException):
             await self.thread.send(embed=self.to_closed_embed())
         await self.thread.edit(archived=True, locked=True)
@@ -210,8 +265,10 @@ class Ticket(abc.ABC):
         if self.closed_at is not None:
             return False
 
-        if self.status_channel_id == STATUS_CHANNEL_ID_NEW:
-            await self.edit(agent=user, status_channel_id=STATUS_CHANNEL_ID_OPEN)
+        guild_data = await self.bot.mongo.db.guild.find_one({"_id": self.guild_id})
+
+        if self.status_channel_id == guild_data["ticket_new_channel_id"]:
+            await self.edit(agent=user, status_channel_id=guild_data["ticket_open_channel_id"])
         else:
             await self.edit(agent=user)
 
@@ -239,6 +296,8 @@ class ClaimTicketButton(discord.ui.Button):
         if any(x.id in constants.TRIAL_MODERATOR_ROLES for x in interaction.user.roles):
             await self.ticket.claim(interaction.user)
             await interaction.response.defer()
+        else:
+            await interaction.response.send_message("You can't do this!", ephemeral=True)
 
 
 class CloseTicketButton(discord.ui.Button):
@@ -284,45 +343,52 @@ class OpenTicketModal(discord.ui.Modal):
         label="Description", style=discord.TextStyle.paragraph, min_length=100, max_length=1024
     )
 
-    def __init__(self, category: HelpDeskCategory):
+    def __init__(self, category: HelpDeskCategory, extra_info: str = None):
         super().__init__(title=f"Open Ticket: {category.label}")
         self.category = category
+        self.extra_info = extra_info
         self.bot = category.bot
 
-    async def on_submit(self, interaction: discord.Interaction):
-        guild = self.bot.get_guild(constants.SUPPORT_SERVER_ID)
-        channel = guild.get_channel(TICKETS_CHANNEL_ID)
+    async def on_submit(self, interaction: discord.Interaction, **ticket_kwargs):
+        if interaction.guild is None:
+            return
 
         await self.bot.redis.set(f"ticket:{interaction.user.id}", 1, expire=1200)
 
-        _id = f"{self.category.id.upper()} {await self.bot.mongo.reserve_id(f'ticket_{self.category.id}'):03}"
-        thread = await channel.create_thread(
-            name=_id,
-            auto_archive_duration=10080,
-            type=discord.ChannelType.private_thread,
-            invitable=False,
-            reason=f"Created support ticket for {interaction.user}",
-        )
-        ticket = Ticket(
-            bot=self.bot,
-            _id=_id,
-            user=interaction.user,
-            category=self.category,
-            subject=self.subject.value,
-            description=self.description.value,
-            guild_id=guild.id,
-            channel_id=channel.id,
-            thread_id=thread.id,
-            created_at=discord.utils.snowflake_time(interaction.id),
-        )
+        ticket_kwargs = {
+            "bot": self.bot,
+            "guild": interaction.guild,
+            "user": interaction.user,
+            "category": self.category,
+            "subject": self.subject.value,
+            "description": self.description.value,
+            "extra_info": self.extra_info,
+            "created_at": discord.utils.snowflake_time(interaction.id),
+            **ticket_kwargs,
+        }
 
-        await ticket.edit()
+        ticket = await Ticket.open(**ticket_kwargs)
 
-        first_view = FirstView(ticket)
-        await thread.add_user(interaction.user)
-        await thread.send(embed=ticket.to_first_embed(), view=first_view)
-        await interaction.response.send_message(f"Opened ticket {thread.mention}.", ephemeral=True)
-        await ticket.category.on_open(ticket)
+        await interaction.response.send_message(f"Opened ticket {ticket.thread.mention}.", ephemeral=True)
+
+
+class OpenReportModal(OpenTicketModal):
+    subject = discord.ui.TextInput(label="User ID", max_length=200)
+    description = discord.ui.TextInput(label="Description", style=discord.TextStyle.paragraph, max_length=1024)
+
+    async def on_submit(self, interaction: discord.Interaction, **ticket_kwargs):
+        ticket_kwargs = {"subject": f"Report for {self.subject.value}", **ticket_kwargs}
+        return await super().on_submit(interaction, **ticket_kwargs)
+
+
+class OpenNSFWReportModal(OpenReportModal):
+    async def on_submit(self, interaction: discord.Interaction, **ticket_kwargs):
+        guild_data = await self.bot.mongo.db.guild.find_one({"_id": interaction.guild.id})
+        ticket_kwargs = {
+            "subject": f"[NSFW] Report for {self.subject.value}",
+            "ticket_channel_id": guild_data["nsfw_ticket_channel_id"],
+        }
+        return await super().on_submit(interaction, **ticket_kwargs)
 
 
 class FirstView(discord.ui.View):
@@ -354,6 +420,7 @@ class HelpDeskCategory(abc.ABC):
     label: str
     description: str
     emoji: str
+    hidden = False
 
     def __init__(self, bot):
         self.bot = bot
@@ -361,8 +428,11 @@ class HelpDeskCategory(abc.ABC):
     def __init_subclass__(cls):
         ALL_CATEGORIES[cls.id] = cls
 
-    async def on_select(self, interaction: discord.Interaction):
-        await self.open_ticket(interaction)
+    async def reserve_id(self):
+        return f"{self.id.upper()} {await self.bot.mongo.reserve_id(f'ticket_{self.id}'):03}"
+
+    async def on_select(self, interaction: discord.Interaction, *, modal_cls=None):
+        await self.open_ticket(interaction, modal_cls=modal_cls or OpenTicketModal)
 
     async def on_open(self, ticket: Ticket):
         pass
@@ -373,12 +443,12 @@ class HelpDeskCategory(abc.ABC):
     async def respond_then_open_ticket(self, interaction: discord.Interaction, response: str):
         await interaction.response.send_message(textwrap.dedent(response), ephemeral=True, view=OpenTicketView(self))
 
-    async def open_ticket(self, interaction: discord.Interaction):
+    async def open_ticket(self, interaction: discord.Interaction, *, modal_cls=None):
         cd = await self.bot.redis.pttl(f"ticket:{interaction.user.id}")
         if cd >= 0:
             msg = f"You can open a ticket again in **{time.human_timedelta(timedelta(seconds=cd / 1000))}**."
             return await interaction.response.send_message(msg, ephemeral=True)
-        await interaction.response.send_modal(OpenTicketModal(self))
+        await interaction.response.send_modal(modal_cls(self))
 
 
 class SetupHelp(HelpDeskCategory):
@@ -557,9 +627,18 @@ class Miscellaneous(HelpDeskCategory):
         )
 
 
+class ServerReport(HelpDeskCategory):
+    id = "srv rpt"
+    label = "Community Server Reports"
+    description = "Report users violating the Pokétwo Community Server Rules."
+    emoji = "\N{NO ENTRY SIGN}"
+    hidden = True
+    modal_cls = OpenReportModal
+
+
 class HelpDeskSelect(discord.ui.Select):
     def __init__(self, bot):
-        self.categories = [cls(bot) for cls in ALL_CATEGORIES.values()]
+        self.categories = [cls(bot) for cls in ALL_CATEGORIES.values() if not cls.hidden]
         super().__init__(
             placeholder="Select Option",
             custom_id="persistent:help_desk_select",
@@ -604,6 +683,31 @@ class HelpDeskView(discord.ui.View):
         )
 
 
+class ReportView(discord.ui.View):
+    def __init__(self, bot):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.category = ServerReport(self.bot)
+
+    @property
+    def text(self):
+        return "\n\n".join(
+            [
+                "**Server Reports**",
+                "If someone is violating the community rules, you may open a report with the button below. Please have their User ID ready.\nAdditionally, you can use the /report command to report users in this server.",
+                "If your report is NSFW in nature, please select the NSFW option so we can route you to an appropriate staff member.",
+            ]
+        )
+
+    @discord.ui.button(label="Open Report", style=discord.ButtonStyle.red, custom_id="persistent:open_report")
+    async def open_report(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.category.on_select(interaction, modal_cls=OpenReportModal)
+
+    @discord.ui.button(label="Open NSFW Report", style=discord.ButtonStyle.red, custom_id="persistent:open_nsfw_report")
+    async def open_nsfw_report(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.category.on_select(interaction, modal_cls=OpenNSFWReportModal)
+
+
 class HelpDesk(commands.Cog):
     """For the help desk on the support server."""
 
@@ -614,7 +718,9 @@ class HelpDesk(commands.Cog):
     async def setup_view(self):
         await self.bot.wait_until_ready()
         self.view = HelpDeskView(self.bot)
+        self.report_view = ReportView(self.bot)
         self.bot.add_view(self.view)
+        self.bot.add_view(self.report_view)
 
     async def fetch_ticket_by_id(self, _id):
         ticket = await self.bot.mongo.db.ticket.find_one({"_id": _id})
@@ -635,10 +741,15 @@ class HelpDesk(commands.Cog):
             if ticket.closed_at is None:
                 await after.edit(archived=False)
 
-    @commands.hybrid_command()
+    @commands.command()
     @commands.is_owner()
     async def makedesk(self, ctx):
         await ctx.send(self.view.text, view=self.view)
+
+    @commands.command()
+    @commands.is_owner()
+    async def makereportdesk(self, ctx):
+        await ctx.send(self.report_view.text, view=self.report_view)
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
@@ -662,7 +773,6 @@ class HelpDesk(commands.Cog):
             await interaction.response.send_message("Could not find that ticket!")
 
     @commands.hybrid_command()
-    @checks.support_server_only()
     async def close(self, ctx, *, ticket_thread: discord.Thread = None):
         """Marks a ticket as closed.
 
@@ -684,7 +794,6 @@ class HelpDesk(commands.Cog):
             await ctx.send("You do not have permission to do that!", ephemeral=True)
 
     @commands.hybrid_command()
-    @checks.support_server_only()
     @checks.is_trial_moderator()
     async def claim(self, ctx, *, ticket_thread: discord.Thread = None):
         """Claims a ticket, marking you as the agent.
@@ -705,7 +814,6 @@ class HelpDesk(commands.Cog):
                 await ctx.send("Could not claim ticket.", ephemeral=True)
 
     @commands.hybrid_command()
-    @checks.support_server_only()
     @checks.is_trial_moderator()
     async def move(self, ctx, ticket_thread: Optional[discord.Thread], status_channel: discord.TextChannel):
         """Moves a ticket to a given status channel.
@@ -717,9 +825,12 @@ class HelpDesk(commands.Cog):
         if ticket is None:
             return await ctx.send("Could not find ticket!", ephemeral=True)
 
-        if status_channel.category_id != STATUS_CATEGORY_ID or status_channel.id in (
-            STATUS_CHANNEL_ID_NEW,
-            STATUS_CHANNEL_ID_CLOSED,
+        guild_data = await self.bot.mongo.db.guild.find_one({"_id": ticket.guild_id})
+
+        if status_channel.category_id != guild_data["ticket_status_category_id"] or status_channel.id in (
+            guild_data["ticket_new_channel_id"],
+            guild_data["ticket_closed_channel_id"],
+            guild_data["ticket_channel_id"],
         ):
             return await ctx.send("You cannot move the ticket to this channel!", ephemeral=True)
 
@@ -729,7 +840,6 @@ class HelpDesk(commands.Cog):
             await ctx.send("Could not move ticket.", ephemeral=True)
 
     @commands.hybrid_command()
-    @checks.support_server_only()
     @checks.is_trial_moderator()
     async def status(self, ctx, *, ticket_thread: Optional[discord.Thread]):
         """Displays the status for a given ticket.
@@ -743,8 +853,38 @@ class HelpDesk(commands.Cog):
 
         await ctx.send(embed=ticket.to_status_embed())
 
+    @commands.hybrid_command(cooldown_after_parsing=True)
+    @commands.cooldown(1, 300, commands.BucketType.user)
+    @checks.community_server_only()
+    async def report(self, ctx, user: discord.Member, nsfw: bool = False, *, reason):
+        """Reports a user to server moderators."""
+
+        guild_data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
+
+        if nsfw:
+            ticket_channel_id = guild_data["nsfw_ticket_channel_id"]
+            subject = f"[NSFW] Report for {user} ({user.id})"
+        else:
+            ticket_channel_id = None
+            subject = f"Report for {user} ({user.id})"
+
+        logs_url = f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}"
+        ticket = await Ticket.open(
+            bot=self.bot,
+            guild=ctx.guild,
+            user=ctx.author,
+            category=ServerReport(self.bot),
+            subject=subject,
+            description=reason,
+            created_at=ctx.message.created_at,
+            extra_info=f"Channel: {ctx.channel.mention}\n[Jump to Report]({ctx.message.jump_url})\n[Logs]({logs_url})",
+            ticket_channel_id=ticket_channel_id,
+        )
+        await ctx.send(f"Opened ticket {ticket.thread.mention}.", ephemeral=True)
+
     async def cog_unload(self):
         self.view.stop()
+        self.report_view.stop()
 
 
 async def setup(bot):
