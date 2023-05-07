@@ -79,7 +79,7 @@ class Tags(commands.Cog):
 
     # Reading tags
 
-    @commands.group(invoke_without_command=True)
+    @commands.hybrid_group(fallback="get")
     async def tag(self, ctx, *, name):
         """Allows you to save text into tags for easy access.
 

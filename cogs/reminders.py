@@ -2,7 +2,7 @@ import asyncio
 import textwrap
 from dataclasses import dataclass
 from datetime import datetime
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 import discord
 from discord.ext import commands
@@ -74,9 +74,9 @@ class Reminders(commands.Cog):
         self._current = None
         self.bot.loop.create_task(self.update_current())
 
-    @commands.group(invoke_without_command=True, aliases=("remindme", "reminder"), usage="<when> [event]")
+    @commands.hybrid_group(aliases=("remind", "remindme"), usage="<when> [event]", fallback="set")
     @commands.guild_only()
-    async def remind(self, ctx, *, when: time.UserFriendlyTime(commands.clean_content, default="\u2026")):
+    async def reminder(self, ctx, *, time_and_content: time.UserFriendlyTime(commands.clean_content, default="\u2026")):
         """Sets a reminder for a date or duration of time, e.g.:
 
         • in two hours catch some pokemon
@@ -88,12 +88,12 @@ class Reminders(commands.Cog):
 
         reminder = Reminder(
             user=ctx.author,
-            event=when.arg,
+            event=time_and_content.arg,
             guild_id=ctx.guild.id,
             channel_id=ctx.channel.id,
             message_id=ctx.message.id,
             created_at=ctx.message.created_at,
-            expires_at=when.dt,
+            expires_at=time_and_content.dt,
         )
 
         id = await self.bot.mongo.reserve_id("reminder")
@@ -102,9 +102,11 @@ class Reminders(commands.Cog):
         reminder._id = id
         self.bot.loop.create_task(self.update_current(reminder))
 
-        await ctx.send(f"Alright, I'll remind you in **{time.human_timedelta(reminder.duration)}**: {when.arg}")
+        await ctx.send(
+            f"Alright, I'll remind you in **{time.human_timedelta(reminder.duration)}**: {time_and_content.arg}"
+        )
 
-    @remind.command()
+    @reminder.command()
     @commands.guild_only()
     async def list(self, ctx):
         """Lists future reminders set by you."""
@@ -134,7 +136,7 @@ class Reminders(commands.Cog):
         except IndexError:
             await ctx.send("No reminders found.")
 
-    @remind.command(aliases=("del",))
+    @reminder.command(aliases=("del",))
     @commands.guild_only()
     async def delete(self, ctx, ids: commands.Greedy[int]):
         """Deletes one or more reminders."""
@@ -198,10 +200,7 @@ class Reminders(commands.Cog):
                 text = f"{reminder.user.mention} {text}"
                 message = None
 
-            await channel.send(
-                f"Reminder from {discord.utils.format_dt(reminder.created_at, 'R')}: {reminder.event}",
-                reference=message,
-            )
+            await channel.send(text, reference=message)
 
         self.bot.loop.create_task(self.update_current())
 

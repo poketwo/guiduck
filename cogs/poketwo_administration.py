@@ -209,7 +209,7 @@ class PoketwoAdministration(commands.Cog):
             view.add_item(discord.ui.Button(label="Jump", url=refund.jump_url))
         await channel.send(embed=refund.to_embed(self.bot), view=view)
 
-    @commands.group(invoke_without_command=True)
+    @commands.hybrid_group()
     @checks.support_server_only()
     @checks.is_moderator()
     async def refund(self, ctx):
@@ -332,7 +332,7 @@ class PoketwoAdministration(commands.Cog):
         await self.save_refund(refund)
         await ctx.send(embed=refund.to_embed(self.bot))
 
-    @refund.command()
+    @refund.command(with_app_command=False)
     @checks.support_server_only()
     @checks.is_moderator()
     async def pokemon(self, ctx, member: discord.Member, *, flags: PokemonRefundFlags):

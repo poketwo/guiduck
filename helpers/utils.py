@@ -53,3 +53,11 @@ class FetchUserConverter(commands.Converter):
             return await ctx.bot.fetch_user(int(arg))
         except (discord.NotFound, discord.HTTPException, ValueError):
             raise commands.UserNotFound(arg)
+
+
+class MemberOrFetchUserConverter(commands.Converter):
+    async def convert(self, ctx, arg):
+        try:
+            return await commands.MemberConverter().convert(ctx, arg)
+        except commands.MemberNotFound:
+            return await FetchUserConverter().convert(ctx, arg)

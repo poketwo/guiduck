@@ -74,7 +74,7 @@ class RoleSync(commands.Cog):
         thing = args[-1]
         await self.sync_member(thing)
 
-    @commands.command(name="sync-roles")
+    @commands.hybrid_command(name="sync-roles")
     @commands.guild_only()
     @checks.is_community_manager()
     async def sync_roles(self, ctx):

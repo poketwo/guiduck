@@ -8,6 +8,7 @@ from typing import Dict, Optional, Tuple
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
+
 from helpers import checks, constants
 from helpers.pagination import EmbedListPageSource
 
@@ -189,14 +190,14 @@ class Automod(commands.Cog):
         await action.notify()
         await action.execute(ctx)
 
-    @commands.group(invoke_without_command=True)
+    @commands.hybrid_group()
     @checks.is_community_manager()
     async def automod(self, ctx):
         """Utilities for automoderation."""
 
         await ctx.send_help(ctx.command)
 
-    @automod.group(invoke_without_command=True)
+    @automod.group(fallback="list")
     @checks.is_community_manager()
     async def words(self, ctx):
         """Displays the banned words list.
@@ -215,24 +216,26 @@ class Automod(commands.Cog):
 
     @words.command()
     @checks.is_community_manager()
-    async def add(self, ctx, *words):
+    async def add(self, ctx, words):
         """Adds words to the banned words list.
 
         You must have the Community Manager role to use this.
         """
 
+        words = words.split()
         await self.banned_words.update(ctx.guild, push=[x.casefold() for x in words])
         words_msg = ", ".join(f"**{x}**" for x in words)
         await ctx.send(f"Added {words_msg} to the banned words list.")
 
     @words.command()
     @checks.is_community_manager()
-    async def remove(self, ctx, *words):
+    async def remove(self, ctx, words):
         """Removes words from the banned words list.
 
         You must have the Community Manager role to use this.
         """
 
+        words = words.split()
         await self.banned_words.update(ctx.guild, pull=[x.casefold() for x in words])
         words_msg = ", ".join(f"**{x}**" for x in words)
         await ctx.send(f"Removed {words_msg} from the banned words list.")

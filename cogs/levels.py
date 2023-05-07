@@ -102,7 +102,7 @@ class Levels(commands.Cog):
             if level_logs_channel is not None:
                 await level_logs_channel.send(f"{message.author.mention} reached level **{new_level}**.")
 
-    @commands.command(aliases=("rank", "level"))
+    @commands.hybrid_command(aliases=("rank", "level"))
     async def xp(self, ctx):
         """Shows your server XP and level."""
 
@@ -121,7 +121,7 @@ class Levels(commands.Cog):
         embed.add_field(name="Rank", value=str(rank + 1))
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=("top", "lb", "levels"))
+    @commands.hybrid_command(aliases=("top", "lb", "levels"))
     async def leaderboard(self, ctx):
         """Displays the server XP leaderboard."""
 

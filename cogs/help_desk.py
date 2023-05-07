@@ -10,6 +10,7 @@ from typing import Optional, Type
 
 import discord
 from discord.ext import commands
+
 from helpers import checks, constants, time
 from helpers.utils import FakeUser
 
@@ -435,7 +436,7 @@ class BugReports(HelpDeskCategory):
             Before reporting a bug, please check the #bot-outages and #bot-news channels as well as our GitHub repository at <https://github.com/poketwo/poketwo/issues> to make sure the "bug" is not intended behavior. Note that the bot simply being down does not constitute a bug—bugs are **specific unintended or problematic behaviors**.
 
             If you have done the above and would still like to report your bug, please press the button below to open a ticket.
-            
+
             Note that abusing the ticket feature will result in a ban from the support server.
             """,
         )
@@ -634,7 +635,7 @@ class HelpDesk(commands.Cog):
             if ticket.closed_at is None:
                 await after.edit(archived=False)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.is_owner()
     async def makedesk(self, ctx):
         await ctx.send(self.view.text, view=self.view)
@@ -660,7 +661,7 @@ class HelpDesk(commands.Cog):
         else:
             await interaction.response.send_message("Could not find that ticket!")
 
-    @commands.command()
+    @commands.hybrid_command()
     @checks.support_server_only()
     async def close(self, ctx, *, ticket_thread: discord.Thread = None):
         """Marks a ticket as closed.
@@ -670,7 +671,7 @@ class HelpDesk(commands.Cog):
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
         if ticket is None:
-            return await ctx.send("Could not find ticket!")
+            return await ctx.send("Could not find ticket!", ephemeral=True)
 
         if ctx.author == ticket.user or any(x.id in constants.TRIAL_MODERATOR_ROLES for x in ctx.author.roles):
             result = await ticket.close()
@@ -678,11 +679,11 @@ class HelpDesk(commands.Cog):
                 if result:
                     await ctx.send("Successfully closed ticket.")
                 else:
-                    await ctx.send("Could not close ticket.")
+                    await ctx.send("Could not close ticket.", ephemeral=True)
         else:
-            await ctx.send("You do not have permission to do that!")
+            await ctx.send("You do not have permission to do that!", ephemeral=True)
 
-    @commands.command()
+    @commands.hybrid_command()
     @checks.support_server_only()
     @checks.is_trial_moderator()
     async def claim(self, ctx, *, ticket_thread: discord.Thread = None):
@@ -693,7 +694,7 @@ class HelpDesk(commands.Cog):
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
         if ticket is None:
-            return await ctx.send("Could not find ticket!")
+            return await ctx.send("Could not find ticket!", ephemeral=True)
 
         result = await ticket.claim(ctx.author)
 
@@ -701,9 +702,9 @@ class HelpDesk(commands.Cog):
             if result:
                 await ctx.send(f"Successfully claimed ticket.")
             else:
-                await ctx.send("Could not claim ticket.")
+                await ctx.send("Could not claim ticket.", ephemeral=True)
 
-    @commands.command()
+    @commands.hybrid_command()
     @checks.support_server_only()
     @checks.is_trial_moderator()
     async def move(self, ctx, ticket_thread: Optional[discord.Thread], status_channel: discord.TextChannel):
@@ -714,20 +715,20 @@ class HelpDesk(commands.Cog):
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
         if ticket is None:
-            return await ctx.send("Could not find ticket!")
+            return await ctx.send("Could not find ticket!", ephemeral=True)
 
         if status_channel.category_id != STATUS_CATEGORY_ID or status_channel.id in (
             STATUS_CHANNEL_ID_NEW,
             STATUS_CHANNEL_ID_CLOSED,
         ):
-            return await ctx.send("You cannot move the ticket to this channel!")
+            return await ctx.send("You cannot move the ticket to this channel!", ephemeral=True)
 
         if await ticket.edit(status_channel_id=status_channel.id):
             await ctx.send(f"Successfully moved ticket to {status_channel.mention}.")
         else:
-            await ctx.send("Could not move ticket.")
+            await ctx.send("Could not move ticket.", ephemeral=True)
 
-    @commands.command()
+    @commands.hybrid_command()
     @checks.support_server_only()
     @checks.is_trial_moderator()
     async def status(self, ctx, *, ticket_thread: Optional[discord.Thread]):
@@ -738,7 +739,7 @@ class HelpDesk(commands.Cog):
         ticket_thread = ticket_thread or ctx.channel
         ticket = await self.fetch_ticket_by_thread(ticket_thread.id)
         if ticket is None:
-            return await ctx.send("Could not find ticket!")
+            return await ctx.send("Could not find ticket!", ephemeral=True)
 
         await ctx.send(embed=ticket.to_status_embed())
 

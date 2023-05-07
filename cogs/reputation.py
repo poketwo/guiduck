@@ -72,7 +72,7 @@ class Reputation(commands.Cog):
             ctx = await self.bot.get_context(message)
             await self.process_giverep(ctx, message.mentions[0])
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
     async def rep(self, ctx, *, member: discord.Member = None):
         """Shows the reputation of a given user."""
@@ -87,7 +87,7 @@ class Reputation(commands.Cog):
         embed.add_field(name="Rank", value=str(rank + 1))
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=("gr", "+"), cooldown_after_parsing=True)
+    @commands.hybrid_command(aliases=("gr", "+"), cooldown_after_parsing=True)
     @commands.cooldown(1, 120, commands.BucketType.user)
     @commands.guild_only()
     async def giverep(self, ctx, *, member: discord.Member):
@@ -98,7 +98,7 @@ class Reputation(commands.Cog):
         if msg := await self.process_giverep(ctx, member):
             await ctx.send(msg)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
     @checks.is_community_manager()
     async def setrep(self, ctx, member: discord.Member, value: int):
@@ -109,7 +109,7 @@ class Reputation(commands.Cog):
         await self.update_rep(member, set=value)
         await ctx.send(f"Set **{member}**'s rep to **{value}**")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
     async def toprep(self, ctx):
         """Displays the server reputation leaderboard."""
@@ -138,7 +138,11 @@ class Reputation(commands.Cog):
                 show_index=True,
             )
         )
-        await pages.start(ctx)
+
+        try:
+            await pages.start(ctx)
+        except IndexError:
+            await ctx.send("No users found.")
 
 
 async def setup(bot):

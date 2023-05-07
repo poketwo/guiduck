@@ -498,10 +498,10 @@ class Moderation(commands.Cog):
                 await interaction.message.edit("The operation has been canceled.", view=None)
 
         if limit > 10000:
-            await ctx.send("Too many messages to purge.")
+            await ctx.send("Too many messages to purge.", ephemeral=True)
         elif limit > 100:
             view = ConfirmPurgeView()
-            await ctx.send(f"Are you sure you want to purge up to {limit} messages?", view=view)
+            await ctx.send(f"Are you sure you want to purge up to {limit} messages?", view=view, ephemeral=True)
         else:
             await self._purge(ctx, limit, check)
 
@@ -517,9 +517,9 @@ class Moderation(commands.Cog):
             spammers = sorted(spammers.items(), key=lambda t: t[1], reverse=True)
             messages.extend(f"– **{author}**: {count}" for author, count in spammers)
 
-        await ctx.send("\n".join(messages), delete_after=5)
+        await ctx.send("\n".join(messages), delete_after=5, ephemeral=True)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def cleanup(self, ctx, search=100):
@@ -530,7 +530,7 @@ class Moderation(commands.Cog):
 
         await self.run_purge(ctx, search, lambda m: m.author == ctx.me or m.content.startswith(ctx.prefix))
 
-    @commands.group(invoke_without_command=True, aliases=("remove", "clean", "clear"))
+    @commands.hybrid_group(aliases=("remove", "clean", "clear"))
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def purge(self, ctx, search: Union[discord.Member, int]):
@@ -561,14 +561,23 @@ class Moderation(commands.Cog):
 
     @purge.command()
     @checks.is_trial_moderator()
-    async def contains(self, ctx, *text):
+    async def contains(self, ctx, *, text):
         """Purges messages that contain a substring."""
+        text = text.split()
         search = 100
         if text[-1].isdigit() and len(text) > 1:
             text, search = text[:-1], int(text[-1])
         await self.run_purge(ctx, search, lambda m: " ".join(text).casefold() in m.content.casefold())
 
-    @commands.command()
+    async def parse_time_and_reason(self, ctx, time_and_reason):
+        try:
+            reason = await ModerationUserFriendlyTime().convert(ctx, time_and_reason)
+        except commands.BadArgument:
+            return None, time_and_reason
+        else:
+            return reason.dt, reason.arg
+
+    @commands.hybrid_command()
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def warn(self, ctx, target: discord.Member, *, reason):
@@ -578,7 +587,7 @@ class Moderation(commands.Cog):
         """
 
         if any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(target, "roles", [])):
-            return await ctx.send("You can't punish that person!")
+            return await ctx.send("You can't punish that person!", ephemeral=True)
 
         action = Warn(
             target=target,
@@ -589,9 +598,9 @@ class Moderation(commands.Cog):
         )
         await action.execute(ctx)
         await action.notify()
-        await ctx.send(f"Warned **{target}** (Case #{action._id}).")
+        await ctx.send(f"Warned **{target}** (Case #{action._id}).", ephemeral=True)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def kick(self, ctx, target: discord.Member, *, reason):
@@ -601,7 +610,7 @@ class Moderation(commands.Cog):
         """
 
         if any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(target, "roles", [])):
-            return await ctx.send("You can't punish that person!")
+            return await ctx.send("You can't punish that person!", ephemeral=True)
 
         action = Kick(
             target=target,
@@ -612,25 +621,21 @@ class Moderation(commands.Cog):
         )
         await action.notify()
         await action.execute(ctx)
-        await ctx.send(f"Kicked **{target}** (Case #{action._id}).")
+        await ctx.send(f"Kicked **{target}** (Case #{action._id}).", ephemeral=True)
 
-    @commands.command(usage="<target> [expires_at] [reason]")
+    @commands.hybrid_command(usage="<target> [expires_at] [reason]")
     @commands.guild_only()
     @checks.is_trial_moderator()
-    async def ban(self, ctx, target: MemberOrIdConverter, *, reason: Union[ModerationUserFriendlyTime, str]):
+    async def ban(self, ctx, target: MemberOrIdConverter, *, time_and_reason):
         """Bans a member from the server.
 
         You must have the Trial Moderator role to use this.
         """
 
         if any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(target, "roles", [])):
-            return await ctx.send("You can't punish that person!")
+            return await ctx.send("You can't punish that person!", ephemeral=True)
 
-        if isinstance(reason, time.UserFriendlyTime):
-            expires_at = reason.dt
-            reason = reason.arg
-        else:
-            expires_at = None
+        expires_at, reason = await self.parse_time_and_reason(ctx, time_and_reason)
 
         action = Ban(
             target=target,
@@ -643,11 +648,14 @@ class Moderation(commands.Cog):
         await action.notify()
         await action.execute(ctx)
         if action.duration is None:
-            await ctx.send(f"Banned **{target}** (Case #{action._id}).")
+            await ctx.send(f"Banned **{target}** (Case #{action._id}).", ephemeral=True)
         else:
-            await ctx.send(f"Banned **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).")
+            await ctx.send(
+                f"Banned **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).",
+                ephemeral=True,
+            )
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def unban(self, ctx, target: BanConverter, *, reason=None):
@@ -663,12 +671,12 @@ class Moderation(commands.Cog):
             guild_id=ctx.guild.id,
         )
         await action.execute(ctx)
-        await ctx.send(f"Unbanned **{target.user}** (Case #{action._id}).")
+        await ctx.send(f"Unbanned **{target.user}** (Case #{action._id}).", ephemeral=True)
 
-    @commands.group(invoke_without_command=True, aliases=("mute",), usage="<target> [expires_at] [reason]")
+    @commands.hybrid_command(aliases=("mute",), usage="<target> [expires_at] [reason]")
     @commands.guild_only()
     @checks.is_trial_moderator()
-    async def timeout(self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]):
+    async def timeout(self, ctx, target: discord.Member, *, time_and_reason):
         """Places a member in timeout within the server.
 
         If duration is longer than 28 days, falls back to a mute.
@@ -677,18 +685,14 @@ class Moderation(commands.Cog):
         """
 
         if any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(target, "roles", [])):
-            return await ctx.send("You can't punish that person!")
+            return await ctx.send("You can't punish that person!", ephemeral=True)
 
-        if isinstance(reason, time.UserFriendlyTime):
-            expires_at = reason.dt
-            reason = reason.arg
-            if expires_at > ctx.message.created_at + timedelta(days=28):
-                action_cls = Mute
-            else:
-                action_cls = Timeout
-        else:
-            expires_at = None
+        expires_at, reason = await self.parse_time_and_reason(ctx, time_and_reason)
+
+        if expires_at is None or expires_at > ctx.message.created_at + timedelta(days=28):
             action_cls = Mute
+        else:
+            action_cls = Timeout
 
         action = action_cls(
             target=target,
@@ -703,14 +707,18 @@ class Moderation(commands.Cog):
 
         if action_cls is Timeout:
             await ctx.send(
-                f"Placed **{target}** in timeout for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
+                f"Placed **{target}** in timeout for **{time.human_timedelta(action.duration)}** (Case #{action._id}).",
+                ephemeral=True,
             )
         elif action.duration is None:
-            await ctx.send(f"Muted **{target}** (Case #{action._id}).")
+            await ctx.send(f"Muted **{target}** (Case #{action._id}).", ephemeral=True)
         else:
-            await ctx.send(f"Muted **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).")
+            await ctx.send(
+                f"Muted **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).",
+                ephemeral=True,
+            )
 
-    @commands.command(aliases=("unmute",))
+    @commands.hybrid_command(aliases=("unmute",))
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def untimeout(self, ctx, target: discord.Member, *, reason=None):
@@ -736,14 +744,14 @@ class Moderation(commands.Cog):
         await action.notify()
 
         if action_cls is Unmute:
-            await ctx.send(f"Unmuted **{target}** (Case #{action._id}).")
+            await ctx.send(f"Unmuted **{target}** (Case #{action._id}).", ephemeral=True)
         else:
-            await ctx.send(f"Removed **{target}** from timeout (Case #{action._id}).")
+            await ctx.send(f"Removed **{target}** from timeout (Case #{action._id}).", ephemeral=True)
 
-    @timeout.command(aliases=("sync",))
+    @commands.hybrid_command(name="setup-muted-role", aliases=("sync-muted-role",))
     @commands.guild_only()
     @checks.is_community_manager()
-    async def setup(self, ctx):
+    async def setup_muted_role(self, ctx):
         """Sets up the Muted role's permissions.
 
         You must have the Community Manager role to use this.
@@ -751,7 +759,7 @@ class Moderation(commands.Cog):
 
         role = discord.utils.get(ctx.guild.roles, name="Muted")
         if role is None:
-            return await ctx.send("Please create a role named Muted first.")
+            return await ctx.send("Please create a role named Muted first.", ephemeral=True)
 
         for channel in ctx.guild.channels:
             if isinstance(channel, discord.CategoryChannel) or not channel.permissions_synced:
@@ -766,10 +774,10 @@ class Moderation(commands.Cog):
 
         await ctx.send("I've set up permissions for the Muted role.")
 
-    @commands.command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
+    @commands.hybrid_command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
     @checks.community_server_only()
     @checks.is_trial_moderator()
-    async def tradingmute(self, ctx, target: discord.Member, *, reason: Union[ModerationUserFriendlyTime, str]):
+    async def tradingmute(self, ctx, target: discord.Member, *, time_and_reason):
         """Mutes a member in trading channels.
 
         You must have the Trial Moderator role to use this.
@@ -778,11 +786,7 @@ class Moderation(commands.Cog):
         if any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!")
 
-        if isinstance(reason, time.UserFriendlyTime):
-            expires_at = reason.dt
-            reason = reason.arg
-        else:
-            expires_at = None
+        expires_at, reason = await self.parse_time_and_reason(ctx, time_and_reason)
 
         action = TradingMute(
             target=target,
@@ -801,7 +805,7 @@ class Moderation(commands.Cog):
                 f"Muted **{target}** in trading channels for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
             )
 
-    @commands.command(aliases=("untradingmute", "tunmute", "untmute"))
+    @commands.hybrid_command(aliases=("untradingmute", "tunmute", "untmute"))
     @checks.community_server_only()
     @checks.is_trial_moderator()
     async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
@@ -818,7 +822,7 @@ class Moderation(commands.Cog):
         )
         await action.execute(ctx)
         await action.notify()
-        await ctx.send(f"Unmuted **{target}** in trading channels (Case #{action._id}).")
+        await ctx.send(f"Unmuted **{target}** in trading channels (Case #{action._id}).", ephemeral=True)
 
     async def reverse_raw_action(self, raw_action):
         action = Action.build_from_mongo(self.bot, raw_action)
@@ -863,10 +867,10 @@ class Moderation(commands.Cog):
         async for action in self.bot.mongo.db.action.find(query):
             self.bot.loop.create_task(self.reverse_raw_action(action))
 
-    @commands.group(aliases=("his",), invoke_without_command=True)
+    @commands.hybrid_group(aliases=("his",), fallback="list")
     @commands.guild_only()
     @checks.is_trial_moderator()
-    async def history(self, ctx, *, target: Union[discord.Member, FetchUserConverter]):
+    async def history(self, ctx, *, target: FetchUserConverter):
         """Views a member's punishment history.
 
         You must have the Trial Moderator role to use this.
@@ -932,7 +936,7 @@ class Moderation(commands.Cog):
             {"_id": id, "guild_id": ctx.guild.id}, {"$set": {"note": note}}
         )
         if result is None:
-            return await ctx.send("Could not find an entry with that ID.")
+            return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
         if note.lower() == "reset":
             await self.bot.mongo.db.action.update_one({"_id": id, "guild_id": ctx.guild.id}, {"$unset": {"note": 1}})
             return await ctx.send(f"Successfully removed note of entry **{id}**.")
@@ -950,12 +954,12 @@ class Moderation(commands.Cog):
 
         action = await self.bot.mongo.db.action.find_one({"_id": id, "guild_id": ctx.guild.id})
         if action is None:
-            return await ctx.send("Could not find an entry with that ID.")
+            return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
 
         action = Action.build_from_mongo(self.bot, action)
         await ctx.send(embed=action.to_info_embed())
 
-    @commands.command(cooldown_after_parsing=True)
+    @commands.hybrid_command(cooldown_after_parsing=True)
     @commands.cooldown(1, 20, commands.BucketType.user)
     @checks.community_server_only()
     async def report(self, ctx, user: discord.Member, *, reason):
@@ -964,7 +968,7 @@ class Moderation(commands.Cog):
         data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
         channel = ctx.guild.get_channel_or_thread(data["report_channel_id"])
 
-        message = await ctx.send(f"Reported **{user}**.")
+        message = await ctx.send(f"Reported **{user}**.", ephemeral=True)
         logs_url = f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={message.id+1}"
 
         view = discord.ui.View(timeout=0)

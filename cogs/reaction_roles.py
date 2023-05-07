@@ -10,7 +10,7 @@ class ReactionRoles(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.group(invoke_without_command=True, aliases=("rm",))
+    @commands.hybrid_group()
     @commands.guild_only()
     @checks.is_community_manager()
     async def rolemenu(self, ctx):
@@ -40,7 +40,7 @@ class ReactionRoles(commands.Cog):
         """
 
         if message.guild.id != ctx.guild.id:
-            return await ctx.send("Cannot create role menu in different guild.")
+            return await ctx.send("Cannot create role menu in different guild.", ephemeral=True)
 
         await self.bot.mongo.db.rolemenu.insert_one(
             {
@@ -78,7 +78,7 @@ class ReactionRoles(commands.Cog):
         if result.deleted_count > 0:
             await ctx.send(f"Deleted role menu **{name}**.")
         else:
-            await ctx.send("Could not find role menu with that name.")
+            await ctx.send("Could not find role menu with that name.", ephemeral=True)
 
     @rolemenu.command(name="view")
     @commands.guild_only()
@@ -91,7 +91,7 @@ class ReactionRoles(commands.Cog):
 
         obj = await self.get_menu(name, ctx.guild)
         if obj is None:
-            return await ctx.send("Could not find role menu with that name.")
+            return await ctx.send("Could not find role menu with that name.", ephemeral=True)
 
         options = obj["options"].items()
         message = []
@@ -118,7 +118,7 @@ class ReactionRoles(commands.Cog):
 
         menu = await self.get_menu(name, ctx.guild)
         if menu is None:
-            return await ctx.send("Could not find role menu with that name.")
+            return await ctx.send("Could not find role menu with that name.", ephemeral=True)
 
         try:
             # Custom emoji
@@ -131,7 +131,7 @@ class ReactionRoles(commands.Cog):
         try:
             await message.add_reaction(emoji)
         except discord.InvalidArgument:
-            return await ctx.send("Please enter a valid emoji.")
+            return await ctx.send("Please enter a valid emoji.", ephemeral=True)
 
         key = str(emoji.id) if isinstance(emoji, discord.Emoji) else emoji
         await self.bot.mongo.db.rolemenu.update_one({"_id": menu["_id"]}, {"$set": {f"options.{key}": role.id}})
@@ -148,7 +148,7 @@ class ReactionRoles(commands.Cog):
 
         menu = await self.get_menu(name, ctx.guild)
         if menu is None:
-            return await ctx.send("Could not find role menu with that name.")
+            return await ctx.send("Could not find role menu with that name.", ephemeral=True)
 
         try:
             # Custom emoji
@@ -161,7 +161,7 @@ class ReactionRoles(commands.Cog):
         try:
             await message.clear_reaction(emoji)
         except discord.InvalidArgument:
-            return await ctx.send("Please enter a valid emoji.")
+            return await ctx.send("Please enter a valid emoji.", ephemeral=True)
 
         key = str(emoji.id) if isinstance(emoji, discord.Emoji) else emoji
         role = ctx.guild.get_role(menu["options"][key])

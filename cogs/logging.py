@@ -160,7 +160,7 @@ class Logging(commands.Cog):
             {"$set": {"deleted_at": datetime.now(timezone.utc)}},
         )
 
-    @commands.group(invoke_without_command=True)
+    @commands.hybrid_group(fallback="get")
     @checks.is_trial_moderator()
     @commands.guild_only()
     async def logs(self, ctx, *, channel: discord.TextChannel = None):
@@ -170,7 +170,7 @@ class Logging(commands.Cog):
         """
 
         channel = channel or ctx.channel
-        await ctx.send(f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}")
+        await ctx.send(f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}", ephemeral=True)
 
     @logs.command()
     @commands.guild_only()

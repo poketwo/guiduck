@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
+
 from helpers import checks
 from helpers.converters import SpeciesConverter
 from helpers.pagination import AsyncEmbedListPageSource
@@ -18,7 +19,7 @@ class Collectors(commands.Cog):
                 continue
             yield self.bot.data.species_by_number(int(x))
 
-    @commands.group(aliases=("col",), invoke_without_command=True)
+    @commands.hybrid_group(aliases=("col",), fallback="list")
     @checks.community_server_only()
     async def collect(self, ctx, *, member: discord.Member = None):
         """Allows members to keep track of the collectors for a pokémon species.
@@ -58,7 +59,7 @@ class Collectors(commands.Cog):
         if result.upserted_id or result.modified_count > 0:
             return await ctx.send(f"Added **{species}** to your collecting list.")
         else:
-            return await ctx.send(f"**{species}** is already on your collecting list!")
+            return await ctx.send(f"**{species}** is already on your collecting list!", ephemeral=True)
 
     @collect.command()
     @checks.community_server_only()
@@ -73,7 +74,7 @@ class Collectors(commands.Cog):
         if result.modified_count > 0:
             return await ctx.send(f"Removed **{species}** from your collecting list.")
         else:
-            return await ctx.send(f"**{species}** is not on your collecting list!")
+            return await ctx.send(f"**{species}** is not on your collecting list!", ephemeral=True)
 
     @collect.command()
     @checks.community_server_only()
