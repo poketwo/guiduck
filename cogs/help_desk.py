@@ -323,7 +323,7 @@ class JumpToTicketButton(discord.ui.Button):
     def __init__(self, ticket: Ticket):
         super().__init__(
             label="Jump to Thread",
-            url=f"https://discord.com/channels/930339868503048202/{ticket.thread_id}",
+            url=f"https://discord.com/channels/{ticket.guild_id}/{ticket.thread_id}",
         )
         self.ticket = ticket
 
