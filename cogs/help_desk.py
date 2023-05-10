@@ -856,7 +856,7 @@ class HelpDesk(commands.Cog):
     @commands.hybrid_command(cooldown_after_parsing=True)
     @commands.cooldown(1, 300, commands.BucketType.user)
     @checks.community_server_only()
-    async def report(self, ctx, user: discord.Member, nsfw: bool = False, *, reason):
+    async def report(self, ctx, user: discord.Member, nsfw: Optional[bool] = False, *, reason):
         """Reports a user to server moderators."""
 
         guild_data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
