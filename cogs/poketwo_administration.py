@@ -11,6 +11,7 @@ from discord.ext import commands
 from data.models import Species
 from helpers import checks, constants
 from helpers.converters import SpeciesConverter
+from helpers.poketwo import format_pokemon_details
 
 REFUND_CHANNEL_ID = 973239955784614008
 
@@ -139,15 +140,9 @@ class Refund:
         if self.pokemon_data:
             contents.append("**Pokémon:**")
             for i, pokemon in enumerate(self.pokemon_data):
-                species = bot.data.species_by_number(pokemon["species_id"]).name
-                shiny = "\N{SPARKLES} " if pokemon["shiny"] else ""
-                level = pokemon["level"]
-                iv = pokemon["iv_total"] / 186
-                iv_distr = " / ".join(str(pokemon[x]) for x in IV_FLAGS)
-                contents.append(f"\N{EN DASH} Level {level} {shiny}{species}")
-                contents.append(f"\N{IDEOGRAPHIC SPACE}\N{EN DASH} IV: {iv_distr} ({iv:.2%})")
                 if self.pokemon is not None:
-                    contents.append(f"\N{IDEOGRAPHIC SPACE}\N{EN DASH} ID: {self.pokemon[i]}")
+                    pokemon["_id"] = self.pokemon[i]
+                contents.extend(format_pokemon_details(self.bot, pokemon))
 
         embed = discord.Embed(
             title=f"Refunded {self.target} (ID: {self.target.id})",
