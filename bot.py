@@ -3,6 +3,13 @@ from discord.ext import commands, events
 from discord.ext.events import member_kick
 
 import config
+from helpers.context import GuiduckContext
+
+ESSENTIAL_COGS = [
+    "mongo",
+    "logging",
+    "redis",
+]
 
 COGS = [
     "automod",
@@ -14,13 +21,10 @@ COGS = [
     "help_desk",
     "help",
     "levels",
-    "logging",
     "moderation",
-    "mongo",
     "names",
     "poketwo_administration",
     "reaction_roles",
-    "redis",
     "reminders",
     "reputation",
     "role_sync",
@@ -42,6 +46,8 @@ class Bot(commands.Bot, events.EventsMixin):
 
     async def setup_hook(self):
         await self.load_extension("jishaku")
+        for i in ESSENTIAL_COGS:
+            await self.load_extension(f"cogs.{i}")
         for i in COGS:
             await self.load_extension(f"cogs.{i}")
 
@@ -71,6 +77,9 @@ class Bot(commands.Bot, events.EventsMixin):
     async def close(self):
         self.log.info("Shutting down")
         await super().close()
+
+    async def get_context(self, origin, /, *, cls=GuiduckContext):
+        return await super().get_context(origin, cls=cls)
 
 
 if __name__ == "__main__":
