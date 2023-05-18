@@ -14,7 +14,7 @@ from helpers.utils import FakeUser
 
 @dataclass
 class Giveaway:
-    duration = timedelta(hours=4)
+    duration = timedelta(hours=12)
 
     bot: commands.Bot
     guild_id: int
