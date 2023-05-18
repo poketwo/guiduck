@@ -228,6 +228,12 @@ class Giveaway:
         )
 
     async def update_embed(self):
+        """Updates the giveaway embed."""
+
+        if await self.bot.redis.get(f"giveaway_embed_update:{self._id}") is not None:
+            return
+        await self.bot.redis.set(f"giveaway_embed_update:{self._id}", 1, expire=2)
+
         if message := await self.message:
             if self.ends_at < datetime.now(timezone.utc):
                 await message.edit(embed=await self.giveaway_embed(), view=None)
