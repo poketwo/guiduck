@@ -22,5 +22,5 @@ jobs:
           username: poketwo
           password: ${{ secrets.GHCR_PAT }}
           registry: ghcr.io
-          image_name: helper-bot
+          image_name: guiduck
           image_tag: latest,${{ env.BRANCH_NAME }},${{ github.sha }}
