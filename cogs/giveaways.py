@@ -406,7 +406,12 @@ class Giveaways(commands.Cog):
             description=message,
         )
 
-        if not await ctx.confirm(embed=await giveaway.approval_embed(), ephemeral=True):
+        if pokemon["favorite"]:
+            content = "**Warning:** This Pokémon is favorited. Make sure you want to give it away!"
+        else:
+            content = None
+
+        if not await ctx.confirm(content=content, embed=await giveaway.approval_embed(), ephemeral=True):
             return await ctx.send("Aborted.", ephemeral=True)
 
         try:
