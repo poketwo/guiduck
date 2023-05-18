@@ -182,9 +182,10 @@ class Giveaway:
 
         self.ends_at = datetime.now(timezone.utc) + self.duration
         message = await channel.send(
-            f'{self.user.mention} is giving away the following Pokémon and says "{self.description}"! Click \N{PARTY POPPER} to enter!',
+            f'<@&721875438879768742> {self.user.mention} is giving away the following Pokémon and says "{self.description}"! Click \N{PARTY POPPER} to enter!',
             embed=await self.giveaway_embed(),
             view=GiveawayJoinView(self),
+            allowed_mentions=discord.AllowedMentions(roles=[discord.Object(721875438879768742)]),
         )
         self.message_id = message.id
         self.channel_id = channel.id
