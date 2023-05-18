@@ -18,6 +18,7 @@ COGS = [
     "collectors",
     "data",
     "forms",
+    "giveaways",
     "help_desk",
     "help",
     "levels",
