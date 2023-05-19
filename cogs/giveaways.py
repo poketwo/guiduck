@@ -106,7 +106,7 @@ class Giveaway:
             description="\n".join(i for x in await self.pokemon for i in format_pokemon_details(self.bot, x)),
             color=discord.Color.blurple(),
         )
-        embed.set_author(name=str(self.user), icon_url=self.user.display_avatar)
+        embed.set_author(name=str(self.user), icon_url=self.user.display_avatar.url)
         if self.description is not None:
             embed.add_field(name="Message", value=self.description)
         return embed
@@ -124,7 +124,7 @@ class Giveaway:
             description="\n".join(i for x in await self.pokemon for i in format_pokemon_details(self.bot, x)),
             timestamp=self.ends_at,
         )
-        embed.set_author(name=str(self.user), icon_url=self.user.display_avatar)
+        embed.set_author(name=str(self.user), icon_url=self.user.display_avatar.url)
 
         if self.ends_at < datetime.now(timezone.utc):
             embed.set_footer(text="Ended at")
