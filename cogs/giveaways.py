@@ -139,7 +139,7 @@ class Giveaway:
         embed.add_field(name="Details", value="\n".join(details))
 
         pokemon, *_ = await self.pokemon
-        if pokemon["shiny"]:
+        if pokemon.get("shiny"):
             embed.set_thumbnail(url=f"https://cdn.poketwo.net/shiny/{pokemon['species_id']}.png")
         else:
             embed.set_thumbnail(url=f"https://cdn.poketwo.net/images/{pokemon['species_id']}.png")
@@ -357,7 +357,7 @@ class Giveaways(commands.Cog):
             (species.mythical or species.legendary or species.ultra_beast) and iv_total >= 112,
             species.event and iv_total >= 112,
             iv_total >= 168 or iv_total <= 18,
-            p["shiny"],
+            p.get("shiny"),
         ]
         return any(conditions)
 
@@ -406,7 +406,7 @@ class Giveaways(commands.Cog):
             description=message,
         )
 
-        if pokemon["favorite"]:
+        if pokemon.get("favorite"):
             content = "**Warning:** This Pokémon is favorited. Make sure you want to give it away!"
         else:
             content = None
