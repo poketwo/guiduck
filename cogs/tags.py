@@ -11,6 +11,9 @@ from helpers.pagination import AsyncEmbedListPageSource
 from helpers.utils import FakeUser
 
 
+CHAR_LIMIT = 1994
+
+
 @dataclass
 class Tag:
     name: str
@@ -158,13 +161,21 @@ class Tags(commands.Cog):
 
     # Writing tags
 
+    @staticmethod
+    def with_attachment_urls(content, attachments):
+        for attachment in attachments:
+            content += f"\n{attachment.url}"
+        return content
+
     @tag.command()
     @commands.check_any(checks.is_moderator(), commands.has_role("Create Tags"))
     async def create(self, ctx, name, *, content):
-        """Creates a new tag owned by you."""
+        """Creates a new tag owned by you. Attachments will have their URLs appended to the tag."""
 
-        if len(content) > 1994:
-            await ctx.send("Tag content must be at most 1994 characters.")
+        content = self.with_attachment_urls(content, ctx.message.attachments)
+
+        if len(content) > CHAR_LIMIT:
+            return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
 
         tag = Tag(name=name, owner_id=ctx.author.id, alias=False, content=content)
         try:
@@ -191,7 +202,12 @@ class Tags(commands.Cog):
 
     @tag.command()
     async def edit(self, ctx, name, *, content):
-        """Modifies an existing tag that you own."""
+        """Modifies an existing tag that you own. Attachments will have their URLs appended to the tag."""
+
+        content = self.with_attachment_urls(content, ctx.message.attachments)
+
+        if len(content) > CHAR_LIMIT:
+            return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -207,9 +223,14 @@ class Tags(commands.Cog):
     @tag.command(aliases=("fe",))
     @checks.is_moderator()
     async def forceedit(self, ctx, name, *, content):
-        """Edits a tag by force.
+        """Edits a tag by force. Attachments will have their URLs appended to the tag.
 
         You must have the Moderator role to use this."""
+
+        content = self.with_attachment_urls(content, ctx.message.attachments)
+
+        if len(content) > CHAR_LIMIT:
+            return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
 
         tag = await self.get_tag(name)
         if tag is None:
