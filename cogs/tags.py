@@ -169,13 +169,15 @@ class Tags(commands.Cog):
 
     @tag.command()
     @commands.check_any(checks.is_moderator(), commands.has_role("Create Tags"))
-    async def create(self, ctx, name, *, content):
+    async def create(self, ctx, name, *, content = ""):
         """Creates a new tag owned by you. Attachments will have their URLs appended to the tag."""
 
         content = self.with_attachment_urls(content, ctx.message.attachments)
 
-        if len(content) > CHAR_LIMIT:
-            return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
+        if len(content) == 0:
+            return await ctx.send_help(ctx.command)
+        elif len(content) > CHAR_LIMIT:
+            return await ctx.send(f"Tag content (including attachment URLs) can be at most {CHAR_LIMIT} characters.")
 
         tag = Tag(name=name, owner_id=ctx.author.id, alias=False, content=content)
         try:
@@ -201,13 +203,15 @@ class Tags(commands.Cog):
             await ctx.send(f'A tag with the name "{tag.name}" already exists.')
 
     @tag.command()
-    async def edit(self, ctx, name, *, content):
+    async def edit(self, ctx, name, *, content = ""):
         """Modifies an existing tag that you own. Attachments will have their URLs appended to the tag."""
 
         content = self.with_attachment_urls(content, ctx.message.attachments)
 
-        if len(content) > CHAR_LIMIT:
-            return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
+        if len(content) == 0:
+            return await ctx.send_help(ctx.command)
+        elif len(content) > CHAR_LIMIT:
+            return await ctx.send(f"Tag content (including attachment URLs) can be at most {CHAR_LIMIT} characters.")
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -222,15 +226,17 @@ class Tags(commands.Cog):
 
     @tag.command(aliases=("fe",))
     @checks.is_moderator()
-    async def forceedit(self, ctx, name, *, content):
+    async def forceedit(self, ctx, name, *, content = ""):
         """Edits a tag by force. Attachments will have their URLs appended to the tag.
 
         You must have the Moderator role to use this."""
 
         content = self.with_attachment_urls(content, ctx.message.attachments)
 
-        if len(content) > CHAR_LIMIT:
-            return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
+        if len(content) == 0:
+            return await ctx.send_help(ctx.command)
+        elif len(content) > CHAR_LIMIT:
+            return await ctx.send(f"Tag content (including attachment URLs) can be at most {CHAR_LIMIT} characters.")
 
         tag = await self.get_tag(name)
         if tag is None:
