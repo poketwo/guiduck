@@ -51,8 +51,8 @@ class GuiduckContext(commands.Context):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    async def confirm(self, message=None, *, timeout=40, delete_after=False, cls=ConfirmationView, **kwargs):
+    async def confirm(self, content=None, *, timeout=40, delete_after=False, cls=ConfirmationView, **kwargs):
         view = cls(self, timeout=timeout, delete_after=delete_after)
-        view.message = await self.send(message, view=view, **kwargs)
+        view.message = await self.send(content, view=view, **kwargs)
         await view.wait()
         return view.result
