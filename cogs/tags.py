@@ -177,7 +177,7 @@ class Tags(commands.Cog):
         if len(content) == 0:
             return await ctx.send_help(ctx.command)
         elif len(content) > CHAR_LIMIT:
-            return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
+            return await ctx.send(f"Tag content (including attachment URLs) can be at most {CHAR_LIMIT} characters.")
 
         tag = Tag(name=name, owner_id=ctx.author.id, alias=False, content=content)
         try:
@@ -211,7 +211,7 @@ class Tags(commands.Cog):
         if len(content) == 0:
             return await ctx.send_help(ctx.command)
         elif len(content) > CHAR_LIMIT:
-            return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
+            return await ctx.send(f"Tag content (including attachment URLs) can be at most {CHAR_LIMIT} characters.")
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -236,7 +236,7 @@ class Tags(commands.Cog):
         if len(content) == 0:
             return await ctx.send_help(ctx.command)
         elif len(content) > CHAR_LIMIT:
-            return await ctx.send(f"Tag content (including attachment URLs) must be at most {CHAR_LIMIT} characters.")
+            return await ctx.send(f"Tag content (including attachment URLs) can be at most {CHAR_LIMIT} characters.")
 
         tag = await self.get_tag(name)
         if tag is None:
