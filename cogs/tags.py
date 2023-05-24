@@ -226,7 +226,7 @@ class Tags(commands.Cog):
 
     @tag.command(aliases=("fe",))
     @checks.is_moderator()
-    async def forceedit(self, ctx, name, *, content):
+    async def forceedit(self, ctx, name, *, content = ""):
         """Edits a tag by force. Attachments will have their URLs appended to the tag.
 
         You must have the Moderator role to use this."""
