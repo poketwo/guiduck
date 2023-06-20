@@ -431,8 +431,8 @@ class HelpDeskCategory(abc.ABC):
     async def reserve_id(self):
         return f"{self.id.upper()} {await self.bot.mongo.reserve_id(f'ticket_{self.id}'):03}"
 
-    async def on_select(self, interaction: discord.Interaction, *, modal_cls=None):
-        await self.open_ticket(interaction, modal_cls=modal_cls or OpenTicketModal)
+    async def on_select(self, interaction: discord.Interaction, *, modal_cls=OpenTicketModal):
+        await self.open_ticket(interaction, modal_cls=modal_cls)
 
     async def on_open(self, ticket: Ticket):
         pass
@@ -443,7 +443,7 @@ class HelpDeskCategory(abc.ABC):
     async def respond_then_open_ticket(self, interaction: discord.Interaction, response: str):
         await interaction.response.send_message(textwrap.dedent(response), ephemeral=True, view=OpenTicketView(self))
 
-    async def open_ticket(self, interaction: discord.Interaction, *, modal_cls=None):
+    async def open_ticket(self, interaction: discord.Interaction, *, modal_cls=OpenTicketModal):
         cd = await self.bot.redis.pttl(f"ticket:{interaction.user.id}")
         if cd >= 0:
             msg = f"You can open a ticket again in **{time.human_timedelta(timedelta(seconds=cd / 1000))}**."
