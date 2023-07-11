@@ -86,7 +86,7 @@ class AsyncEmbedListPageSource(menus.AsyncIteratorPageSource):
             color=discord.Color.blurple(),
             description=f"\n".join(lines),
         )
-        footer = f"Showing entries {start + 1}–{start + len(lines) + 1}"
+        footer = f"Showing entries {start + 1}–{start + len(lines)}"
         if self.count is not None:
             footer += f" out of {self.count}"
         embed.set_footer(text=footer)
