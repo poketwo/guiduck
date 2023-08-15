@@ -100,6 +100,8 @@ class Reputation(commands.Cog):
 
         if msg := await self.process_giverep(ctx, member):
             await ctx.send(msg)
+            # Reset cooldown if rep failed to go through
+            ctx.command.reset_cooldown(ctx)
 
     @commands.hybrid_command()
     @commands.guild_only()
