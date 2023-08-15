@@ -46,6 +46,9 @@ class Reputation(commands.Cog):
         await self.bot.mongo.db.member.update_one({"_id": {"id": member.id, "guild_id": member.guild.id}}, update)
 
     async def process_giverep(self, ctx, member):
+        if member.bot:
+            return "You can't give rep to a bot user!"
+
         if member == ctx.author:
             return "You can't give rep to yourself!"
 
