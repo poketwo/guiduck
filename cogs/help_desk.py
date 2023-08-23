@@ -607,6 +607,20 @@ class Punishments(HelpDeskCategory):
             """,
         )
 
+    async def on_open(self, ticket: Ticket):
+        if ticket.thread is None:
+            return
+        embed = discord.Embed(
+            title="Bans & Suspension Appeal",
+            color=discord.Color.blurple(),
+            description=textwrap.dedent(
+                """
+                We do not accept appeals through this server. If you would like to appeal a punishment, please do so via our appeals site at https://forms.poketwo.net/.
+                """
+            ),
+        )
+        await ticket.thread.send(embed=embed)
+
 
 class Miscellaneous(HelpDeskCategory):
     id = "misc"
