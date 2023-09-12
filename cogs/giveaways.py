@@ -102,7 +102,7 @@ class Giveaway:
 
     async def approval_embed(self):
         embed = discord.Embed(
-            title="Giveaway Request",
+            title="Giveaway Request Pending",
             description="\n".join(i for x in await self.pokemon for i in format_pokemon_details(self.bot, x)),
             color=discord.Color.blurple(),
         )
