@@ -57,12 +57,16 @@ class Logging(commands.Cog):
             "guild_id": channel.guild.id,
             "type": str(channel.type),
             "name": channel.name,
-            "position": channel.position,
         }
+
+        if isinstance(channel, (discord.TextChannel, discord.VoiceChannel, discord.CategoryChannel)):
+            base["position"] = channel.position
         if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
             base["category_id"] = channel.category_id
-        if isinstance(channel, discord.TextChannel):
+        if isinstance(channel, (discord.TextChannel, discord.Thread)):
             base["last_message_id"] = channel.last_message_id
+        if isinstance(channel, (discord.Thread)):
+            base["parent_id"] = channel.parent_id
 
         return UpdateOne({"_id": channel.id}, {"$set": base}, upsert=True)
 
