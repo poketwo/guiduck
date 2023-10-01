@@ -17,6 +17,8 @@ discord-ext-menus-views = { git = "https://github.com/oliver-ni/discord-ext-menu
 python-dateutil = "^2.8.2"
 parsedatetime = "^2.6"
 "discord.py" = { git = "https://github.com/poketwo/discord.py.git" }
+httpx = "^0.25.0"
+authlib = "^1.2.1"
 
 [tool.poetry.dev-dependencies]
 black = "^22.3.0"
