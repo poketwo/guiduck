@@ -36,6 +36,7 @@ class Logging(commands.Cog):
     async def full_cache_guild(self, guild):
         await self.bot.mongo.db.guild.bulk_write([self.make_cache_guild(guild)])
         await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(channel) for channel in guild.channels])
+        await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(channel) for channel in guild.threads])
         await self.bot.mongo.db.member.bulk_write([self.make_cache_member(member) for member in guild.members])
 
     def make_cache_guild(self, guild):
@@ -106,6 +107,8 @@ class Logging(commands.Cog):
 
     @commands.Cog.listener(name="on_guild_channel_create")
     @commands.Cog.listener(name="on_guild_channel_update")
+    @commands.Cog.listener(name="on_thread_create")
+    @commands.Cog.listener(name="on_thread_update")
     async def on_guild_channel_updates(self, *args):
         await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(args[-1])])
 
