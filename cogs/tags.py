@@ -316,8 +316,6 @@ class Tags(commands.Cog):
             member = await ctx.guild.fetch_member(tag.owner_id)
         except discord.NotFound:
             member = None
-        except:  # Ideally this should never occur, but here as a safeguard
-            return await ctx.send("An unexpected error occured, please try again.")
 
         if member is not None:
             return await ctx.send("Tag owner is still in server.")
