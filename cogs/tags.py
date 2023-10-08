@@ -311,7 +311,15 @@ class Tags(commands.Cog):
         tag = await self.get_tag(name)
         if tag is None:
             return await ctx.send("Tag not found.")
-        if ctx.guild.get_member(tag.owner_id) is not None:
+
+        try:
+            member = await ctx.guild.fetch_member(tag.owner_id)
+        except discord.NotFound:
+            member = None
+        except:  # Ideally this should never occur, but here as a safeguard
+            return await ctx.send("An unexpected error occured, please try again.")
+
+        if member is not None:
             return await ctx.send("Tag owner is still in server.")
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": ctx.author.id}})
