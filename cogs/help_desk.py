@@ -561,7 +561,7 @@ class IncenseRefunds(HelpDeskCategory):
 
                 1) A screenshot of you purchasing the incense,
                 2) A screenshot of the bot malfunctioning—not sending spawns, not responding to commands, or something else—and
-                3) A screenshot of you running `p!stopincense`, and pressing Confirm if it asks (if you have not done so yet, please do this now).
+                3) A screenshot of you running `@Pokétwo stopincense`, and pressing Confirm if it asks (if you have not done so yet, please do this now).
 
                 After you submit these pieces of documentation, someone will come by to refund you shortly. Thank you!
                 """
