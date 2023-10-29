@@ -212,6 +212,16 @@ class Warn(Action):
         await super().execute(ctx)
 
 
+class Note(Action):
+    type = "note"
+    past_tense = "noted"
+    emoji = "\N{MEMO}"
+    color = discord.Color.yellow()
+
+    async def execute(self, ctx):
+        await super().execute(ctx)
+
+
 class Timeout(Action):
     type = "timeout"
     past_tense = "placed in timeout"
@@ -323,7 +333,7 @@ class FakeContext:
     guild: discord.Guild
 
 
-cls_dict = {x.type: x for x in (Kick, Ban, Unban, Warn, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute)}
+cls_dict = {x.type: x for x in (Kick, Ban, Unban, Warn, Note, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute)}
 
 
 class BanConverter(commands.Converter):
@@ -599,6 +609,25 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
         await ctx.send(f"Warned **{target}** (Case #{action._id}).", ephemeral=True)
+
+    @commands.hybrid_group(fallback="add")
+    @commands.guild_only()
+    @checks.is_trial_moderator()
+    async def note(self, ctx, target: Union[discord.Member, discord.User], *, note: str):
+        """Silently add a note to a user's history without the need of a parent history entry.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        action = Note(
+            target=target,
+            user=ctx.author,
+            reason=note,
+            guild_id=ctx.guild.id,
+            created_at=ctx.message.created_at,
+        )
+        await action.execute(ctx)
+        await ctx.send(f"Added a note to **{target}**'s history (Case #{action._id}).", ephemeral=True)
 
     @commands.hybrid_command()
     @commands.guild_only()
