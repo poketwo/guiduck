@@ -330,7 +330,9 @@ class FakeContext:
     guild: discord.Guild
 
 
-cls_dict = {x.type: x for x in (Kick, Ban, Unban, Warn, Note, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute)}
+cls_dict = {
+    x.type: x for x in (Kick, Ban, Unban, Warn, Note, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute)
+}
 
 
 class BanConverter(commands.Converter):
@@ -607,7 +609,7 @@ class Moderation(commands.Cog):
         await action.notify()
         await ctx.send(f"Warned **{target}** (Case #{action._id}).", ephemeral=True)
 
-    @commands.hybrid_group(fallback="add")
+    @commands.hybrid_command()
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def note(self, ctx, target: Union[discord.Member, discord.User], *, note: str):
@@ -949,10 +951,10 @@ class Moderation(commands.Cog):
         word = "entry" if result.deleted_count == 1 else "entries"
         await ctx.send(f"Successfully deleted {result.deleted_count} {word}.")
 
-    @history.command()
+    @history.command(name="note")
     @commands.guild_only()
     @checks.is_trial_moderator()
-    async def note(self, ctx, id: int, *, note):
+    async def history_note(self, ctx, id: int, *, note):
         """Adds a note to an entry from punishment history.
 
         You must have the Trial Moderator role to use this.
