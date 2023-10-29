@@ -218,9 +218,6 @@ class Note(Action):
     emoji = "\N{MEMO}"
     color = discord.Color.yellow()
 
-    async def execute(self, ctx):
-        await super().execute(ctx)
-
 
 class Timeout(Action):
     type = "timeout"
