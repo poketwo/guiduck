@@ -39,7 +39,7 @@ class AutoLockThreads(commands.Cog):
                 self.clear_warnings(thread)
             elif time_left < timedelta(hours=1):
                 await self.send_warning(thread, "1 hour")
-            elif time_left < timedelta(days=1):
+            elif timedelta(hours=23) < time_left < timedelta(days=1):
                 await self.send_warning(thread, "24 hours")
 
     @lock_threads.before_loop
