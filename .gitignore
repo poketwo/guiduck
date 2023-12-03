@@ -1,4 +1,5 @@
 .env
+.direnv
 **/.DS_Store
 logs/
 attachments/

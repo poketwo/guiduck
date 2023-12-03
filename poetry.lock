@@ -901,7 +901,7 @@ test = ["pytest", "pytest-cov"]
 
 [[package]]
 name = "jishaku"
-version = "2.5.1a472+gecdd201.master"
+version = "2.5.2a486+g247537e.master"
 description = "A discord.py extension including useful tools for bot development and debugging."
 optional = false
 python-versions = ">=3.10.0"
@@ -911,23 +911,23 @@ develop = false
 [package.dependencies]
 braceexpand = ">=0.1.7"
 click = ">=8.1.3"
-import_expression = ">=1.0.0,<2.0.0"
+import-expression = ">=1.0.0,<2.0.0"
 tabulate = ">=0.9.0"
 
 [package.extras]
-discordpy = ["discord.py (>=2.1.0)"]
-docs = ["Sphinx (>=4.4.0)", "sphinxcontrib_trio (>=1.1.2)"]
-procinfo = ["psutil (>=5.9.4)"]
-profiling = ["line-profiler (>=4.0.2)"]
+discordpy = ["discord.py (>=2.3.1)"]
+docs = ["Sphinx (>=4.4.0)", "sphinxcontrib-trio (>=1.1.2)"]
+procinfo = ["psutil (>=5.9.5)"]
+profiling = ["line-profiler (>=4.0.3)"]
 publish = ["Jinja2 (>=3.1.2)"]
-test = ["coverage (>=7.0.5)", "flake8 (>=6.0.0)", "isort (>=5.11.4)", "pylint (>=2.15.10)", "pytest (>=7.2.1)", "pytest-asyncio (>=0.20.3)", "pytest-cov (>=4.0.0)", "pytest-mock (>=3.10.0)"]
-voice = ["yt-dlp (>=2023.1.6)"]
+test = ["coverage (>=7.2.7)", "flake8 (>=6.0.0)", "isort (>=5.12.0)", "pylint (>=2.17.4)", "pytest (>=7.4.0)", "pytest-asyncio (>=0.21.0)", "pytest-cov (>=4.1.0)", "pytest-mock (>=3.11.1)"]
+voice = ["yt-dlp (>=2023.6.22)"]
 
 [package.source]
 type = "git"
 url = "https://github.com/Gorialis/jishaku.git"
 reference = "HEAD"
-resolved_reference = "4590932f56a0e5a33b15d1c536955d4898d6b04e"
+resolved_reference = "247537e14ecff373fe2c3ac7beb1f7dddf5d49d2"
 
 [[package]]
 name = "motor"
