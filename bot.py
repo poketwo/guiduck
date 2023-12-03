@@ -6,6 +6,9 @@ import config
 from helpers.context import GuiduckContext
 
 ESSENTIAL_COGS = [
+    "bot",
+    "data",
+    "help",
     "mongo",
     "logging",
     "redis",
@@ -14,13 +17,12 @@ ESSENTIAL_COGS = [
 COGS = [
     "automod",
     "autopost",
-    "bot",
+    "auto_lock_threads",
     "collectors",
-    "data",
     "forms",
     "giveaways",
     "help_desk",
-    "help",
+    "keycloak_sync",
     "levels",
     "moderation",
     "names",
