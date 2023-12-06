@@ -22,7 +22,6 @@ COGS = [
     "forms",
     "giveaways",
     "help_desk",
-    "keycloak_sync",
     "levels",
     "moderation",
     "names",
