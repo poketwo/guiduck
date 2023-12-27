@@ -930,7 +930,7 @@ class Moderation(commands.Cog):
         pages = ViewMenuPages(
             source=AsyncEmbedFieldsPageSource(
                 get_actions(),
-                title=f"Punishment History • {target}",
+                title=f"Punishment History • {target} ({target.id})",
                 format_item=format_item,
                 count=count,
             )
