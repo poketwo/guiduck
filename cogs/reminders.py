@@ -75,7 +75,6 @@ class Reminders(commands.Cog):
         self.bot.loop.create_task(self.update_current())
 
     @commands.hybrid_group(aliases=("remind", "remindme"), usage="<when> [event]", fallback="set")
-    @commands.guild_only()
     async def reminder(self, ctx, *, time_and_content: time.UserFriendlyTime(commands.clean_content, default="\u2026")):
         """Sets a reminder for a date or duration of time, e.g.:
 
@@ -89,7 +88,7 @@ class Reminders(commands.Cog):
         reminder = Reminder(
             user=ctx.author,
             event=time_and_content.arg,
-            guild_id=ctx.guild.id,
+            guild_id=ctx.guild and ctx.guild.id or None,
             channel_id=ctx.channel.id,
             message_id=ctx.message.id,
             created_at=ctx.message.created_at,
@@ -107,7 +106,6 @@ class Reminders(commands.Cog):
         )
 
     @reminder.command()
-    @commands.guild_only()
     async def list(self, ctx):
         """Lists future reminders set by you."""
 
@@ -137,14 +135,12 @@ class Reminders(commands.Cog):
             await ctx.send("No reminders found.")
 
     @reminder.command(aliases=("del",))
-    @commands.guild_only()
     async def delete(self, ctx, ids: commands.Greedy[int]):
         """Deletes one or more reminders."""
 
         result = await self.bot.mongo.db.reminder.delete_many(
             {
                 "_id": {"$in": ids},
-                "guild_id": ctx.guild.id,
                 "resolved": False,
                 "user_id": ctx.author.id,
             }
@@ -189,8 +185,11 @@ class Reminders(commands.Cog):
             return
 
         await self.bot.mongo.db.reminder.update_one({"_id": reminder._id}, {"$set": {"resolved": True}})
-        guild = self.bot.get_guild(reminder.guild_id)
-        channel = guild.get_channel_or_thread(reminder.channel_id)
+        if (guild_id := reminder.guild_id):
+            guild = self.bot.get_guild(guild_id)
+            channel = guild.get_channel_or_thread(reminder.channel_id)
+        else:
+            channel = await self.bot.create_dm(reminder.user)
         text = f"Reminder from {discord.utils.format_dt(reminder.created_at, 'R')}: {reminder.event}"
 
         if channel is not None:
