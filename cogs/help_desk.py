@@ -615,7 +615,7 @@ class Punishments(HelpDeskCategory):
             color=discord.Color.blurple(),
             description=textwrap.dedent(
                 """
-                We do not accept appeals through this server. If you would like to appeal a punishment, please do so via our appeals site at https://forms.poketwo.net/.
+                We do not accept appeals through this server. If you would like to appeal a punishment, please do so via our appeals site at https://forms.poketwo.net.
                 """
             ),
         )
