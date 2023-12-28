@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import Iterable, NamedTuple
 
 import discord
 from discord.ext import commands
@@ -61,3 +61,9 @@ class MemberOrFetchUserConverter(commands.Converter):
             return await commands.MemberConverter().convert(ctx, arg)
         except commands.MemberNotFound:
             return await FetchUserConverter().convert(ctx, arg)
+
+
+def with_attachment_urls(content: str, attachments: Iterable[discord.Attachment]) -> str:
+    for attachment in attachments:
+        content += f"\n{attachment.url}"
+    return content

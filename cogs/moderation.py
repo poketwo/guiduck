@@ -3,7 +3,7 @@ from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Union
+from typing import Optional, Union
 
 import discord
 from discord.ext import commands, tasks
@@ -13,7 +13,7 @@ from discord.ui import button
 
 from helpers import checks, constants, time
 from helpers.pagination import AsyncEmbedFieldsPageSource
-from helpers.utils import FakeUser, FetchUserConverter
+from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
 
 class ModerationUserFriendlyTime(time.UserFriendlyTime):
@@ -615,11 +615,18 @@ class Moderation(commands.Cog):
     @commands.hybrid_command()
     @commands.guild_only()
     @checks.is_trial_moderator()
-    async def note(self, ctx, target: Union[discord.Member, discord.User], *, note: str):
+    async def note(self, ctx, target: Union[discord.Member, discord.User], *, note: Optional[str] = ""):
         """Silently add a note to a user's history without the need of a parent history entry.
 
         You must have the Trial Moderator role to use this.
         """
+
+        note = with_attachment_urls(note, ctx.message.attachments)
+
+        if len(note) == 0:
+            return await ctx.send_help(ctx.command)
+        elif len(note) > constants.EMBED_FIELD_CHAR_LIMIT:
+            return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
 
         action = Note(
             target=target,
@@ -957,11 +964,18 @@ class Moderation(commands.Cog):
     @history.command(name="note")
     @commands.guild_only()
     @checks.is_trial_moderator()
-    async def history_note(self, ctx, id: int, *, note):
+    async def history_note(self, ctx, id: int, *, note: Optional[str] = ""):
         """Adds a note to an entry from punishment history.
 
         You must have the Trial Moderator role to use this.
         """
+
+        note = with_attachment_urls(note, ctx.message.attachments)
+
+        if len(note) == 0:
+            return await ctx.send_help(ctx.command)
+        elif len(note) > constants.EMBED_FIELD_CHAR_LIMIT:
+            return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
 
         result = await self.bot.mongo.db.action.find_one_and_update(
             {"_id": id, "guild_id": ctx.guild.id}, {"$set": {"note": note}}
