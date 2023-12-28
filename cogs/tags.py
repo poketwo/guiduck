@@ -8,7 +8,7 @@ from discord.ext.menus.views import ViewMenuPages
 
 from helpers import checks
 from helpers.pagination import AsyncEmbedListPageSource
-from helpers.utils import FakeUser
+from helpers.utils import FakeUser, with_attachment_urls
 
 
 CHAR_LIMIT = 1994
@@ -161,18 +161,12 @@ class Tags(commands.Cog):
 
     # Writing tags
 
-    @staticmethod
-    def with_attachment_urls(content, attachments):
-        for attachment in attachments:
-            content += f"\n{attachment.url}"
-        return content
-
     @tag.command()
     @commands.check_any(checks.is_moderator(), commands.has_role("Create Tags"))
     async def create(self, ctx, name, *, content = ""):
         """Creates a new tag owned by you. Attachments will have their URLs appended to the tag."""
 
-        content = self.with_attachment_urls(content, ctx.message.attachments)
+        content = with_attachment_urls(content, ctx.message.attachments)
 
         if len(content) == 0:
             return await ctx.send_help(ctx.command)
@@ -206,7 +200,7 @@ class Tags(commands.Cog):
     async def edit(self, ctx, name, *, content = ""):
         """Modifies an existing tag that you own. Attachments will have their URLs appended to the tag."""
 
-        content = self.with_attachment_urls(content, ctx.message.attachments)
+        content = with_attachment_urls(content, ctx.message.attachments)
 
         if len(content) == 0:
             return await ctx.send_help(ctx.command)
@@ -231,7 +225,7 @@ class Tags(commands.Cog):
 
         You must have the Moderator role to use this."""
 
-        content = self.with_attachment_urls(content, ctx.message.attachments)
+        content = with_attachment_urls(content, ctx.message.attachments)
 
         if len(content) == 0:
             return await ctx.send_help(ctx.command)
