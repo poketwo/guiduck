@@ -170,7 +170,7 @@ class Logging(commands.Cog):
     @commands.hybrid_group(fallback="get")
     @checks.is_trial_moderator()
     @commands.guild_only()
-    async def logs(self, ctx, *, channel: discord.TextChannel = None):
+    async def logs(self, ctx, *, channel: discord.TextChannel | discord.Thread | discord.VoiceChannel = None):
         """Gets a link to the message logs for a channel.
 
         You must have the Trial Moderator role to use this.
@@ -182,7 +182,7 @@ class Logging(commands.Cog):
     @logs.command()
     @commands.guild_only()
     @checks.is_community_manager()
-    async def restrict(self, ctx, channel: discord.TextChannel = None):
+    async def restrict(self, ctx, channel: discord.TextChannel | discord.Thread | discord.VoiceChannel = None):
         """Restricts the logs for a channel to Admins.
 
         You must have the Community Manager role to use this.
