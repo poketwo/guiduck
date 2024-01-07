@@ -528,7 +528,7 @@ class Moderation(commands.Cog):
     @commands.cooldown(1, EMERGENCY_COOLDOWN_HOURS*60*60, commands.BucketType.guild)  # Cooldown per guild
     @commands.guild_only()
     async def emergency(self, ctx: GuiduckContext, *, reason: str):
-        """Emergency command to alert moderators.
+        """Emergency command to alert staff members.
 
         Do no abuse. Meant for use during emergencies that need immediate staff attention.
         """
@@ -540,7 +540,7 @@ class Moderation(commands.Cog):
         number_staff = len(role.members)
         confirm_embed = discord.Embed(
             color=discord.Color.red(),
-            title="Emergency Staff Alert",
+            title="🚨 Emergency Staff Alert",
             description=textwrap.dedent(
                 f"""
                 This command is designed for use in case of emergencies that need immediate staff attention. This will ping **{number_staff}** staff member{'' if number_staff == 1 else 's'} assigned to the {role.mention} role, and you will be assisted shortly.
@@ -582,7 +582,7 @@ class Moderation(commands.Cog):
 
         alert_embed = discord.Embed(
             color=discord.Color.red(),
-            title="Emergency Staff Alert Issued",
+            title="🚨 Emergency Staff Alert Issued",
             description=""
         )
         alert_embed.set_author(
