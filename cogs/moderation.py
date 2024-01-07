@@ -3,6 +3,7 @@ from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import textwrap
 from typing import Optional, Union
 
 import discord
@@ -12,6 +13,7 @@ from discord.ext.menus.views import ViewMenuPages
 from discord.ui import button
 
 from helpers import checks, constants, time
+from helpers.context import GuiduckContext
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
@@ -365,6 +367,9 @@ class MemberOrIdConverter(commands.Converter):
             raise commands.MemberNotFound(arg)
 
 
+EMERGENCY_COOLDOWN_HOURS = 1
+
+
 class Moderation(commands.Cog):
     """For moderation."""
 
@@ -491,6 +496,78 @@ class Moderation(commands.Cog):
             created_at=entry.created_at,
         )
         await self.save_action(action)
+
+    @commands.hybrid_group(name="emergency", aliases=("emergency-staff", "alert", "alert-staff"), cooldown_after_parsing=True)
+    @commands.cooldown(1, EMERGENCY_COOLDOWN_HOURS*60*60, commands.BucketType.guild)  # Cooldown per guild
+    @commands.guild_only()
+    async def emergency(self, ctx: GuiduckContext, *, reason: str):
+        """Emergency command to alert moderators.
+
+        Do no abuse. Meant for use during emergencies that need immediate staff attention.
+        """
+
+        role = discord.utils.find(lambda r: r.id in constants.EMERGENCY_STAFF_ROLES, ctx.guild.roles)
+        if role is None:
+            return await ctx.send("Emergency Staff role not found in this guild. Please ask an Administrator to set one up.", ephemeral=True)
+
+        number_staff = len(role.members)
+        confirm_embed = discord.Embed(
+            color=discord.Color.red(),
+            title="Emergency Staff Alert",
+            description=textwrap.dedent(
+                f"""
+                This command is designed for use in case of emergencies that need immediate staff attention. This will ping **{number_staff}** staff member{'' if number_staff == 1 else 's'} assigned to the {role.mention} role, and you will be assisted shortly.
+                """
+            )
+        )
+        confirm_embed.add_field(
+            name="Are you sure that you want to send an Emergency Staff Alert for the following reason?",
+            value=reason,
+            inline=False
+        )
+
+        rules_embed = discord.Embed(
+            color=discord.Color.blurple(),
+            title="Use Cases & Abuse",
+            description=textwrap.dedent(
+                f"""
+                Abuse of this alert system is **strictly prohibited** and **will** result in repercussions if used maliciously. Here are some examples to help understand when and when not to use it, this is not exhaustive:
+                **✅ Acceptable Cases**
+                - Sending NSFW/disturbing content in our server(s)/DMs
+                - Advertising Crosstrading/Distribution of automated scripts in our server(s), that violate Pokétwo TOS
+                - Malicious/excessive spam in our server(s)
+                - Advertising/Links to malicious/scam websites in our server(s)/DMs
+                - Violating any other rule to an excessive extent
+                **<:white_cross_mark:1193650736702177361> Unacceptable Cases**
+                - Suspected autocatching in our server(s)
+                - Server advertisement
+                - Toxicity/Harrassment
+                - Bot outages/bugs/glitches — Please use #bug-reports
+                - To ask staff to check appeals/applications
+                """  # TODO: Use actual cross emoji
+            )
+        )
+        rules_embed.set_footer(text="Please use `?report` in unacceptable cases that violate our rules.")
+
+        if not await ctx.confirm(embeds=[confirm_embed, rules_embed], ephemeral=True):
+            ctx.command.reset_cooldown(ctx)
+            return await ctx.send("Aborted.", ephemeral=True)
+
+        alert_embed = discord.Embed(
+            color=discord.Color.red(),
+            title="Emergency Staff Alert Issued",
+            description=""
+        )
+        alert_embed.set_author(
+            name=f"{ctx.author} ({ctx.author.id})",
+            icon_url=ctx.author.display_avatar,
+        )
+        alert_embed.add_field(
+            name="Reason",
+            value=reason,
+            inline=False
+        )
+        await ctx.reply(role.mention, embed=alert_embed)
 
     async def run_purge(self, ctx, limit, check):
         class ConfirmPurgeView(discord.ui.View):
