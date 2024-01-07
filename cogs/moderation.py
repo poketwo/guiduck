@@ -369,6 +369,33 @@ class MemberOrIdConverter(commands.Converter):
 
 EMERGENCY_COOLDOWN_HOURS = 1
 
+class EmergencyView(discord.ui.View):
+    def __init__(self, ctx: GuiduckContext):
+        super().__init__(timeout=None)
+        self.ctx = ctx
+        self.message: discord.Message
+
+    @discord.ui.button(label="Resolve", style=discord.ButtonStyle.green)
+    async def resolve(self, interaction: discord.Interaction, button: discord.Button):
+        await interaction.response.defer()
+        button.label = "Resolved"
+        button.disabled = True
+
+        embed = self.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"Resolved by @{interaction.user} ({interaction.user.id})")
+        await self.message.edit(embed=embed, view=self)
+
+    async def interaction_check(self, interaction: discord.Interaction):
+        user = interaction.user
+        checks = (
+            any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(user, "roles", []))
+            or user.id in {self.ctx.bot.owner_id, self.ctx.author.id, *self.ctx.bot.owner_ids}
+        )
+        if not checks:
+            await interaction.response.send_message("You can't use this!", ephemeral=True)
+            return False
+        return True
 
 class Moderation(commands.Cog):
     """For moderation."""
@@ -567,7 +594,9 @@ class Moderation(commands.Cog):
             value=reason,
             inline=False
         )
-        await ctx.reply(role.mention, embed=alert_embed)
+        view = EmergencyView(ctx)
+        view.add_item(discord.ui.Button(label="Logs", url=f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}"))
+        view.message = await ctx.reply(role.mention, embed=alert_embed, view=view)
 
     @emergency.error
     async def emergency_error(self, ctx: GuiduckContext, error):
