@@ -329,6 +329,36 @@ class TradingUnmute(Action):
         await super().execute(ctx)
 
 
+class EmergencyAlertBan(Action):
+    type = "emergency_alert_ban"
+    past_tense = "banned from emergency staff alerts"
+    emoji = "\N{BELL WITH CANCELLATION STROKE}"
+    color = discord.Color.magenta()
+
+    async def execute(self, ctx):
+        await ctx.bot.mongo.db.member.update_one(
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$set": {"emergency_alert_banned_until": self.expires_at or True}},
+            upsert=True,
+        )
+        await super().execute(ctx)
+
+
+class EmergencyAlertUnban(Action):
+    type = "emergency_alert_unban"
+    past_tense = "removed from emergency staff alert ban"
+    emoji = "\N{BELL}"
+    color = discord.Color.green()
+
+    async def execute(self, ctx):
+        await ctx.bot.mongo.db.member.update_one(
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$unset": {"emergency_alert_banned_until": 1}},
+            upsert=True,
+        )
+        await super().execute(ctx)
+
+
 @dataclass
 class FakeContext:
     bot: commands.Bot
@@ -336,7 +366,7 @@ class FakeContext:
 
 
 cls_dict = {
-    x.type: x for x in (Kick, Ban, Unban, Warn, Note, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute)
+    x.type: x for x in (Kick, Ban, Unban, Warn, Note, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute, EmergencyAlertBan, EmergencyAlertUnban)
 }
 
 
@@ -533,6 +563,14 @@ class Moderation(commands.Cog):
         Do no abuse. Meant for use during emergencies that need immediate staff attention.
         """
 
+        member = await self.bot.mongo.db.member.find_one({"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}})
+        if until := member.get("emergency_alert_banned_until"):
+            if until is True:
+                return await ctx.send("You've been permanently banned from issuing emergency staff alerts due to violation(s) of its rules. If you think that this was a mistake, please contact a staff member.")
+            elif until is not None and until > (now := datetime.now(timezone.utc)):
+                seconds = (until - now).total_seconds()
+                return await ctx.send(f"You've been banned from issuing emergency staff alerts for **{time.human_timedelta(timedelta(seconds=seconds))}** due to violation(s) of its rules.")
+
         role = discord.utils.find(lambda r: r.id in constants.EMERGENCY_STAFF_ROLES, ctx.guild.roles)
         if role is None:
             return await ctx.send("Emergency Staff role not found in this guild. Please ask an Administrator to set one up.", ephemeral=True)
@@ -605,6 +643,60 @@ class Moderation(commands.Cog):
                 f"An Emergency Staff Alert has already been issued recently and is currently on cooldown. Please use `?report` instead if necessary.",
                 ephemeral=True,
             )
+
+    @emergency.command(name="ban", usage="<target> [expires_at] [reason]")
+    @checks.is_trial_moderator()
+    async def emergency_ban(self, ctx, target: discord.Member, *, time_and_reason):
+        """Temporarily or permanently bans a member from using the Emergency Staff Alert command.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        if any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(target, "roles", [])):
+            return await ctx.send("You can't punish that person!", ephemeral=True)
+
+        expires_at, reason = await self.parse_time_and_reason(ctx, time_and_reason)
+
+        action = EmergencyAlertBan(
+            target=target,
+            user=ctx.author,
+            reason=reason,
+            guild_id=ctx.guild.id,
+            created_at=ctx.message.created_at,
+            expires_at=expires_at,
+        )
+        await action.execute(ctx)
+        await action.notify()
+
+        if action.duration is None:
+            await ctx.send(f"Permanently banned **{target}** from issuing emergency staff alerts (Case #{action._id}).", ephemeral=True)
+        else:
+            await ctx.send(
+                f"Banned **{target}** from issuing emergency staff alerts for **{time.human_timedelta(action.duration)}** (Case #{action._id}).",
+                ephemeral=True,
+            )
+
+    @emergency.command(name="unban", usage="<target> [reason]")
+    @checks.is_trial_moderator()
+    async def emergency_unban(self, ctx, target: discord.Member, *, reason=None):
+        """Unbans a member who has been banned from using the Emergency Staff Alert command.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        action = EmergencyAlertUnban(
+            target=target,
+            user=ctx.author,
+            reason=reason,
+            guild_id=ctx.guild.id,
+        )
+        await action.execute(ctx)
+        await action.notify()
+
+        await ctx.send(
+            f"Unbanned **{target}** from issuing emergency staff alerts (Case #{action._id}).",
+            ephemeral=True,
+        )
 
     async def run_purge(self, ctx, limit, check):
         class ConfirmPurgeView(discord.ui.View):
@@ -995,6 +1087,8 @@ class Moderation(commands.Cog):
             action_type = SymbolicUntimeout
         elif action.type == "trading_mute":
             action_type = TradingUnmute
+        elif action.type == "emergency_alert_ban":
+            action_type = EmergencyAlertUnban
         else:
             return
 
