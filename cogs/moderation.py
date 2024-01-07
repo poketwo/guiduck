@@ -576,7 +576,7 @@ class Moderation(commands.Cog):
         )
         rules_embed.set_footer(text="Please use `?report` in unacceptable cases that violate our rules.")
 
-        if not await ctx.confirm(embeds=[confirm_embed, rules_embed], ephemeral=True):
+        if not await ctx.confirm(timeout=120, embeds=[confirm_embed, rules_embed], ephemeral=True):
             ctx.command.reset_cooldown(ctx)
             return await ctx.send("Aborted.", ephemeral=True)
 
