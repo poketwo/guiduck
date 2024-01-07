@@ -569,6 +569,14 @@ class Moderation(commands.Cog):
         )
         await ctx.reply(role.mention, embed=alert_embed)
 
+    @emergency.error
+    async def emergency_error(self, ctx: GuiduckContext, error):
+        if isinstance(error, commands.CommandOnCooldown):
+            await ctx.send(
+                f"An Emergency Staff Alert has already been issued recently and is currently on cooldown. Please use `?report` instead if necessary.",
+                ephemeral=True,
+            )
+
     async def run_purge(self, ctx, limit, check):
         class ConfirmPurgeView(discord.ui.View):
             @button(label=f"Purge up to {limit} messages", style=discord.ButtonStyle.danger)
