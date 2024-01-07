@@ -581,7 +581,7 @@ class Moderation(commands.Cog):
             title="🚨 Emergency Staff Alert",
             description=textwrap.dedent(
                 f"""
-                This command is designed for use in case of emergencies that need immediate staff attention. This will ping **{number_staff}** staff member{'' if number_staff == 1 else 's'} assigned to the {role.mention} role, and you will be assisted shortly.
+                This command is designed for use in case of emergencies that need immediate staff attention. This will ping **{number_staff}** staff member{'' if number_staff == 1 else 's'} currently assigned to the {role.mention} role, and you will be assisted shortly.
                 """
             )
         )
@@ -601,15 +601,15 @@ class Moderation(commands.Cog):
                 - Sending NSFW/disturbing content in our server(s)/DMs
                 - Advertising Crosstrading/Distribution of automated scripts in our server(s), that violate Pokétwo TOS
                 - Malicious/excessive spam in our server(s)
-                - Advertising/Links to malicious/scam websites in our server(s)/DMs
+                - Advertising links to malicious/scam websites in our server(s)/DMs
                 - Violating any other rule to an excessive extent
-                **<:white_cross_mark:1193650736702177361> Unacceptable Cases**
+                **<:white_cross_mark:1193650425166045224> Unacceptable Cases**
                 - Suspected autocatching in our server(s)
                 - Server advertisement
                 - Toxicity/Harrassment
-                - Bot outages/bugs/glitches — Please use #bug-reports
+                - Bot outages/bugs/glitches — Please use #bug-reports, or ping a Developer in case of emergency
                 - To ask staff to check appeals/applications
-                """  # TODO: Use actual cross emoji
+                """
             )
         )
         rules_embed.set_footer(text="Please use `?report` in unacceptable cases that violate our rules.")
