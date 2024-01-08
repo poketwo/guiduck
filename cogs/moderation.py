@@ -589,10 +589,12 @@ class Moderation(commands.Cog):
         member = await self.bot.mongo.db.member.find_one({"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}})
         if until := member.get("emergency_alert_banned_until"):
             if until is True:
+                ctx.command.reset_cooldown(ctx)
                 return await ctx.send(
                     "You've been permanently banned from issuing emergency staff alerts due to violation(s) of its rules. If you think that this was a mistake, please contact a staff member."
                 )
             elif until is not None and until > (now := datetime.now(timezone.utc)):
+                ctx.command.reset_cooldown(ctx)
                 seconds = (until - now).total_seconds()
                 return await ctx.send(
                     f"You've been banned from issuing emergency staff alerts for **{time.human_timedelta(timedelta(seconds=seconds))}** due to violation(s) of its rules."
@@ -601,6 +603,7 @@ class Moderation(commands.Cog):
         guild = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
         role = ctx.guild.get_role(guild.get("emergency_alert_role")) if guild else None
         if role is None:
+            ctx.command.reset_cooldown(ctx)
             return await ctx.send(
                 "Emergency Staff Alert role not found for this guild. Please ask an Administrator to set one up.",
                 ephemeral=True,
