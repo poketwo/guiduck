@@ -541,7 +541,7 @@ class Reports(HelpDeskCategory):
                 Thank you for reporting! We're sorry for any inconveniences you may have experienced. Please provide the following pieces of information for the report you're making to help us understand the situation better:
 
                 1. User ID of the user you're reporting (use `?tag find-id` if you're not sure how),
-                2. Context and explanation regarding the report (e.g. how you think they've violated our rules, how this has troubled you, how we can help, etc) and
+                2. Context and explanation regarding the report (e.g. what happened, how you think they've violated our rules, etc) and
                 3. Evidence to back your report. This can be in the form of, but not limited to:
                   - Full, unedited screenshots
                   - Screen recordings
