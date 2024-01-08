@@ -571,9 +571,10 @@ class Moderation(commands.Cog):
                 seconds = (until - now).total_seconds()
                 return await ctx.send(f"You've been banned from issuing emergency staff alerts for **{time.human_timedelta(timedelta(seconds=seconds))}** due to violation(s) of its rules.")
 
-        role = discord.utils.find(lambda r: r.id in constants.EMERGENCY_STAFF_ROLES, ctx.guild.roles)
+        guild = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
+        role = ctx.guild.get_role(guild.get("emergency_alert_role")) if guild else None
         if role is None:
-            return await ctx.send("Emergency Staff role not found in this guild. Please ask an Administrator to set one up.", ephemeral=True)
+            return await ctx.send("Emergency Staff Alert role not found for this guild. Please ask an Administrator to set one up.", ephemeral=True)
 
         number_staff = len(role.members)
         confirm_embed = discord.Embed(
@@ -643,6 +644,18 @@ class Moderation(commands.Cog):
                 f"An Emergency Staff Alert has already been issued recently and is currently on cooldown. Please use `?report` instead if necessary.",
                 ephemeral=True,
             )
+
+    @emergency.command(name="set-role")
+    @checks.is_community_manager()
+    @commands.guild_only()
+    async def emergency_set_role(self, ctx: GuiduckContext, *, role: Optional[discord.Role] = None):
+        """Set the role for emergency alerts for a guild.
+
+        You must have the Community Manager role to use this.
+        """
+
+        await self.bot.mongo.db.guild.update_one({"_id": ctx.guild.id}, {"$set": {"emergency_alert_role": getattr(role, "id", role)}}, upsert=True)
+        await ctx.send(f"{f'Set {role.mention} as' if role else 'Unset'} the Emergency Staff Alert role for this guild.")
 
     @emergency.command(name="ban", usage="<target> [expires_at] [reason]")
     @checks.is_trial_moderator()
