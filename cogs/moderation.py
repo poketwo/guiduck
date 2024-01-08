@@ -554,7 +554,7 @@ class Moderation(commands.Cog):
         )
         await self.save_action(action)
 
-    @commands.hybrid_group(name="emergency", aliases=("emergency-staff", "alert", "alert-staff"), cooldown_after_parsing=True)
+    @commands.hybrid_group(aliases=("emergency-staff", "alert", "alert-staff"), cooldown_after_parsing=True, fallback="send", invoke_without_subcommand=True)
     @commands.cooldown(1, EMERGENCY_COOLDOWN_HOURS*60*60, commands.BucketType.guild)  # Cooldown per guild
     @commands.guild_only()
     async def emergency(self, ctx: GuiduckContext, *, reason: str):
@@ -659,7 +659,8 @@ class Moderation(commands.Cog):
 
     @emergency.command(name="ban", usage="<target> [expires_at] [reason]")
     @checks.is_trial_moderator()
-    async def emergency_ban(self, ctx, target: discord.Member, *, time_and_reason):
+    @commands.guild_only()
+    async def emergency_ban(self, ctx: GuiduckContext, target: discord.Member, *, time_and_reason):
         """Temporarily or permanently bans a member from using the Emergency Staff Alert command.
 
         You must have the Trial Moderator role to use this.
@@ -691,7 +692,8 @@ class Moderation(commands.Cog):
 
     @emergency.command(name="unban", usage="<target> [reason]")
     @checks.is_trial_moderator()
-    async def emergency_unban(self, ctx, target: discord.Member, *, reason=None):
+    @commands.guild_only()
+    async def emergency_unban(self, ctx: GuiduckContext, target: discord.Member, *, reason=None):
         """Unbans a member who has been banned from using the Emergency Staff Alert command.
 
         You must have the Trial Moderator role to use this.
