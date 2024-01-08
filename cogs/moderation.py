@@ -366,7 +366,22 @@ class FakeContext:
 
 
 cls_dict = {
-    x.type: x for x in (Kick, Ban, Unban, Warn, Note, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute, EmergencyAlertBan, EmergencyAlertUnban)
+    x.type: x
+    for x in (
+        Kick,
+        Ban,
+        Unban,
+        Warn,
+        Note,
+        Timeout,
+        Untimeout,
+        Mute,
+        Unmute,
+        TradingMute,
+        TradingUnmute,
+        EmergencyAlertBan,
+        EmergencyAlertUnban,
+    )
 }
 
 
@@ -399,6 +414,7 @@ class MemberOrIdConverter(commands.Converter):
 
 EMERGENCY_COOLDOWN_HOURS = 1
 
+
 class EmergencyView(discord.ui.View):
     def __init__(self, ctx: GuiduckContext):
         super().__init__(timeout=None)
@@ -418,14 +434,16 @@ class EmergencyView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction):
         user = interaction.user
-        checks = (
-            any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(user, "roles", []))
-            or user.id in {self.ctx.bot.owner_id, self.ctx.author.id, *self.ctx.bot.owner_ids}
-        )
+        checks = any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(user, "roles", [])) or user.id in {
+            self.ctx.bot.owner_id,
+            self.ctx.author.id,
+            *self.ctx.bot.owner_ids,
+        }
         if not checks:
             await interaction.response.send_message("You can't use this!", ephemeral=True)
             return False
         return True
+
 
 class Moderation(commands.Cog):
     """For moderation."""
@@ -554,8 +572,13 @@ class Moderation(commands.Cog):
         )
         await self.save_action(action)
 
-    @commands.hybrid_group(aliases=("emergency-staff", "alert", "alert-staff"), cooldown_after_parsing=True, fallback="send", invoke_without_subcommand=True)
-    @commands.cooldown(1, EMERGENCY_COOLDOWN_HOURS*60*60, commands.BucketType.guild)  # Cooldown per guild
+    @commands.hybrid_group(
+        aliases=("emergency-staff", "alert", "alert-staff"),
+        cooldown_after_parsing=True,
+        fallback="send",
+        invoke_without_subcommand=True,
+    )
+    @commands.cooldown(1, EMERGENCY_COOLDOWN_HOURS * 60 * 60, commands.BucketType.guild)  # Cooldown per guild
     @commands.guild_only()
     async def emergency(self, ctx: GuiduckContext, *, reason: str):
         """Emergency command to alert staff members.
@@ -566,15 +589,22 @@ class Moderation(commands.Cog):
         member = await self.bot.mongo.db.member.find_one({"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}})
         if until := member.get("emergency_alert_banned_until"):
             if until is True:
-                return await ctx.send("You've been permanently banned from issuing emergency staff alerts due to violation(s) of its rules. If you think that this was a mistake, please contact a staff member.")
+                return await ctx.send(
+                    "You've been permanently banned from issuing emergency staff alerts due to violation(s) of its rules. If you think that this was a mistake, please contact a staff member."
+                )
             elif until is not None and until > (now := datetime.now(timezone.utc)):
                 seconds = (until - now).total_seconds()
-                return await ctx.send(f"You've been banned from issuing emergency staff alerts for **{time.human_timedelta(timedelta(seconds=seconds))}** due to violation(s) of its rules.")
+                return await ctx.send(
+                    f"You've been banned from issuing emergency staff alerts for **{time.human_timedelta(timedelta(seconds=seconds))}** due to violation(s) of its rules."
+                )
 
         guild = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
         role = ctx.guild.get_role(guild.get("emergency_alert_role")) if guild else None
         if role is None:
-            return await ctx.send("Emergency Staff Alert role not found for this guild. Please ask an Administrator to set one up.", ephemeral=True)
+            return await ctx.send(
+                "Emergency Staff Alert role not found for this guild. Please ask an Administrator to set one up.",
+                ephemeral=True,
+            )
 
         number_staff = len(role.members)
         confirm_embed = discord.Embed(
@@ -584,12 +614,12 @@ class Moderation(commands.Cog):
                 f"""
                 This command is designed for use in case of emergencies that need immediate staff attention. This will ping **{number_staff}** staff member{'' if number_staff == 1 else 's'} currently assigned to the {role.mention} role, and you will be assisted shortly.
                 """
-            )
+            ),
         )
         confirm_embed.add_field(
             name="Are you sure that you want to send an Emergency Staff Alert for the following reason?",
             value=reason,
-            inline=False
+            inline=False,
         )
 
         rules_embed = discord.Embed(
@@ -611,7 +641,7 @@ class Moderation(commands.Cog):
                 - Bot outages/bugs/glitches — Please use #bug-reports or ping a Developer in case of emergency
                 - To ask staff to check appeals/applications
                 """
-            )
+            ),
         )
         rules_embed.set_footer(text="Please use `?report` in unacceptable cases that violate our rules.")
 
@@ -619,22 +649,19 @@ class Moderation(commands.Cog):
             ctx.command.reset_cooldown(ctx)
             return await ctx.send("Aborted.", ephemeral=True)
 
-        alert_embed = discord.Embed(
-            color=discord.Color.red(),
-            title="🚨 Emergency Staff Alert Issued",
-            description=""
-        )
+        alert_embed = discord.Embed(color=discord.Color.red(), title="🚨 Emergency Staff Alert Issued", description="")
         alert_embed.set_author(
             name=f"{ctx.author} ({ctx.author.id})",
             icon_url=ctx.author.display_avatar,
         )
-        alert_embed.add_field(
-            name="Reason",
-            value=reason,
-            inline=False
-        )
+        alert_embed.add_field(name="Reason", value=reason, inline=False)
         view = EmergencyView(ctx)
-        view.add_item(discord.ui.Button(label="Logs", url=f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}"))
+        view.add_item(
+            discord.ui.Button(
+                label="Logs",
+                url=f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}",
+            )
+        )
         view.message = await ctx.reply(role.mention, embed=alert_embed, view=view)
 
     @emergency.error
@@ -654,8 +681,12 @@ class Moderation(commands.Cog):
         You must have the Community Manager role to use this.
         """
 
-        await self.bot.mongo.db.guild.update_one({"_id": ctx.guild.id}, {"$set": {"emergency_alert_role": getattr(role, "id", role)}}, upsert=True)
-        await ctx.send(f"{f'Set {role.mention} as' if role else 'Unset'} the Emergency Staff Alert role for this guild.")
+        await self.bot.mongo.db.guild.update_one(
+            {"_id": ctx.guild.id}, {"$set": {"emergency_alert_role": getattr(role, "id", role)}}, upsert=True
+        )
+        await ctx.send(
+            f"{f'Set {role.mention} as' if role else 'Unset'} the Emergency Staff Alert role for this guild."
+        )
 
     @emergency.command(name="ban", usage="<target> [expires_at] [reason]")
     @checks.is_trial_moderator()
@@ -683,7 +714,10 @@ class Moderation(commands.Cog):
         await action.notify()
 
         if action.duration is None:
-            await ctx.send(f"Permanently banned **{target}** from issuing emergency staff alerts (Case #{action._id}).", ephemeral=True)
+            await ctx.send(
+                f"Permanently banned **{target}** from issuing emergency staff alerts (Case #{action._id}).",
+                ephemeral=True,
+            )
         else:
             await ctx.send(
                 f"Banned **{target}** from issuing emergency staff alerts for **{time.human_timedelta(action.duration)}** (Case #{action._id}).",
@@ -847,7 +881,9 @@ class Moderation(commands.Cog):
         if len(note) == 0:
             return await ctx.send_help(ctx.command)
         elif len(note) > constants.EMBED_FIELD_CHAR_LIMIT:
-            return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
+            return await ctx.send(
+                f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters."
+            )
 
         action = Note(
             target=target,
@@ -1198,7 +1234,9 @@ class Moderation(commands.Cog):
         if len(note) == 0:
             return await ctx.send_help(ctx.command)
         elif len(note) > constants.EMBED_FIELD_CHAR_LIMIT:
-            return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
+            return await ctx.send(
+                f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters."
+            )
 
         reset = note.lower() == "reset"
         
