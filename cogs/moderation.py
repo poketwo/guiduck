@@ -10,7 +10,6 @@ from discord.ext import commands, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from discord.ext.menus.views import ViewMenuPages
 from discord.ui import button
-from pymongo import ReturnDocument
 
 from helpers import checks, constants, time
 from helpers.pagination import AsyncEmbedFieldsPageSource
@@ -983,7 +982,6 @@ class Moderation(commands.Cog):
         result = await self.bot.mongo.db.action.find_one_and_update(
             {"_id": id, "guild_id": ctx.guild.id},
             {"$set": {"note": note}} if not reset else {"$unset": {"note": 1}},
-            return_document=ReturnDocument.AFTER,
         )
         if result is None:
             return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
