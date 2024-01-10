@@ -982,7 +982,7 @@ class Moderation(commands.Cog):
         
         result = await self.bot.mongo.db.action.find_one_and_update(
             {"_id": id, "guild_id": ctx.guild.id},
-            {"$set": {"note": note}} if not reset else {"$unset": {"note": 1}}},
+            {"$set": {"note": note}} if not reset else {"$unset": {"note": 1}},
             return_document=ReturnDocument.AFTER,
         )
         if result is None:
