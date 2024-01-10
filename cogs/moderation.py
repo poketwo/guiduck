@@ -10,6 +10,7 @@ from discord.ext import commands, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from discord.ext.menus.views import ViewMenuPages
 from discord.ui import button
+from pymongo import ReturnDocument
 
 from helpers import checks, constants, time
 from helpers.pagination import AsyncEmbedFieldsPageSource
@@ -977,16 +978,21 @@ class Moderation(commands.Cog):
         elif len(note) > constants.EMBED_FIELD_CHAR_LIMIT:
             return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
 
+        reset = note.lower() == "reset"
+        
         result = await self.bot.mongo.db.action.find_one_and_update(
-            {"_id": id, "guild_id": ctx.guild.id}, {"$set": {"note": note}}
+            {"_id": id, "guild_id": ctx.guild.id},
+            {"$set": {"note": note}} if not reset else {"$unset": {"note": 1}},
+            return_document=ReturnDocument.AFTER,
         )
         if result is None:
             return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
-        if note.lower() == "reset":
-            await self.bot.mongo.db.action.update_one({"_id": id, "guild_id": ctx.guild.id}, {"$unset": {"note": 1}})
-            return await ctx.send(f"Successfully removed note of entry **{id}**.")
 
-        await ctx.send(f"Successfully added a note to entry **{id}**.")
+        action = Action.build_from_mongo(self.bot, result)
+        await ctx.send(
+            f"Successfully added a note to entry **{id}**." if not reset else f"Successfully removed note of entry **{id}**.",
+            embed=action.to_info_embed(),
+        )
 
     @history.command(aliases=("show",))
     @commands.guild_only()
