@@ -46,6 +46,9 @@ class Reputation(commands.Cog):
         await self.bot.mongo.db.member.update_one({"_id": {"id": member.id, "guild_id": member.guild.id}}, update)
 
     async def process_giverep(self, ctx, member):
+        if member.bot:
+            return "You can't give rep to a bot user!"
+
         if member == ctx.author:
             return "You can't give rep to yourself!"
 
@@ -97,6 +100,8 @@ class Reputation(commands.Cog):
 
         if msg := await self.process_giverep(ctx, member):
             await ctx.send(msg)
+            # Reset cooldown if rep failed to go through
+            ctx.command.reset_cooldown(ctx)
 
     @commands.hybrid_command()
     @commands.guild_only()
