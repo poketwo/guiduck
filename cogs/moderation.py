@@ -990,6 +990,7 @@ class Moderation(commands.Cog):
         await ctx.send(
             f"Successfully added a note to entry **{id}**." if not reset else f"Successfully removed note of entry **{id}**.",
             embed=action.to_info_embed(),
+            ephemeral=True,
         )
 
     @history.command(aliases=("show",))
