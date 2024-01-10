@@ -981,16 +981,17 @@ class Moderation(commands.Cog):
         reset = note.lower() == "reset"
         
         result = await self.bot.mongo.db.action.find_one_and_update(
-            {"_id": id, "guild_id": ctx.guild.id}, {"$set": {"note": note}} if not reset else {"$unset": {"note": 1}}},
-            return_document=ReturnDocument.AFTER
+            {"_id": id, "guild_id": ctx.guild.id},
+            {"$set": {"note": note}} if not reset else {"$unset": {"note": 1}}},
+            return_document=ReturnDocument.AFTER,
         )
         if result is None:
             return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
 
         action = Action.build_from_mongo(self.bot, result)
         await ctx.send(
-            "Successfully added a note to entry **{id}**." if not reset else f"Successfully removed note of entry **{id}**.",
-            embed=action.to_info_embed()
+            f"Successfully added a note to entry **{id}**." if not reset else f"Successfully removed note of entry **{id}**.",
+            embed=action.to_info_embed(),
         )
 
     @history.command(aliases=("show",))
