@@ -530,6 +530,29 @@ class Reports(HelpDeskCategory):
             """,
         )
 
+    async def on_open(self, ticket: Ticket):
+        if ticket.thread is None:
+            return
+        embed = discord.Embed(
+            title="User Report Instructions",
+            color=discord.Color.blurple(),
+            description=textwrap.dedent(
+                """
+                Thank you for reporting! We're sorry for any inconveniences you may have experienced. Please provide the following pieces of information for the report you're making to help us understand the situation better:
+
+                1. User ID of the user you're reporting (use `?tag find-id` if you're not sure how),
+                2. Context and explanation regarding the report (e.g. what happened, how you think they've violated our rules, etc) and
+                3. Evidence to back your report. This can be in the form of, but not limited to:
+                  - Full, unedited screenshots
+                  - Screen recordings
+                  - Message links
+
+                After you submit these pieces of documentation, a staff member will assist you with the report shortly. Thank you!
+                """
+            ),
+        )
+        await ticket.thread.send(embed=embed)
+
 
 class IncenseRefunds(HelpDeskCategory):
     id = "inc"
