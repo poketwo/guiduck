@@ -142,7 +142,7 @@ class Refund:
             for i, pokemon in enumerate(self.pokemon_data):
                 if self.pokemon is not None:
                     pokemon["_id"] = self.pokemon[i]
-                contents.extend(format_pokemon_details(self.bot, pokemon))
+                contents.extend(format_pokemon_details(bot, pokemon))
 
         embed = discord.Embed(
             title=f"Refunded {self.target} (ID: {self.target.id})",
