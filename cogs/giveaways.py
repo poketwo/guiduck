@@ -152,6 +152,14 @@ class Giveaway:
         guild_data = await self.bot.mongo.db.guild.find_one({"_id": self.guild_id})
         if guild_data is None or guild_data.get("giveaway_approval_channel_id") is None:
             raise ValueError("Guild does not have giveaways set up.")
+
+        for pokemon_id in self.pokemon_ids:
+            pokemon = await self.bot.mongo.poketwo_db.pokemon.find_one(
+                {"owned_by": "user", "owner_id": self.user.id, "_id": pokemon_id}
+            )
+            if pokemon is None:
+                raise ValueError(f"Couldn't find the pokemon with ID {pokemon_id}!")
+
         channel = self.bot.get_channel(guild_data["giveaway_approval_channel_id"])
 
         result = await self.bot.mongo.db.giveaway.insert_one(self.to_dict())
