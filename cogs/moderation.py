@@ -592,8 +592,7 @@ class Moderation(commands.Cog):
     async def emergency(self, ctx: GuiduckContext, *, reason: str):
         """Emergency command to alert staff members with the role."""
 
-        guild = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
-        role = discord.utils.get(ctx.guild.roles, name=EMERGENCY_ROLE_NAME) if guild else None
+        role = discord.utils.get(ctx.guild.roles, name=EMERGENCY_ROLE_NAME)
         if role is None:
             ctx.command.reset_cooldown(ctx)
             return await ctx.send(
@@ -605,13 +604,12 @@ class Moderation(commands.Cog):
         confirm_embed = discord.Embed(
             color=discord.Color.red(),
             title="🚨 Emergency Staff Alert",
-            description=textwrap.dedent(
-                f"""
-                This command is designed for use in case of emergencies actively happening in our server(s) that need immediate staff attention. This will ping **{number_staff}** staff member{'' if number_staff == 1 else 's'} currently assigned to the {role.mention} role, and you will be assisted shortly.
-                """
+            description=(
+                f"This command is designed for use in case of emergencies actively happening in our server(s) that need"
+                f" immediate staff attention. This will ping **{number_staff}** staff member{'' if number_staff == 1 else 's'}"
+                f" currently assigned to the {role.mention} role, and you will be assisted shortly."
             ),
-        )
-        confirm_embed.add_field(
+        ).add_field(
             name="Are you sure that you want to send an Emergency Staff Alert for the following reason?",
             value=reason,
             inline=False,
@@ -634,7 +632,7 @@ class Moderation(commands.Cog):
                 url=f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}",
             )
         )
-        view.message = await ctx.reply(role.mention, embed=alert_embed, view=view)
+        view.message = await ctx.reply(role.mention, embed=alert_embed, view=view)  # TODO: Fix role not being pinged
 
     @emergency.error
     async def emergency_error(self, ctx: GuiduckContext, error):
