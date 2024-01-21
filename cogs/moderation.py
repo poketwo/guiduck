@@ -617,30 +617,7 @@ class Moderation(commands.Cog):
             inline=False,
         )
 
-        rules_embed = discord.Embed(
-            color=discord.Color.blurple(),
-            title="Use Cases & Abuse",
-            description=textwrap.dedent(
-                f"""
-                Abuse of this alert system is **strictly prohibited** and **will** result in repercussions if used maliciously. Here are some examples to help understand when and when not to use it, this is not exhaustive:
-                **✅ Acceptable Cases**
-                - Sending NSFW/disturbing content in our server(s)/DMs
-                - Advertising Crosstrading/Distribution of automated scripts in our server(s) that violate our ToS
-                - Malicious/excessive spam in our server(s)
-                - Advertising links to malicious/scam websites in our server(s)/DMs
-                - Extreme Toxicity/Harassment/Trolling
-                - Actively violating any other rule to an excessive extent
-                **<:white_cross_mark:1193650425166045224> Unacceptable Cases**
-                - Suspected autocatching in our server(s)
-                - Server advertisement
-                - Bot outages/bugs/glitches — Please use #bug-reports or ping a Developer in case of emergency
-                - Asking staff to check appeals/applications
-                """
-            ),
-        )
-        rules_embed.set_footer(text="Please use `?report` in unacceptable cases that violate our rules.")
-
-        if not await ctx.confirm(timeout=120, embeds=[confirm_embed, rules_embed], ephemeral=True):
+        if not await ctx.confirm(timeout=120, embeds=[confirm_embed, constants.EMERGENCY_RULES_EMBED], ephemeral=True):
             ctx.command.reset_cooldown(ctx)
             return await ctx.send("Aborted.", ephemeral=True)
 
