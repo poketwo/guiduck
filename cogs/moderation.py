@@ -331,6 +331,21 @@ class TradingUnmute(Action):
 
 class EmergencyAlertBan(Action):
     type = "emergency_alert_ban"
+    past_tense = "permanently banned from emergency staff alerts"
+    emoji = "\N{BELL WITH CANCELLATION STROKE}"
+    color = discord.Color.magenta()
+
+    async def execute(self, ctx):
+        await ctx.bot.mongo.db.member.update_one(
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$set": {"emergency_alert_banned": True}, "$unset": {"emergency_alert_banned_until": 1}},
+            upsert=True,
+        )
+        await super().execute(ctx)
+
+
+class EmergencyAlertTempBan(Action):
+    type = "emergency_alert_temporary_ban"
     past_tense = "banned from emergency staff alerts"
     emoji = "\N{BELL WITH CANCELLATION STROKE}"
     color = discord.Color.magenta()
@@ -338,7 +353,7 @@ class EmergencyAlertBan(Action):
     async def execute(self, ctx):
         await ctx.bot.mongo.db.member.update_one(
             {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
-            {"$set": {"emergency_alert_banned_until": self.expires_at or True}},
+            {"$set": {"emergency_alert_banned_until": self.expires_at}, "$unset": {"emergency_alert_banned": 1}},
             upsert=True,
         )
         await super().execute(ctx)
@@ -353,7 +368,7 @@ class EmergencyAlertUnban(Action):
     async def execute(self, ctx):
         await ctx.bot.mongo.db.member.update_one(
             {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
-            {"$unset": {"emergency_alert_banned_until": 1}},
+            {"$unset": {"emergency_alert_banned": 1, "emergency_alert_banned_until": 1}},
             upsert=True,
         )
         await super().execute(ctx)
@@ -380,6 +395,7 @@ cls_dict = {
         TradingMute,
         TradingUnmute,
         EmergencyAlertBan,
+        EmergencyAlertTempBan,
         EmergencyAlertUnban,
     )
 }
@@ -656,7 +672,9 @@ class Moderation(commands.Cog):
 
         expires_at, reason = await self.parse_time_and_reason(ctx, time_and_reason)
 
-        action = EmergencyAlertBan(
+        permanent_ban = expires_at is None
+        action_cls = EmergencyAlertBan if permanent_ban else EmergencyAlertTempBan
+        action = action_cls(
             target=target,
             user=ctx.author,
             reason=reason,
@@ -667,13 +685,13 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await action.notify()
 
-        if action.duration is None:
-            await ctx.send(
+        if permanent_ban:
+            return await ctx.send(
                 f"Permanently banned **{target}** from issuing emergency staff alerts (Case #{action._id}).",
                 ephemeral=True,
             )
         else:
-            await ctx.send(
+            return await ctx.send(
                 f"Banned **{target}** from issuing emergency staff alerts for **{time.human_timedelta(action.duration)}** (Case #{action._id}).",
                 ephemeral=True,
             )
@@ -1092,7 +1110,7 @@ class Moderation(commands.Cog):
             action_type = SymbolicUntimeout
         elif action.type == "trading_mute":
             action_type = TradingUnmute
-        elif action.type == "emergency_alert_ban":
+        elif action.type in ("emergency_alert_ban", "emergency_alert_temporary_ban"):
             action_type = EmergencyAlertUnban
         else:
             return

@@ -55,18 +55,23 @@ def is_level(level):
 def is_not_emergency_alert_banned():
     async def predicate(ctx):
         member = await ctx.bot.mongo.db.member.find_one({"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}})
-        if until := member.get("emergency_alert_banned_until"):
-            if until is True:
-                ctx.command.reset_cooldown(ctx)
-                raise EmergencyAlertBanned(
-                    "You've been permanently banned from issuing emergency staff alerts due to violation(s) of its rules. If you think that this was a mistake, please contact a staff member."
-                )
-            elif until is not None and until > (now := datetime.now(timezone.utc)):
-                ctx.command.reset_cooldown(ctx)
-                seconds = (until - now).total_seconds()
-                raise EmergencyAlertBanned(
-                    f"You've been banned from issuing emergency staff alerts for **{time.human_timedelta(timedelta(seconds=seconds))}** due to violation(s) of its rules."
-                )
+        now = datetime.now(timezone.utc)
+
+        permanently_banned = member.get("emergency_alert_banned")
+        if permanently_banned:
+            ctx.command.reset_cooldown(ctx)
+            raise EmergencyAlertBanned(
+                "You've been permanently banned from issuing emergency staff alerts due to violation(s) of its rules. If you think that this was a mistake, please contact a staff member."
+            )
+
+        temp_banned_until = member.get("emergency_alert_banned_until")
+        temp_banned = temp_banned_until is not None
+        if temp_banned and temp_banned_until > now:
+            ctx.command.reset_cooldown(ctx)
+            duration_seconds = (temp_banned_until - now).total_seconds()
+            raise EmergencyAlertBanned(
+                f"You've been banned from issuing emergency staff alerts for **{time.human_timedelta(timedelta(seconds=duration_seconds))}** due to violation(s) of its rules."
+            )
         return True
 
     return commands.check(predicate)
