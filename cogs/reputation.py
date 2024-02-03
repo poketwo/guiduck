@@ -1,4 +1,5 @@
 from datetime import timedelta
+import re
 
 import discord
 from discord.ext import commands
@@ -19,6 +20,19 @@ GIVEREP_TRIGGERS = [
     "tyvm",
     "thanx",
 ]
+
+# Compiles regex pattern for all triggers like "(?<!\w)((\+rep+)|(thanks+)|(thank+)|(thx+)|...)(?!\w)"
+#
+# For each trigger, it uses the + quantifier to check for repetition of the last letter, and that the
+# trigger is an isolated word. We use negative lookbehind (?<!\w) and negative lookahead (?!\w) for
+# word characters instead of \b because of triggers like "+rep" where "+" is not a word boundary.
+#
+# This makes strings like "tyyyy", "ty!", "tyyyy!", etc. valid triggers.
+#
+# See https://imgur.com/a/cFAMpzm for demonstration
+GIVEREP_TRIGGERS_REGEX = re.compile(
+    rf"(?<!\w)({'|'.join([f'({re.escape(trigger)}+)' for trigger in GIVEREP_TRIGGERS])})(?!\w)"
+)
 
 
 class Reputation(commands.Cog):
@@ -70,8 +84,9 @@ class Reputation(commands.Cog):
         if message.author.bot or len(message.mentions) == 0:
             return
 
-        words = message.content.casefold().split()
-        if any(x in words for x in GIVEREP_TRIGGERS):
+        content = message.content.casefold()
+        match = GIVEREP_TRIGGERS_REGEX.search(content)
+        if match is not None:
             ctx = await self.bot.get_context(message)
             await self.process_giverep(ctx, message.mentions[0])
 
