@@ -43,10 +43,18 @@ class Bot(commands.Cog):
         elif isinstance(error, commands.MissingRequiredArgument):
             await ctx.send_help(ctx.command)
         elif isinstance(error, commands.CommandOnCooldown):
-            await ctx.send(
-                f"You're on cooldown! Try again in **{time.human_timedelta(timedelta(seconds=error.retry_after))}**.",
-                ephemeral=True,
-            )
+            retry_after = lambda seconds: time.human_timedelta(timedelta(seconds=seconds))
+            name = error.type.name
+            if name == "user":
+                await ctx.send(
+                    f"You're on cooldown! Try again in **{retry_after(error.retry_after)}**.",
+                    ephemeral=True,
+                )
+            else:
+                number = error.cooldown.rate
+                per_text = f"per {name}" if name != 'default' else 'globally'
+                fmt = f"**{number} time{'s' if number > 1 else ''} {per_text}** every **{retry_after(error.cooldown.per)}**"
+                await ctx.send(f"This command can only be used {fmt}! Try again in **{retry_after(error.retry_after)}**.", ephemeral=True)
         elif isinstance(error, commands.CheckFailure):
             await ctx.send(error, ephemeral=True)
         elif isinstance(error, commands.UserInputError):
