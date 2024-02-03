@@ -648,7 +648,13 @@ class Moderation(commands.Cog):
                 url=f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}",
             )
         )
-        view.message = await ctx.reply(role.mention, embed=alert_embed, view=view)  # TODO: Fix role not being pinged
+        view.message = await ctx.reply(
+            role.mention,
+            embed=alert_embed,
+            view=view,
+            mention_author=False,
+            allowed_mentions=discord.AllowedMentions(roles=[role]),
+        )
 
     @emergency.error
     async def emergency_error(self, ctx: GuiduckContext, error):
