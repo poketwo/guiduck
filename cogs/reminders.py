@@ -119,7 +119,7 @@ class Reminders(commands.Cog):
         def format_item(i, x):
             name = f"{x._id}. {discord.utils.format_dt(x.expires_at, 'R')}"
             message_url = f"https://discord.com/channels/{x.guild_id or '@me'}/{x.channel_id}/{x.message_id}"
-            return {"name": name, "value": f"[{textwrap.shorten(x.event, 512)}]({message_url})", "inline": False}
+            return {"name": name, "value": f"{textwrap.shorten(x.event, 512)} [Jump]({message_url})", "inline": False}
 
         pages = ViewMenuPages(
             source=AsyncEmbedFieldsPageSource(
