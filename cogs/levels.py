@@ -109,19 +109,19 @@ class Levels(commands.Cog):
                 await level_logs_channel.send(f"{message.author.mention} reached level **{new_level}**.")
 
     @commands.hybrid_command(aliases=("rank", "level"))
-    async def xp(self, ctx):
+    async def xp(self, ctx, *, member: Optional[discord.Member] = commands.Author):
         """Shows your server XP and level."""
 
-        user = await self.bot.mongo.db.member.find_one({"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}})
+        user = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": ctx.guild.id}})
         rank = await self.bot.mongo.db.member.count_documents(
-            {"xp": {"$gt": user.get("xp", 0)}, "_id.id": {"$ne": ctx.author.id}, "_id.guild_id": ctx.guild.id}
+            {"xp": {"$gt": user.get("xp", 0)}, "_id.id": {"$ne": member.id}, "_id.guild_id": ctx.guild.id}
         )
         xp, level = user.get("xp", 0), user.get("level", 0)
         progress = xp - self.min_xp_at(level)
         required = self.min_xp_at(level + 1) - self.min_xp_at(level)
 
         embed = discord.Embed(title=f"Level {level}", color=discord.Color.blurple())
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
         embed.add_field(name="XP", value=str(xp))
         embed.add_field(name="Progress", value=f"{progress}/{required}")
         embed.add_field(name="Rank", value=str(rank + 1))
