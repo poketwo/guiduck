@@ -1,11 +1,14 @@
+import itertools
 import random
 from collections import defaultdict
+from typing import Optional
 
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
 
 from helpers.pagination import AsyncEmbedFieldsPageSource
+from helpers import checks
 
 SILENT = False
 
@@ -106,23 +109,78 @@ class Levels(commands.Cog):
                 await level_logs_channel.send(f"{message.author.mention} reached level **{new_level}**.")
 
     @commands.hybrid_command(aliases=("rank", "level"))
-    async def xp(self, ctx):
+    async def xp(self, ctx, *, member: Optional[discord.Member] = commands.Author):
         """Shows your server XP and level."""
 
-        user = await self.bot.mongo.db.member.find_one({"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}})
+        user = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": ctx.guild.id}})
         rank = await self.bot.mongo.db.member.count_documents(
-            {"xp": {"$gt": user.get("xp", 0)}, "_id.id": {"$ne": ctx.author.id}, "_id.guild_id": ctx.guild.id}
+            {"xp": {"$gt": user.get("xp", 0)}, "_id.id": {"$ne": member.id}, "_id.guild_id": ctx.guild.id}
         )
         xp, level = user.get("xp", 0), user.get("level", 0)
         progress = xp - self.min_xp_at(level)
         required = self.min_xp_at(level + 1) - self.min_xp_at(level)
 
         embed = discord.Embed(title=f"Level {level}", color=discord.Color.blurple())
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
         embed.add_field(name="XP", value=str(xp))
         embed.add_field(name="Progress", value=f"{progress}/{required}")
         embed.add_field(name="Rank", value=str(rank + 1))
         await ctx.send(embed=embed)
+
+    @commands.hybrid_command()
+    @commands.guild_only()
+    @checks.is_community_manager()
+    async def setlevel(self, ctx, member: discord.Member, level: int):
+        """Sets a user's level to a given value.
+
+        You must have the Community Manager role to use this."""
+
+        data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
+        try:
+            level_logs_channel = self.bot.get_channel(data["level_logs_channel_id"])
+        except KeyError:
+            return await ctx.send("No level logs channel set in this server!")
+
+        await ctx.message.add_reaction("▶️")
+
+        xp = self.min_xp_at(level)
+        user = await self.bot.mongo.db.member.find_one_and_update(
+            {"_id": {"id": member.id, "guild_id": ctx.guild.id}},
+            {"$set": {"xp": xp, "level": level}},
+            upsert=True,
+        )
+        current_level = user.get("level", 0)
+
+        if current_level == level:
+            return await ctx.send("No changes made.")
+
+        add_roles = [
+            ctx.guild.get_role(x)
+            for x in itertools.chain(
+                *[lvl_roles for lvl, lvl_roles in ROLES.items() if lvl <= level and lvl > current_level]
+            )
+        ]
+        await member.add_roles(*add_roles)
+
+        remove_roles = [
+            ctx.guild.get_role(x)
+            for x in itertools.chain(
+                *[lvl_roles for lvl, lvl_roles in ROLES.items() if lvl > level and lvl <= current_level]
+            )
+        ]
+        await member.remove_roles(*remove_roles)
+
+        msg = f"Set **{member}**'s level to **{level}**."
+        if add_roles:
+            msg += f" They have received the roles {', '.join(map(lambda r: f'**{r}**', [role.mention for role in add_roles]))}."
+        if remove_roles:
+            msg += f" The roles {', '.join(map(lambda r: f'**{r}**', [role.mention for role in remove_roles]))} have been removed."
+
+        await ctx.channel.send(msg)
+        if level_logs_channel is not None:
+            await level_logs_channel.send(f"**{member.mention}**'s level has been set to **{level}** by {ctx.author}.")
+
+        await ctx.message.add_reaction("✅")
 
     @commands.hybrid_command(aliases=("top", "lb", "levels"))
     async def leaderboard(self, ctx):
