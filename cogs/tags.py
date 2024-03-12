@@ -162,7 +162,7 @@ class Tags(commands.Cog):
     # Writing tags
 
     @tag.command()
-    @commands.check_any(checks.is_moderator(), commands.has_role("Create Tags"))
+    @commands.check_any(checks.is_trial_moderator(), commands.has_role("Create Tags"))
     async def create(self, ctx, name, *, content = ""):
         """Creates a new tag owned by you. Attachments will have their URLs appended to the tag."""
 
@@ -181,7 +181,7 @@ class Tags(commands.Cog):
             await ctx.send(f'A tag with the name "{tag.name}" already exists.')
 
     @tag.command()
-    @commands.check_any(checks.is_moderator(), commands.has_role("Create Tags"))
+    @commands.check_any(checks.is_trial_moderator(), commands.has_role("Create Tags"))
     async def alias(self, ctx, name, *, original):
         """Creates an alias for a pre-existing tag."""
 
@@ -219,11 +219,11 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully edited tag.")
 
     @tag.command(aliases=("fe",))
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def forceedit(self, ctx, name, *, content = ""):
         """Edits a tag by force. Attachments will have their URLs appended to the tag.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         content = with_attachment_urls(content, ctx.message.attachments)
 
@@ -256,11 +256,11 @@ class Tags(commands.Cog):
         await ctx.send(f"Tag and corresponding aliases successfully deleted.")
 
     @tag.command(aliases=("fd",))
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def forcedelete(self, ctx, *, name):
         """Removes a tag by force.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -284,11 +284,11 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully transferred tag.")
 
     @tag.command()
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def forcetransfer(self, ctx, member: discord.Member, *, name):
         """Transfers a tag to another user by force.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:
