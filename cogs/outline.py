@@ -137,7 +137,7 @@ class DocumentArgs(commands.FlagConverter, case_insensitive=True):
     )
     search: str = commands.flag(
         aliases=("s",),
-        description="Search documents",
+        description="Search documents (type a space to refresh based on selected collection)",
         max_args=1,
     )
     ephemeral: Optional[bool] = commands.flag(
@@ -325,7 +325,7 @@ class Outline(commands.Cog):
 
         return [
             app_commands.Choice(
-                name=f"{COLLECTION_NAMES[document.collection_id].title()} — {document.title}", value=str(document.id)
+                name=f"{COLLECTION_NAMES[document.collection_id].title()}　|　{document.title}", value=str(document.id)
             )
             for document in documents
         ]
