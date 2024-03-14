@@ -102,6 +102,11 @@ class DocumentArgs(commands.FlagConverter, case_insensitive=True):
         description="Search documents",
         max_args=1,
     )
+    ephemeral: Optional[bool] = commands.flag(
+        description="Send as an ephemeral message that only you can see",
+        max_args=1,
+        default=False,
+    )
 
 
 def format_dt(dt: datetime) -> str:
@@ -193,21 +198,28 @@ class Outline(commands.Cog):
         You must have the Trial Moderator role in order to use this.
         """
 
-        collection_id = args.collection
-        if not collection_id:
-            return
-        elif collection_id == "all":
-            collection_id = None
+        # This is temporary until this bug is fixed in discord.py (https://github.com/Rapptz/discord.py/issues/9641)
+        for flag in args.get_flags().values():
+            arg = getattr(args, flag.attribute)
+            if callable(arg):
+                setattr(args, flag.attribute, await discord.utils.maybe_coroutine(arg, ctx))
 
-        try:
-            UUID(args.search)
-        except ValueError:
-            docs = await self.client.search_documents(args.search, collection_id, limit=1)
-            if not docs:
-                return await ctx.send("Document not found.")
-            doc = docs[0].document
-        else:
-            doc = await self.client.fetch_document(args.search)
+        async with ctx.typing(ephemeral=args.ephemeral):
+            collection_id = args.collection
+            if not collection_id:
+                return
+            elif collection_id == "all":
+                collection_id = None
+
+            try:
+                UUID(args.search)
+            except ValueError:
+                docs = await self.client.search_documents(args.search, collection_id, limit=1)
+                if not docs:
+                    return await ctx.send("Document not found.")
+                doc = docs[0].document
+            else:
+                doc = await self.client.fetch_document(args.search)
 
             total_lines = len(doc.text.split("\n"))
             total_pages = math.ceil(total_lines / LINES_PER_PAGE)
