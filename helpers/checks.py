@@ -44,6 +44,30 @@ def support_server_only():
     return in_guilds(constants.SUPPORT_SERVER_ID)
 
 
+class NotInCategory(commands.CheckFailure):
+    pass
+
+
+def in_categories(*category_ids):
+    def predicate(ctx):
+        if ctx.channel.category is None or ctx.channel.category.id not in category_ids:
+            raise NotInCategory("This command is restricted to specific categories.")
+        return True
+
+    return commands.check_any(is_admin(), commands.check(predicate))
+
+
+def staff_categories_only():
+    return in_categories(
+        717881335313858610,
+        1122578424867864616,
+        1196191915272577134,
+        730992224635977748,
+        1103248448934912052,
+        1104727423603449866,
+    )
+
+
 def is_level(level):
     async def predicate(ctx):
         user = await ctx.bot.mongo.db.member.find_one(

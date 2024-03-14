@@ -21,12 +21,31 @@ from helpers.outline.models.document import Document
 from helpers.pagination import Paginator
 
 
+LINES_PER_PAGE = 15
+NO_PERMISSION_MESSAGE = "You do not have permission to use this command."
+EPHEMERAL_REQUIRED_MESSAGE = "This command is restricted to staff categories only. However, you can use the slash command to view an ephemeral version anywhere."
+
+COLLECTION_NAMES = {v: k for k, v in COLLECTION_IDS.items()}
 ACCESSIBLE_COLLECTIONS = {
     checks.is_developer: ("development",),
     checks.is_trial_moderator: ("moderators", "moderator wiki"),
     checks.is_moderator: ("moderators", "moderator wiki"),
     checks.is_community_manager: ("management",),
 }
+
+
+def has_outline_access():
+    async def predicate(ctx):
+        possible_cols = await CollectionConverter.get_accessible_collections(ctx)
+        if len(possible_cols) == 0:
+            raise commands.CheckFailure(NO_PERMISSION_MESSAGE)
+        return True
+
+    return commands.check(predicate)
+
+
+def format_dt(dt: datetime) -> str:
+    return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
 
 
 class CollectionConverter(commands.Converter):
@@ -78,19 +97,6 @@ class CollectionConverter(commands.Converter):
         return COLLECTION_IDS[argument]
 
 
-NO_PERMISSION_MESSAGE = "You do not have permission to use this command."
-
-
-def has_outline_access():
-    async def predicate(ctx):
-        possible_cols = await CollectionConverter.get_accessible_collections(ctx)
-        if len(possible_cols) == 0:
-            raise commands.CheckFailure(NO_PERMISSION_MESSAGE)
-        return True
-
-    return commands.check(predicate)
-
-
 class DocumentArgs(commands.FlagConverter, case_insensitive=True):
     collection: CollectionConverter = commands.flag(
         aliases=("col",),
@@ -110,27 +116,6 @@ class DocumentArgs(commands.FlagConverter, case_insensitive=True):
     )
 
 
-def format_dt(dt: datetime) -> str:
-    return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
-
-
-# TODO: Remove this
-def reload_modules(directory: str, skip: Optional[str] = None):
-    """Recursively reload all modules in a directory"""
-    for file in os.listdir(directory):
-        file_path = os.path.join(directory, file)
-        if os.path.isdir(file_path):
-            reload_modules(file_path)
-        elif file.endswith(".py"):
-            file_path = file_path.replace("/", ".").replace(".py", "")
-            if file_path == skip:
-                continue
-            module = sys.modules.get(file_path) or importlib.import_module(file_path)
-            importlib.reload(module)
-
-
-LINES_PER_PAGE = 15
-
 class Outline(commands.Cog):
     """For interfacing with Outline."""
 
@@ -141,9 +126,6 @@ class Outline(commands.Cog):
             self.bot.config.OUTLINE_API_TOKEN,
             session=self.bot.http_session,
         )
-
-    async def cog_unload(self) -> None:
-        reload_modules("helpers/outline")  # Todo: Remove
 
     def translate_markdown(self, text: str) -> str:
         """Method to translate Outline markdown syntax to Discord markdown syntax"""
@@ -193,6 +175,21 @@ class Outline(commands.Cog):
 
         return get_page
 
+    async def do_ephemeral(self, ctx: GuiduckContext) -> bool | None:
+        """Checks if the command is being ran in Staff categories and whether to
+        do ephemeral or not. Returns True/False if outside/in staff categories, and
+        None if command was a message command and hence ephemeral not possible."""
+
+        try:
+            if await checks.staff_categories_only().predicate(ctx):
+                ephemeral = False
+        except commands.CheckFailure:
+            if ctx.interaction:
+                ephemeral = True  # Force ephemeral incase it's outside staff categories if app command
+            else:
+                return None
+        return ephemeral
+
     @has_outline_access()
     @commands.hybrid_group(
         "document",
@@ -212,7 +209,11 @@ class Outline(commands.Cog):
             if callable(arg):
                 setattr(args, flag.attribute, await discord.utils.maybe_coroutine(arg, ctx))
 
-        async with ctx.typing(ephemeral=args.ephemeral):
+        ephemeral = await self.do_ephemeral(ctx)
+        if ephemeral is None:
+            return await ctx.reply(EPHEMERAL_REQUIRED_MESSAGE, mention_author=False)
+
+        async with ctx.typing(ephemeral=ephemeral or args.ephemeral):
             collection_id = args.collection
             if not collection_id:
                 return
