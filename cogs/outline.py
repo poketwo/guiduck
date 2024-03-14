@@ -1,13 +1,10 @@
 import contextlib
 from datetime import datetime
 import difflib
-import importlib
 import math
-import os
 import re
-import sys
-import textwrap
-from typing import List, Optional
+from textwrap import dedent, shorten
+from typing import List, Optional, Tuple
 from uuid import UUID
 import discord
 from discord.ext import commands
@@ -44,7 +41,7 @@ ACCESSIBLE_COLLECTIONS = {
 
 
 def has_outline_access():
-    """Check to for commands to ensure that user has perms to use Outline things"""
+    """Check if user has perms to use Outline things"""
 
     async def predicate(ctx):
         accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
@@ -53,6 +50,12 @@ def has_outline_access():
         return True
 
     return commands.check(predicate)
+
+
+def is_outline_admin():
+    """Check if user should have admin access"""
+
+    return checks.is_admin()
 
 
 def format_dt(dt: datetime) -> str:
@@ -98,12 +101,20 @@ class CollectionConverter(commands.Converter):
         return list(dict.fromkeys(accessible_collections))
 
     @staticmethod
+    async def is_admin(ctx: GuiduckContext) -> bool:
+        try:
+            await is_outline_admin().predicate(ctx)
+        except commands.CheckFailure:
+            return False
+        else:
+            return True
+
+    @staticmethod
     async def get_default_collection(ctx: GuiduckContext) -> str | None:
         """Default collection to use for user when no collection is provided"""
 
-        with contextlib.suppress(commands.CheckAnyFailure):
-            if await checks.is_admin().predicate(ctx):
-                return "all"
+        if await CollectionConverter.is_admin(ctx):
+            return None
 
         accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
         return COLLECTION_IDS[accessible_collections[0]]
@@ -115,12 +126,10 @@ class CollectionConverter(commands.Converter):
         if not argument:
             return await CollectionConverter.get_default_collection(ctx)
 
-        argument = argument.casefold()
-
-        with contextlib.suppress(commands.CheckAnyFailure):
-            if await checks.is_admin().predicate(ctx):
-                if argument == "all":
-                    return "all"
+        argument = argument.strip().casefold()
+        if await CollectionConverter.is_admin(ctx):
+            if argument == "all":
+                return None
 
         accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
 
@@ -190,7 +199,7 @@ class Outline(commands.Cog):
         embed.set_author(name=document.created_by.name, icon_url=document.created_by.avatar_url)
         embed.add_field(
             name="Information",
-            value=textwrap.dedent(
+            value=dedent(
                 f"""
                 Created At: {format_dt(document.created_at)}
                 Updated At: {format_dt(document.updated_at)}
@@ -256,10 +265,6 @@ class Outline(commands.Cog):
 
         async with ctx.typing(ephemeral=ephemeral or args.ephemeral):
             collection_id = args.collection
-            if not collection_id:
-                return
-            elif collection_id == "all":
-                collection_id = None
 
             # TODO: Make this a converter so that it can be reused for search
             try:
@@ -296,9 +301,8 @@ class Outline(commands.Cog):
         except MissingPermission as e:
             return [app_commands.Choice(name=str(e), value="")]
 
-        with contextlib.suppress(commands.CheckAnyFailure):
-            if await checks.is_admin().predicate(ctx):
-                accessible_collections.append("all")
+        if await CollectionConverter.is_admin(ctx):
+            accessible_collections.append("all")
 
         current = current.strip().casefold()
         if not current:
