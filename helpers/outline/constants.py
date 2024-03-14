@@ -1,7 +1,4 @@
 from enum import Enum
-from urllib.parse import urljoin
-
-import config
 
 
 __all__ = [

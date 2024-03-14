@@ -39,9 +39,9 @@ class HTTPClient:
     Parameters
     ----------
     base_url : str
-        The base URL of the Outline app whose API to use
+        The base URL of the Outline app whose API to use.
     base_api_url : str
-        The base API URL of base_url
+        The base API URL of base_url.
     api_token : Optional[str]
         The API Token to use when making requests. Optional, but necessary for requests that need authentication.
     session : Optional[aiohttp.ClientSession]
@@ -107,28 +107,28 @@ class HTTPClient:
         endpoint : OutlineAPIEndpoint
             The Outline api endpoint to make the request to. Accepts OutlineAPIEndpoint enums only.
         data : Optional[Dict]
-            The data to pass to the request
+            The data to pass to the request.
         params : Optional[Dict]
-            The params to pass to the request
+            The params to pass to the request.
         headers : Optional[Dict]
-            The headers to pass to the request
+            The headers to pass to the request.
         authentication : Optional[bool] = True
-            Whether or not this request should require authentication
+            Whether or not this request should require authentication.
 
         Returns
         -------
         Dict | str
-            Returns the json data or the content returned by the response
+            Returns the json data or the content returned by the response.
 
         Errors
         ------
         AuthenticationFailure
-            Raised if client was unable to authorize the request (status code 401)
+            Raised if client was unable to authorize the request (status code 401).
             E.g. invalid token
         NotFound
-            Raised if the requested resource was not found (status code 404)
+            Raised if the requested resource was not found (status code 404).
         HTTPException
-            Raised for any other status code
+            Raised for any other status code.
         """
 
         headers_final = {"Accept": "application/json", "User-Agent": self.user_agent}

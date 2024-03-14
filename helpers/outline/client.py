@@ -23,9 +23,16 @@ class Client:
     Parameters
     ----------
     base_url : str
-        The base URL of the Outline app whose API to use
+        The base URL of the Outline app whose API to use.
     session : Optional[aiohttp.ClientSession]
         The aiohttp session to use to make requests. Creates a new one if not provided.
+
+    Attributes
+    ----------
+    base_url : str
+        The base URL of the Outline app whose API is being used.
+    session : Optional[aiohttp.ClientSession]
+        The aiohttp session being used to make requests.
     http_client : Optional[HTTPClient]
         The http client to make requests to the API.
     """
@@ -50,9 +57,9 @@ class Client:
         Parameters
         ----------
         document_id : str
-            The id of the document to fetch
+            The id of the document to fetch.
         share_id : Optional[UUID]
-            A share id of the document. Does not require authentication if
+            A share id of the document. Does not require authentication if.
         """
 
         if share_id:
@@ -84,11 +91,11 @@ class Client:
         Parameters
         ----------
         query : str
-            The search query
+            The search query.
         collection_id : Optional[UUID]
-            The id of the collection whose documents to search within
+            The id of the collection whose documents to search within.
         user_id : Optional[UUID]
-            Any documents that have not been edited by the user identifier will be filtered out
+            Any documents that have not been edited by the user identifier will be filtered out.
         offset : Optional[int]
             How many results to skip when searching. Useful for pagination.
         limit : Optional[int] = 25
@@ -139,23 +146,23 @@ class Client:
         Parameters
         ----------
         collection_id : Optional[UUID]
-            The id of the collection whose documents to list
+            The id of the collection whose documents to list.
         user_id : Optional[UUID]
-            The id of the user whose documents to list
+            The id of the user whose documents to list.
         backlink_document_id : Optional[UUID]
-            The id of the backlink document whose documents to list
+            The id of the backlink document whose documents to list.
         parent_document_id : Optional[UUID]
-            The id of the parent document whose documents to list
+            The id of the parent document whose documents to list.
         template : Optional[bool]
-            If it should list only tempalates
+            If it should list only tempalates.
         offset : Optional[int]
             How many results to skip when searching. Useful for pagination.
         limit : Optional[int] = 25
             How many results to retrieve. Useful for pagination.
         sort : Optional[str]
-            Which field/attribute of the documents to sort by
+            Which field/attribute of the documents to sort by.
         direction : Optional[Direction]
-            Which direction to sort by
+            Which direction to sort by.
         """
 
         data = {}

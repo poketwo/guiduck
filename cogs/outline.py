@@ -44,6 +44,8 @@ ACCESSIBLE_COLLECTIONS = {
 
 
 def has_outline_access():
+    """Check to for commands to ensure that user has perms to use Outline things"""
+
     async def predicate(ctx):
         accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
         if len(accessible_collections) == 0:
@@ -77,6 +79,8 @@ class CollectionNotFound(OutlineException):
 
 
 class CollectionConverter(commands.Converter):
+    """Converter to convert collection name to id"""
+
     @staticmethod
     async def get_accessible_collections(ctx: GuiduckContext) -> List[str]:
         """Get all collections accessible by user"""
@@ -129,6 +133,8 @@ class CollectionConverter(commands.Converter):
 
 
 class DocumentArgs(commands.FlagConverter, case_insensitive=True):
+    """Flags for the document command"""
+
     collection: CollectionConverter = commands.flag(
         aliases=("col",),
         description="Search within collection",
@@ -174,6 +180,8 @@ class Outline(commands.Cog):
         return text
 
     def document_to_embed(self, document: Document) -> discord.Embed:
+        """Create an embed from an Outline Document object. Returns function required to paginate."""
+
         embed = discord.Embed(
             title=document.title,
             color=discord.Color.blurple(),
@@ -234,12 +242,14 @@ class Outline(commands.Cog):
         You must have the Trial Moderator role in order to use this.
         """
 
-        # This is temporary until this bug is fixed in discord.py (https://github.com/Rapptz/discord.py/issues/9641)
+        # This is temporary to set the function attrs until this bug is fixed in discord.py (https://github.com/Rapptz/discord.py/issues/9641)
         for flag in args.get_flags().values():
             arg = getattr(args, flag.attribute)
             if callable(arg):
                 setattr(args, flag.attribute, await discord.utils.maybe_coroutine(arg, ctx))
 
+        # Restrict the command to staff categories only
+        # Or force ephemeral if possible
         ephemeral = await self.do_ephemeral(ctx)
         if ephemeral is None:
             return await ctx.reply(ERROR_MESSAGES.EPHEMERAL_REQUIRED, mention_author=False)
@@ -251,6 +261,7 @@ class Outline(commands.Cog):
             elif collection_id == "all":
                 collection_id = None
 
+            # TODO: Make this a converter so that it can be reused for search
             try:
                 UUID(args.search)
             except ValueError:
@@ -273,9 +284,7 @@ class Outline(commands.Cog):
         return list(COLLECTION_NAMES.keys()).index(document.collection_id)
 
     def search_collections(self, text: str, collections_list: List[str]):
-        substring_search = sorted(
-            [c for c in collections_list if text in c], key=lambda c: c.index(text)
-        )
+        substring_search = sorted([c for c in collections_list if text in c], key=lambda c: c.index(text))
         return substring_search or difflib.get_close_matches(text, collections_list, n=25)
 
     @document.autocomplete("collection")

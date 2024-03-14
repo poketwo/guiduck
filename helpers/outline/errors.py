@@ -11,9 +11,9 @@ class HTTPException(Exception):
     Parameters
     ----------
     response : aiohttp.ClientResponse
-        The request response
+        The request response.
     data : Optional[Union[Dict, str]]
-        The data received from the request
+        The data received from the request.
     """
 
     def __init__(
