@@ -180,8 +180,9 @@ class Paginator(discord.ui.View):
         await self.show_page(interaction, (self.current_page - 1) % self.num_pages)
 
     @discord.ui.button(emoji=STOP_EMOJI, style=discord.ButtonStyle.grey)
-    async def stop(self, interaction: discord.Interaction, button: discord.Button):
+    async def stop_button(self, interaction: discord.Interaction, button: discord.Button):
         await interaction.response.defer()
+        self.stop()
         try:
             await interaction.delete_original_response()
         except (discord.NotFound, discord.InteractionResponded):
