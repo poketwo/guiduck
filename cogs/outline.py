@@ -2,6 +2,7 @@ import contextlib
 from datetime import datetime
 import difflib
 import importlib
+import math
 import os
 import re
 import sys
@@ -17,6 +18,7 @@ from helpers.context import GuiduckContext
 from helpers import checks
 from helpers import outline
 from helpers.outline.models.document import Document
+from helpers.pagination import Paginator
 
 
 ACCESSIBLE_COLLECTIONS = {
@@ -121,6 +123,8 @@ def reload_modules(directory: str, skip: Optional[str] = None):
             importlib.reload(module)
 
 
+LINES_PER_PAGE = 15
+
 class Outline(commands.Cog):
     """For interfacing with Outline."""
 
@@ -146,7 +150,6 @@ class Outline(commands.Cog):
     def document_to_embed(self, document: Document) -> discord.Embed:
         embed = discord.Embed(
             title=document.title,
-            description=self.translate_markdown(document.text)[:4000],  # TODO: Paginate
             color=discord.Color.blurple(),
             url=document.full_url(self.client.base_url),
         )
@@ -155,14 +158,27 @@ class Outline(commands.Cog):
             name="Information",
             value=textwrap.dedent(
                 f"""
-                Updated At: {format_dt(document.updated_at)}
                 Created At: {format_dt(document.created_at)}
+                Updated At: {format_dt(document.updated_at)}
                 """
             ),
             inline=False,
         )
 
-        return embed
+        def get_page(pidx: Optional[int] = 0) -> discord.Embed:
+            total_lines = len(document.text.split("\n"))
+            total_pages = math.ceil(total_lines / LINES_PER_PAGE)
+            offset = pidx * LINES_PER_PAGE
+            limit = offset + LINES_PER_PAGE
+
+            text = self.translate_markdown(document.text)
+            lines = text.split("\n")[offset:limit]
+            embed.description = "\n".join(lines)
+            embed.set_footer(text=f"Page {pidx + 1}/{total_pages}")
+
+            return embed
+
+        return get_page
 
     @has_outline_access()
     @commands.hybrid_group(
@@ -193,10 +209,10 @@ class Outline(commands.Cog):
         else:
             doc = await self.client.fetch_document(args.search)
 
-        await ctx.send(
-            embed=self.document_to_embed(doc),
-            reference=ctx.message.reference,
-        )
+            total_lines = len(doc.text.split("\n"))
+            total_pages = math.ceil(total_lines / LINES_PER_PAGE)
+            paginator = Paginator(self.document_to_embed(doc), total_pages, loop=False)
+            await paginator.start(ctx)
 
     @document.autocomplete("collection")
     async def collection_autocomplete(self, interaction: discord.Interaction, current: str):
