@@ -92,12 +92,12 @@ def has_outline_access():
 class DocumentArgs(commands.FlagConverter, case_insensitive=True):
     collection: CollectionConverter = commands.flag(
         aliases=("col",),
-        description="The name of the collection to search within",
+        description="Search within collection",
         max_args=1,
         default=CollectionConverter.convert,
     )
     search: str = commands.flag(
-        description="Search any text in documents",
+        description="Search documents",
         max_args=1,
     )
 
