@@ -269,6 +269,7 @@ class Outline(commands.Cog):
         current = current.strip().casefold()
         if not current:
             documents = await self.client.list_documents(collection_id=collection_id)
+            documents.sort(key=lambda d: list(COLLECTION_NAMES.keys()).index(d.collection_id))
         else:
             results = await self.client.search_documents(current, collection_id=collection_id)
             if not results:
@@ -276,7 +277,12 @@ class Outline(commands.Cog):
             else:
                 documents = [result.document for result in results if result.ranking > 0.8]
 
-        return [app_commands.Choice(name=document.title, value=str(document.id)) for document in documents]
+        return [
+            app_commands.Choice(
+                name=f"{COLLECTION_NAMES[document.collection_id].title()} — {document.title}", value=str(document.id)
+            )
+            for document in documents
+        ]
 
 
 async def setup(bot):
