@@ -238,6 +238,42 @@ class Outline(commands.Cog):
                 return None
         return ephemeral
 
+    def sort_by_collection(self, document: Document) -> int:
+        return list(COLLECTION_NAMES.keys()).index(document.collection_id)
+
+    def search_collections(self, text: str, collections_list: List[str]):
+        substring_search = sorted([c for c in collections_list if text in c], key=lambda c: c.index(text))
+        return substring_search or difflib.get_close_matches(text, collections_list, n=25)
+
+    def format_choice_label(self, document: Document) -> str:
+        collection = COLLECTION_NAMES.get(document.collection_id, "")
+        return f"{collection.title()}　|　{document.title}"
+
+    async def search_documents(
+        self,
+        query: str | None,
+        collection_id: str | None,
+        *,
+        context_limit: Optional[int] = 100,
+        ranking_threshold: Optional[int] = 0.6,
+    ) -> List[Tuple[str, Document]]:
+        """Search documents based on query"""
+
+        query = query.strip().casefold()
+        if not query:
+            documents = await self.client.list_documents(collection_id=collection_id)
+            documents.sort(key=self.sort_by_collection)
+            results = [(shorten(document.text, context_limit), document) for document in documents]
+        else:
+            results = await self.client.search_documents(query, collection_id=collection_id)
+            results = [
+                (shorten(result.context, context_limit), result.document)
+                for result in results
+                if result.ranking >= ranking_threshold
+            ]
+
+        return results
+
     @has_outline_access()
     @commands.hybrid_group(
         "document",
@@ -285,13 +321,6 @@ class Outline(commands.Cog):
             paginator = Paginator(self.document_to_embed(doc), total_pages, loop=False)
             await paginator.start(ctx)
 
-    def sort_by_collection(self, document: Document) -> int:
-        return list(COLLECTION_NAMES.keys()).index(document.collection_id)
-
-    def search_collections(self, text: str, collections_list: List[str]):
-        substring_search = sorted([c for c in collections_list if text in c], key=lambda c: c.index(text))
-        return substring_search or difflib.get_close_matches(text, collections_list, n=25)
-
     @document.autocomplete("collection")
     async def collection_autocomplete(self, interaction: discord.Interaction, current: str):
         ctx = await GuiduckContext.from_interaction(interaction)
@@ -322,25 +351,13 @@ class Outline(commands.Cog):
         except (MissingPermission, CollectionNotFound) as e:
             return [app_commands.Choice(name=str(e), value="")]
 
-        if collection_id == "all":
-            collection_id = None
-
-        current = current.strip().casefold()
-        if not current:
-            documents = await self.client.list_documents(collection_id=collection_id)
-            documents.sort(key=self.sort_by_collection)
-        else:
-            results = await self.client.search_documents(current, collection_id=collection_id)
-            documents = [result.document for result in results if result.ranking > 0.8]
-
-        if not documents:
+        search_results = await self.search_documents(current, collection_id)
+        if not search_results:
             return [app_commands.Choice(name=ERROR_MESSAGES.NO_DOCUMENTS, value="")]
 
         return [
-            app_commands.Choice(
-                name=f"{COLLECTION_NAMES[document.collection_id].title()}　|　{document.title}", value=str(document.id)
-            )
-            for document in documents
+            app_commands.Choice(name=self.format_choice_label(document), value=str(document.id))
+            for context, document in search_results
         ]
 
 
