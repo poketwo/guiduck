@@ -47,6 +47,8 @@ class Bot(commands.Cog):
                 f"You're on cooldown! Try again in **{time.human_timedelta(timedelta(seconds=error.retry_after))}**.",
                 ephemeral=True,
             )
+        elif isinstance(error, commands.BadFlagArgument):
+            await ctx.send(error.original, ephemeral=True)
         elif isinstance(error, commands.CheckFailure):
             await ctx.send(error, ephemeral=True)
         elif isinstance(error, commands.UserInputError):
