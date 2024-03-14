@@ -1,11 +1,12 @@
-import contextlib
+from __future__ import annotations
+
 from datetime import datetime
 import difflib
+import functools
 import math
 import re
 from textwrap import dedent, shorten
-from typing import List, Optional, Tuple
-from uuid import UUID
+from typing import Any, Callable, Dict, List, Optional, Tuple
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -15,21 +16,12 @@ from helpers.context import GuiduckContext
 from helpers import checks
 from helpers import outline
 from helpers.outline.models.document import Document
+from helpers.outline.utils import is_valid_uuid
 from helpers.pagination import Paginator
 
 
 LINES_PER_PAGE = 15
-
-
-class ERROR_MESSAGES:
-    MISSING_PERMISSION = "You do not have permission to use this command."
-    MISSING_COLLECTION_PERMISSION = "You do not have permission to view this collection."
-    MISSING_DOCUMENT_PERMISSION = "You do not have permission to view this document."
-
-    NO_DOCUMENTS = "No documents found."
-    NO_COLLECTIONS = "No collections found."
-
-    EPHEMERAL_REQUIRED = "This command is restricted to staff categories only. However, you can use the slash command to view an ephemeral version anywhere."
+DOCS_PER_PAGE = 5
 
 
 COLLECTION_NAMES = {v: k for k, v in COLLECTION_IDS.items()}
@@ -39,6 +31,45 @@ ACCESSIBLE_COLLECTIONS = {
     checks.is_moderator: ("moderators", "moderator wiki"),
     checks.is_community_manager: ("management",),
 }
+DEFAULT_COLLECTION = ACCESSIBLE_COLLECTIONS[checks.is_trial_moderator][0]
+
+
+class OutlineException(commands.CheckFailure):
+    message = "An Outline command exception occurred"
+
+    def __init__(self, message: Optional[str] = None, *args):
+        super().__init__(message or self.message, *args)
+
+
+class MissingCommandPermission(OutlineException):
+    message = "You do not have permission to use this command."
+
+
+class MissingDocumentPermission(OutlineException):
+    message = "You do not have permission to view this document."
+
+
+class MissingCollectionPermission(OutlineException):
+    message = "You do not have permission to view this collection."
+
+
+class DocumentNotFound(OutlineException):
+    message = "No documents found."
+
+
+class CollectionNotFound(OutlineException):
+    message = "No collections found."
+
+
+class EphemeralRequired(OutlineException):
+    message = (
+        "This command is restricted to staff categories only. However, you can use the"
+        " slash command to view an ephemeral version anywhere."
+    )
+
+
+def format_dt(dt: datetime) -> str:
+    return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
 
 
 def has_outline_access():
@@ -47,7 +78,7 @@ def has_outline_access():
     async def predicate(ctx):
         accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
         if len(accessible_collections) == 0:
-            raise MissingPermission
+            raise MissingCommandPermission
         return True
 
     return commands.check(predicate)
@@ -59,66 +90,98 @@ def is_outline_admin():
     return checks.is_admin()
 
 
-def format_dt(dt: datetime) -> str:
-    return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
+async def passes_check(check: Callable[[GuiduckContext], Any], ctx: GuiduckContext) -> bool:
+    try:
+        await check().predicate(ctx)
+    except commands.CheckFailure:
+        return False
+    else:
+        return True
 
 
-class OutlineException(commands.CheckFailure):
-    pass
+async def do_ephemeral(ctx: GuiduckContext):
+    ephemeral_arg = (ctx.interaction.namespace if ctx.interaction else list(ctx.kwargs.values())[0]).ephemeral
+
+    if await passes_check(checks.staff_categories_only, ctx):
+        ephemeral = False
+    else:
+        if ctx.interaction:
+            ephemeral = True  # Force ephemeral incase it's outside staff categories if app command
+        else:
+            raise EphemeralRequired
+
+    return ephemeral or ephemeral_arg
 
 
-class MissingPermission(OutlineException):
-    def __init__(self, message: Optional[str] = ERROR_MESSAGES.MISSING_PERMISSION, *args):
-        super().__init__(message)
+def with_typing(do_ephemeral: Callable[[GuiduckContext], bool]):
+    """Run command with calling ctx.typing, and make it ephemeral depending on check"""
+
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            ctx = discord.utils.find(lambda a: isinstance(a, commands.Context), args)
+            ephemeral = await do_ephemeral(ctx)
+
+            try:
+                async with ctx.typing(ephemeral=ephemeral):
+                    return await func(*args, **kwargs)
+            except discord.InteractionResponded:
+                return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
-class MissingCollectionPermission(OutlineException):
-    def __init__(self, message: Optional[str] = ERROR_MESSAGES.MISSING_COLLECTION_PERMISSION, *args):
-        super().__init__(message)
+def remedy_args_bug(func):
+    """This decorators is to remedy a bug in discord.py (https://github.com/Rapptz/discord.py/issues/9641)
+    that makes it so that callable default values of flags aren't called in case of slash commands. So this decorator
+    sets these for the FlagConverter object before the command's callback is ran."""
 
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        ctx = discord.utils.find(lambda a: isinstance(a, GuiduckContext), args)
+        flags = discord.utils.find(lambda k: isinstance(k, commands.FlagConverter), kwargs.values())
 
-class CollectionNotFound(OutlineException):
-    def __init__(self, message: Optional[str] = ERROR_MESSAGES.NO_COLLECTIONS, *args):
-        super().__init__(message)
+        if flags is not None:
+            for flag in flags.get_flags().values():
+                arg = getattr(flags, flag.attribute)
+                if callable(arg):
+                    setattr(flags, flag.attribute, await discord.utils.maybe_coroutine(arg, ctx))
+
+        return await func(*args, **kwargs)
+
+    return wrapper
 
 
 class CollectionConverter(commands.Converter):
     """Converter to convert collection name to id"""
 
     @staticmethod
-    async def get_accessible_collections(ctx: GuiduckContext) -> List[str]:
+    async def get_accessible_collections(ctx: GuiduckContext) -> Dict[str, str]:
         """Get all collections accessible by user"""
 
-        accessible_collections = []
+        accessible_collections = {}
 
         for check, collections in ACCESSIBLE_COLLECTIONS.items():
-            with contextlib.suppress(commands.CheckAnyFailure):
-                if await check().predicate(ctx):
-                    accessible_collections.extend(collections)
+            if await passes_check(check, ctx):
+                for collection in collections:
+                    accessible_collections[collection] = COLLECTION_IDS[collection]
 
         if not accessible_collections:
-            raise MissingPermission
+            raise MissingCommandPermission
 
-        return list(dict.fromkeys(accessible_collections))
-
-    @staticmethod
-    async def is_admin(ctx: GuiduckContext) -> bool:
-        try:
-            await is_outline_admin().predicate(ctx)
-        except commands.CheckFailure:
-            return False
-        else:
-            return True
+        return accessible_collections
 
     @staticmethod
     async def get_default_collection(ctx: GuiduckContext) -> str | None:
         """Default collection to use for user when no collection is provided"""
 
-        if await CollectionConverter.is_admin(ctx):
+        if await passes_check(is_outline_admin, ctx):
             return None
 
         accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
-        return COLLECTION_IDS[accessible_collections[0]]
+        return list(accessible_collections.values())[0]
 
     @staticmethod
     async def convert(ctx: GuiduckContext, argument: Optional[str] = None) -> str | None:
@@ -128,7 +191,7 @@ class CollectionConverter(commands.Converter):
             return await CollectionConverter.get_default_collection(ctx)
 
         argument = argument.strip().casefold()
-        if await CollectionConverter.is_admin(ctx):
+        if await passes_check(is_outline_admin, ctx):
             if argument == "all":
                 return None
 
@@ -138,28 +201,41 @@ class CollectionConverter(commands.Converter):
             if argument in COLLECTION_IDS or argument == "all":
                 raise MissingCollectionPermission
             raise CollectionNotFound
+        else:
+            return accessible_collections[argument]
 
-        return COLLECTION_IDS[argument]
 
+class DocumentArgs(commands.FlagConverter):
+    """Base flags for the document commands"""
 
-class DocumentArgs(commands.FlagConverter, case_insensitive=True):
-    """Flags for the document command"""
-
+    MSG_CMD_USAGE = f'text: <text> collection: [collection="{DEFAULT_COLLECTION.title()}"]'
+    text: str = commands.flag(
+        aliases=("t", "txt"),
+        description="Search for text in documents (type a space to refresh)",
+        max_args=1,
+    )
     collection: CollectionConverter = commands.flag(
         aliases=("col",),
         description="Search within collection",
         max_args=1,
         default=CollectionConverter.convert,
     )
-    search: str = commands.flag(
-        aliases=("s",),
-        description="Search documents (type a space to refresh based on selected collection)",
-        max_args=1,
-    )
     ephemeral: Optional[bool] = commands.flag(
-        description="Send as an ephemeral message that only you can see",
+        description="Send as an ephemeral message that only you can see. This is forced True if outside Staff Categories.",
         max_args=1,
         default=False,
+    )
+
+
+class SearchDocumentArgs(DocumentArgs):
+    """Flags for the document search command"""
+
+    MSG_CMD_USAGE = f'text: [text] collection: [collection="{DEFAULT_COLLECTION.title()}"]'
+    text: str = commands.flag(
+        aliases=("t", "txt"),
+        description="Search for text in documents (type a space to refresh)",
+        max_args=1,
+        default="",
     )
 
 
@@ -224,20 +300,9 @@ class Outline(commands.Cog):
 
         return get_page
 
-    async def do_ephemeral(self, ctx: GuiduckContext) -> bool | None:
-        """Checks if the command is being ran in Staff categories and whether to
-        do ephemeral or not. Returns True/False if outside/in staff categories, and
-        None if command was a message command and hence ephemeral not possible."""
-
-        try:
-            if await checks.staff_categories_only().predicate(ctx):
-                ephemeral = False
-        except commands.CheckFailure:
-            if ctx.interaction:
-                ephemeral = True  # Force ephemeral incase it's outside staff categories if app command
-            else:
-                return None
-        return ephemeral
+    def format_choice_label(self, document: Document) -> str:
+        collection = COLLECTION_NAMES.get(document.collection_id, "")
+        return f"{collection.title()}　|　{document.title}"
 
     def sort_by_collection(self, document: Document) -> int:
         return list(COLLECTION_NAMES.keys()).index(document.collection_id)
@@ -245,10 +310,6 @@ class Outline(commands.Cog):
     def search_collections(self, text: str, collections_list: List[str]):
         substring_search = sorted([c for c in collections_list if text in c], key=lambda c: c.index(text))
         return substring_search or difflib.get_close_matches(text, collections_list, n=25)
-
-    def format_choice_label(self, document: Document) -> str:
-        collection = COLLECTION_NAMES.get(document.collection_id, "")
-        return f"{collection.title()}　|　{document.title}"
 
     async def search_documents(
         self,
@@ -275,90 +336,111 @@ class Outline(commands.Cog):
 
         return results
 
+    async def has_document_access(self, ctx: GuiduckContext, document: Document) -> bool:
+        accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
+        if document.collection_id not in accessible_collections.values():
+            raise MissingCollectionPermission
+        return True
+
+    async def paginate_document(self, ctx: GuiduckContext, document: Document):
+        total_lines = len(document.text.split("\n"))
+        total_pages = math.ceil(total_lines / LINES_PER_PAGE)
+        paginator = Paginator(self.document_to_embed(document), total_pages, loop=False)
+        await paginator.start(ctx)
+
     @has_outline_access()
     @commands.hybrid_group(
         "document",
         fallback="view",
         aliases=("doc", "docs"),
-        usage='search: <search> collection: [collection="Moderator"]',
+        usage=DocumentArgs.MSG_CMD_USAGE,
     )
+    @with_typing(do_ephemeral=do_ephemeral)
+    @remedy_args_bug
     async def document(self, ctx: GuiduckContext, *, args: DocumentArgs):
-        """View documents from the Outline Knowledge Base.
+        """View a document from the Outline staff knowledge base.
 
         You must have the Trial Moderator role in order to use this.
         """
 
-        # This is temporary to set the function attrs until this bug is fixed in discord.py (https://github.com/Rapptz/discord.py/issues/9641)
-        for flag in args.get_flags().values():
-            arg = getattr(args, flag.attribute)
-            if callable(arg):
-                setattr(args, flag.attribute, await discord.utils.maybe_coroutine(arg, ctx))
-
-        # Restrict the command to staff categories only
-        # Or force ephemeral if possible
-        ephemeral = await self.do_ephemeral(ctx)
-        if ephemeral is None:
-            return await ctx.reply(ERROR_MESSAGES.EPHEMERAL_REQUIRED, mention_author=False)
-
-        async with ctx.typing(ephemeral=ephemeral or args.ephemeral):
-            collection_id = args.collection
-
-            # TODO: Make this a converter so that it can be reused for search
+        if is_valid_uuid(args.text):
+            # A specific document id was passed, either manually or via autocomplete
             try:
-                UUID(args.search)
-            except ValueError:
-                docs = await self.client.search_documents(args.search, collection_id, limit=1)
-                if not docs:
-                    return await ctx.send(ERROR_MESSAGES.NO_DOCUMENTS)
-                doc = docs[0].document
-            else:
-                try:
-                    doc = await self.client.fetch_document(args.search)
-                except outline.NotFound:
-                    return await ctx.send(ERROR_MESSAGES.NO_DOCUMENTS)
-                else:
-                    accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
-                    if doc.collection_id not in accessible_collections:
-                        return await ctx.send(ERROR_MESSAGES.MISSING_DOCUMENT_PERMISSION)
+                doc = await self.client.fetch_document(args.text)
+            except outline.NotFound:
+                raise DocumentNotFound
 
-            total_lines = len(doc.text.split("\n"))
-            total_pages = math.ceil(total_lines / LINES_PER_PAGE)
-            paginator = Paginator(self.document_to_embed(doc), total_pages, loop=False)
-            await paginator.start(ctx)
+            if await self.has_document_access(ctx, doc):
+                return await self.paginate_document(ctx, doc)
+
+        else:
+            collection_id = args.collection
+            docs = await self.client.search_documents(args.text, collection_id, limit=1)
+            if not docs:
+                raise DocumentNotFound
+
+            doc = docs[0].document
+            await self.paginate_document(ctx, doc)
+
+    @has_outline_access()
+    @document.command(
+        "search",
+        aliases=("list",),
+        usage=SearchDocumentArgs.MSG_CMD_USAGE,
+    )
+    @with_typing(do_ephemeral=do_ephemeral)
+    @remedy_args_bug
+    async def document_search(self, ctx: GuiduckContext, *, args: SearchDocumentArgs):
+        """Search or list documents from the Outline Knowledge Base.
+
+        You must have the Trial Moderator role in order to use this.
+        """
+
+        if is_valid_uuid(args.text):
+            return await ctx.invoke(self.document, args=args)
+
+        search_results = await self.search_documents(args.text, args.collection)
+        if not search_results:
+            raise DocumentNotFound
+
+        raise OutlineException("Work in progress!")  # TODO: Complete & Test
 
     @document.autocomplete("collection")
+    @document_search.autocomplete("collection")
     async def collection_autocomplete(self, interaction: discord.Interaction, current: str):
         ctx = await GuiduckContext.from_interaction(interaction)
 
         try:
             accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
-        except MissingPermission as e:
+        except MissingCommandPermission as e:
             return [app_commands.Choice(name=str(e), value="")]
 
-        if await CollectionConverter.is_admin(ctx):
-            accessible_collections.append("all")
+        if passes_check(is_outline_admin, ctx):
+            accessible_collections["all"] = None
 
         current = current.strip().casefold()
         if not current:
             collections = accessible_collections
         else:
-            collections = self.search_collections(current, accessible_collections)
+            collections = self.search_collections(current, list(accessible_collections.keys()))
             if not collections:
-                return [app_commands.Choice(name=ERROR_MESSAGES.NO_COLLECTIONS, value="")]
+                return [app_commands.Choice(name=CollectionNotFound.message, value="")]
+
         return [app_commands.Choice(name=collection.title(), value=collection) for collection in collections]
 
-    @document.autocomplete("search")
+    @document.autocomplete("text")
+    @document_search.autocomplete("text")
     async def doc_search_autocomplete(self, interaction: discord.Interaction, current: str):
         ctx = await GuiduckContext.from_interaction(interaction)
 
         try:
             collection_id = await CollectionConverter.convert(ctx, interaction.namespace.collection)
-        except (MissingPermission, CollectionNotFound) as e:
+        except (MissingCommandPermission, CollectionNotFound) as e:
             return [app_commands.Choice(name=str(e), value="")]
 
         search_results = await self.search_documents(current, collection_id)
         if not search_results:
-            return [app_commands.Choice(name=ERROR_MESSAGES.NO_DOCUMENTS, value="")]
+            return [app_commands.Choice(name=DocumentNotFound.message, value="")]
 
         return [
             app_commands.Choice(name=self.format_choice_label(document), value=str(document.id))
