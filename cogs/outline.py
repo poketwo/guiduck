@@ -69,7 +69,7 @@ class CollectionConverter(commands.Converter):
         accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
 
         if argument not in accessible_collections:
-            if argument in COLLECTION_IDS:
+            if argument in COLLECTION_IDS or argument == "all":
                 raise commands.ArgumentParsingError("You do not have permission to view this collection.")
             raise commands.ArgumentParsingError("Collection not found.")
 
