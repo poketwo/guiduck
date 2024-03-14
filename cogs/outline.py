@@ -22,8 +22,17 @@ from helpers.pagination import Paginator
 
 
 LINES_PER_PAGE = 15
-NO_PERMISSION_MESSAGE = "You do not have permission to use this command."
-EPHEMERAL_REQUIRED_MESSAGE = "This command is restricted to staff categories only. However, you can use the slash command to view an ephemeral version anywhere."
+
+
+class ERROR_MESSAGES:
+    MISSING_PERMISSION = "You do not have permission to use this command."
+    MISSING_COLLECTION_PERMISSION = "You do not have permission to view this collection."
+
+    NO_DOCUMENTS = "No documents found."
+    NO_COLLECTIONS = "No collections found."
+
+    EPHEMERAL_REQUIRED = "This command is restricted to staff categories only. However, you can use the slash command to view an ephemeral version anywhere."
+
 
 COLLECTION_NAMES = {v: k for k, v in COLLECTION_IDS.items()}
 ACCESSIBLE_COLLECTIONS = {
@@ -36,9 +45,9 @@ ACCESSIBLE_COLLECTIONS = {
 
 def has_outline_access():
     async def predicate(ctx):
-        possible_cols = await CollectionConverter.get_accessible_collections(ctx)
-        if len(possible_cols) == 0:
-            raise commands.CheckFailure(NO_PERMISSION_MESSAGE)
+        accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
+        if len(accessible_collections) == 0:
+            raise MissingPermission
         return True
 
     return commands.check(predicate)
@@ -46,6 +55,25 @@ def has_outline_access():
 
 def format_dt(dt: datetime) -> str:
     return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
+
+
+class OutlineException(commands.CheckFailure):
+    pass
+
+
+class MissingPermission(OutlineException):
+    def __init__(self, message: Optional[str] = ERROR_MESSAGES.MISSING_PERMISSION, *args):
+        super().__init__(message)
+
+
+class MissingCollectionPermission(OutlineException):
+    def __init__(self, message: Optional[str] = ERROR_MESSAGES.MISSING_COLLECTION_PERMISSION, *args):
+        super().__init__(message)
+
+
+class CollectionNotFound(OutlineException):
+    def __init__(self, message: Optional[str] = ERROR_MESSAGES.NO_COLLECTIONS, *args):
+        super().__init__(message)
 
 
 class CollectionConverter(commands.Converter):
@@ -60,10 +88,13 @@ class CollectionConverter(commands.Converter):
                 if await check().predicate(ctx):
                     accessible_collections.extend(collections)
 
+        if not accessible_collections:
+            raise MissingPermission
+
         return list(dict.fromkeys(accessible_collections))
 
     @staticmethod
-    async def get_default_collection(ctx: GuiduckContext) -> str:
+    async def get_default_collection(ctx: GuiduckContext) -> str | None:
         """Default collection to use for user when no collection is provided"""
 
         with contextlib.suppress(commands.CheckAnyFailure):
@@ -91,8 +122,8 @@ class CollectionConverter(commands.Converter):
 
         if argument not in accessible_collections:
             if argument in COLLECTION_IDS or argument == "all":
-                raise commands.ArgumentParsingError("You do not have permission to view this collection.")
-            raise commands.ArgumentParsingError("Collection not found.")
+                raise MissingCollectionPermission
+            raise CollectionNotFound
 
         return COLLECTION_IDS[argument]
 
@@ -211,7 +242,7 @@ class Outline(commands.Cog):
 
         ephemeral = await self.do_ephemeral(ctx)
         if ephemeral is None:
-            return await ctx.reply(EPHEMERAL_REQUIRED_MESSAGE, mention_author=False)
+            return await ctx.reply(ERROR_MESSAGES.EPHEMERAL_REQUIRED, mention_author=False)
 
         async with ctx.typing(ephemeral=ephemeral or args.ephemeral):
             collection_id = args.collection
@@ -225,20 +256,36 @@ class Outline(commands.Cog):
             except ValueError:
                 docs = await self.client.search_documents(args.search, collection_id, limit=1)
                 if not docs:
-                    return await ctx.send("Document not found.")
+                    return await ctx.send(ERROR_MESSAGES.NO_DOCUMENTS)
                 doc = docs[0].document
             else:
-                doc = await self.client.fetch_document(args.search)
+                try:
+                    doc = await self.client.fetch_document(args.search)
+                except outline.NotFound:
+                    return await ctx.send(ERROR_MESSAGES.NO_DOCUMENTS)
 
             total_lines = len(doc.text.split("\n"))
             total_pages = math.ceil(total_lines / LINES_PER_PAGE)
             paginator = Paginator(self.document_to_embed(doc), total_pages, loop=False)
             await paginator.start(ctx)
 
+    def sort_by_collection(self, document: Document) -> int:
+        return list(COLLECTION_NAMES.keys()).index(document.collection_id)
+
+    def search_collections(self, text: str, collections_list: List[str]):
+        substring_search = sorted(
+            [c for c in collections_list if text in c], key=lambda c: c.index(text)
+        )
+        return substring_search or difflib.get_close_matches(text, collections_list, n=25)
+
     @document.autocomplete("collection")
     async def collection_autocomplete(self, interaction: discord.Interaction, current: str):
         ctx = await GuiduckContext.from_interaction(interaction)
-        accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
+
+        try:
+            accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
+        except MissingPermission as e:
+            return [app_commands.Choice(name=str(e), value="")]
 
         with contextlib.suppress(commands.CheckAnyFailure):
             if await checks.is_admin().predicate(ctx):
@@ -248,20 +295,19 @@ class Outline(commands.Cog):
         if not current:
             collections = accessible_collections
         else:
-            collections = sorted(
-                [c for c in accessible_collections if current in c], key=lambda c: c.index(current)
-            ) or difflib.get_close_matches(current, accessible_collections, n=25)
+            collections = self.search_collections(current, accessible_collections)
             if not collections:
-                return [app_commands.Choice(name=f"No collections found.", value="")]
+                return [app_commands.Choice(name=ERROR_MESSAGES.NO_COLLECTIONS, value="")]
         return [app_commands.Choice(name=collection.title(), value=collection) for collection in collections]
 
     @document.autocomplete("search")
     async def doc_search_autocomplete(self, interaction: discord.Interaction, current: str):
         ctx = await GuiduckContext.from_interaction(interaction)
 
-        collection_id = await CollectionConverter.convert(ctx, interaction.namespace.collection)
-        if not collection_id:
-            return [app_commands.Choice(name=f"Invalid collection selected.", value="")]
+        try:
+            collection_id = await CollectionConverter.convert(ctx, interaction.namespace.collection)
+        except (MissingPermission, CollectionNotFound) as e:
+            return [app_commands.Choice(name=str(e), value="")]
 
         if collection_id == "all":
             collection_id = None
@@ -269,13 +315,13 @@ class Outline(commands.Cog):
         current = current.strip().casefold()
         if not current:
             documents = await self.client.list_documents(collection_id=collection_id)
-            documents.sort(key=lambda d: list(COLLECTION_NAMES.keys()).index(d.collection_id))
+            documents.sort(key=self.sort_by_collection)
         else:
             results = await self.client.search_documents(current, collection_id=collection_id)
-            if not results:
-                return [app_commands.Choice(name=f"No documents found.", value="")]
-            else:
-                documents = [result.document for result in results if result.ranking > 0.8]
+            documents = [result.document for result in results if result.ranking > 0.8]
+
+        if not documents:
+            return [app_commands.Choice(name=ERROR_MESSAGES.NO_DOCUMENTS, value="")]
 
         return [
             app_commands.Choice(
