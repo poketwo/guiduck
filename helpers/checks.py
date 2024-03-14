@@ -7,6 +7,10 @@ class NotInGuild(commands.CheckFailure):
     pass
 
 
+def is_admin():
+    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.ADMIN_ROLES))
+
+
 def is_community_manager():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.COMMUNITY_MANAGER_ROLES))
 
@@ -17,6 +21,10 @@ def is_moderator():
 
 def is_trial_moderator():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.TRIAL_MODERATOR_ROLES))
+
+
+def is_developer():
+    return commands.check_any(commands.is_owner(), commands.has_role(constants.DEVELOPER_ROLE))
 
 
 def in_guilds(*guild_ids):

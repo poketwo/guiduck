@@ -1,3 +1,4 @@
+import aiohttp
 import discord
 from discord.ext import commands, events
 from discord.ext.events import member_kick
@@ -31,6 +32,7 @@ COGS = [
     "reputation",
     "role_sync",
     "tags",
+    "outline",
 ]
 
 
@@ -47,6 +49,7 @@ class Bot(commands.Bot, events.EventsMixin):
         self.config = config
 
     async def setup_hook(self):
+        self.http_session = aiohttp.ClientSession()
         await self.load_extension("jishaku")
         for i in ESSENTIAL_COGS:
             await self.load_extension(f"cogs.{i}")
