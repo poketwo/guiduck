@@ -151,6 +151,13 @@ class Outline(commands.Cog):
         # Replace double line breaks in front of headers with single
         text = re.sub(r"\n\n(#+ )", r"\n\1", text)
 
+        # Replace highlights with italics
+        text = re.sub(r"==(.+?)==", r"*\1*", text)
+
+        # Replace new command lines
+        while re.search(command_symbol := "\n\\\+\n", text) is not None:
+            text = re.sub(command_symbol, "\n", text)
+
         return text
 
     def document_to_embed(self, document: Document) -> discord.Embed:
