@@ -24,6 +24,7 @@ LINES_PER_PAGE = 15
 class ERROR_MESSAGES:
     MISSING_PERMISSION = "You do not have permission to use this command."
     MISSING_COLLECTION_PERMISSION = "You do not have permission to view this collection."
+    MISSING_DOCUMENT_PERMISSION = "You do not have permission to view this document."
 
     NO_DOCUMENTS = "No documents found."
     NO_COLLECTIONS = "No collections found."
@@ -315,6 +316,10 @@ class Outline(commands.Cog):
                     doc = await self.client.fetch_document(args.search)
                 except outline.NotFound:
                     return await ctx.send(ERROR_MESSAGES.NO_DOCUMENTS)
+                else:
+                    accessible_collections = await CollectionConverter.get_accessible_collections(ctx)
+                    if doc.collection_id not in accessible_collections:
+                        return await ctx.send(ERROR_MESSAGES.MISSING_DOCUMENT_PERMISSION)
 
             total_lines = len(doc.text.split("\n"))
             total_pages = math.ceil(total_lines / LINES_PER_PAGE)
