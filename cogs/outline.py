@@ -99,6 +99,7 @@ class DocumentArgs(commands.FlagConverter, case_insensitive=True):
         default=CollectionConverter.convert,
     )
     search: str = commands.flag(
+        aliases=("s",),
         description="Search documents",
         max_args=1,
     )
