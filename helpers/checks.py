@@ -1,4 +1,7 @@
+from typing import Any, Callable
 from discord.ext import commands
+
+from helpers.context import GuiduckContext
 
 from . import constants
 
@@ -76,3 +79,12 @@ def is_level(level):
         return user.get("level", 0) >= level
 
     return commands.check(predicate)
+
+
+async def passes_check(check: Callable[[GuiduckContext], Any], ctx: GuiduckContext) -> bool:
+    try:
+        await check().predicate(ctx)
+    except commands.CheckFailure:
+        return False
+    else:
+        return True

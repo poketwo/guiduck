@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Iterable, NamedTuple
 
 import discord
@@ -67,3 +68,9 @@ def with_attachment_urls(content: str, attachments: Iterable[discord.Attachment]
     for attachment in attachments:
         content += f"\n{attachment.url}"
     return content
+
+
+def full_format_dt(dt: datetime) -> str:
+    """Formats datetime object to discord timestamp in `FULL (RELATIVE)` format"""
+
+    return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"

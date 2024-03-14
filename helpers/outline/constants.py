@@ -1,27 +1,17 @@
-from enum import Enum
+from helpers import checks
+from config import OUTLINE_COLLECTION_IDS as COLLECTION_IDS
 
 
-__all__ = [
-    "Endpoint",
-]
+LINES_PER_PAGE = 15
+DOCS_PER_PAGE = 5
 
 
-class Endpoint(Enum):
-    LIST_COLLECTIONS = "collections.list"
-    RETRIEVE_COLLECTION = "collections.info"
+COLLECTION_NAMES = {v: k for k, v in COLLECTION_IDS.items()}
+ACCESSIBLE_COLLECTIONS = {
+    checks.is_developer: ("development",),
+    checks.is_trial_moderator: ("moderators", "moderator wiki"),
+    checks.is_moderator: ("moderators", "moderator wiki"),
+    checks.is_community_manager: ("management",),
+}
 
-    LIST_DOCUMENTS = "documents.list"
-    SEARCH_DOCUMENTS = "documents.search"
-    RETRIEVE_DOCUMENT = "documents.info"
-
-
-class DateFilter(Enum):
-    DAY = "day"
-    WEEK = "week"
-    MONTH = "month"
-    YEAR = "year"
-
-
-class Direction(Enum):
-    ASCENDING = "ASC"
-    DESCENDING = "DESC"
+DEFAULT_COLLECTION = ACCESSIBLE_COLLECTIONS[checks.is_trial_moderator][0]
