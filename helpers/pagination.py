@@ -1,5 +1,6 @@
 import asyncio
-from typing import Optional
+import contextlib
+from typing import Callable, Dict, Optional
 
 import discord
 from discord.ext import commands, menus
@@ -125,10 +126,31 @@ GO_PAGE_EMOJI = "🔢"
 
 
 class Paginator(discord.ui.View):
-    def __init__(self, get_page, num_pages: int, *, loop: Optional[bool] = True):
+    """Simple paginator using buttons.
+    Has the following pagination functionalities:
+    - first page
+    - previous page
+    - stop paginator
+    - next page
+    - last page
+    - go to page
+
+    Parameters
+    ----------
+    get_page : Callable[[int], discord.Embed | str]
+        The function that takes in the page number and returns what to show for that page.
+        It should return either a string or an embed.
+    num_pages : int
+        The total number of pages
+    loop_pages : bool
+        If it should allow looping the pages. If False, it disables first/previous and next/last buttons
+        if it's at the beginning and end of the pages, respectively.
+    """
+
+    def __init__(self, get_page: Callable[[int], discord.Embed | str], num_pages: int, *, loop_pages: Optional[bool] = True):
         self.num_pages = num_pages
         self.get_page = get_page
-        self.loop = loop
+        self.loop_pages = loop_pages
 
         self.current_page = 0
         self.message = None
@@ -142,29 +164,34 @@ class Paginator(discord.ui.View):
             self.clear_items()
             return
 
-        if not self.loop:
+        if not self.loop_pages:
             pidx = self.current_page
             self.first.disabled = pidx == 0
             self.last.disabled = (pidx + 1) >= self.num_pages
             self.next.disabled = (pidx + 1) >= self.num_pages
             self.previous.disabled = pidx == 0
 
+    def _get_page_kwargs(self, page:  discord.Embed | str) -> Dict[str,  discord.Embed | str]:
+        if isinstance(page, discord.Embed):
+            return {"embed": page}
+        if isinstance(page, str):
+            return {"content": page}
+
     async def show_page(self, interaction: discord.Interaction, pidx: int) -> None:
         if self.current_page == pidx:
-            try:
+            with contextlib.suppress(discord.NotFound, discord.InteractionResponded):
                 return await interaction.response.defer()
-            except (discord.NotFound, discord.InteractionResponded):
-                pass
 
-        embed = await discord.utils.maybe_coroutine(self.get_page, pidx)
+        page = await discord.utils.maybe_coroutine(self.get_page, pidx)
+        kwargs = self._get_page_kwargs(page)
         self.current_page = pidx
         self._update_labels()
 
         try:
-            await interaction.response.edit_message(embed=embed, view=self)
+            await interaction.response.edit_message(**kwargs, view=self)
         except (discord.NotFound, discord.InteractionResponded):
             if self.message:
-                await self.message.edit(embed=embed, view=self)
+                await self.message.edit(**kwargs, view=self)
 
     async def start(self, ctx: commands.Context, pidx: int = 0):
         self._update_labels()

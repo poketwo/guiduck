@@ -147,7 +147,7 @@ class Outline(commands.Cog):
     async def paginate_document(self, ctx: GuiduckContext, document: outline.Document):
         total_lines = len(document.text.split("\n"))
         total_pages = math.ceil(total_lines / LINES_PER_PAGE)
-        paginator = Paginator(self.document_to_embed(document), total_pages, loop=False)
+        paginator = Paginator(self.document_to_embed(document), total_pages, loop_pages=False)
         await paginator.start(ctx)
 
     @has_outline_access()
