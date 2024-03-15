@@ -23,8 +23,9 @@ from helpers.outline.constants import COLLECTION_NAMES, LINES_PER_PAGE, OPTIONS_
 from helpers.outline.converters import CollectionConverter, DocumentArgs, SearchDocumentArgs
 from helpers.outline.decorators import remedy_args_bug, with_typing
 from helpers.outline.exceptions import (
-    CollectionNotFound,
-    DocumentNotFound,
+    MissingDocumentPermission,
+    NoCollectionsFound,
+    NoDocumentsFound,
     MissingCommandPermission,
     OutlineException,
 )
@@ -140,7 +141,7 @@ class Outline(commands.Cog):
     async def find_document(self, query: str | None, collection_id: str | None) -> Document:
         results = await self.search_documents(query, collection_id, limit=1)
         if not results:
-            raise DocumentNotFound
+            raise NoDocumentsFound
 
         return results[0].document
 
@@ -166,14 +167,14 @@ class Outline(commands.Cog):
         """
 
         if not args.text:
-            raise DocumentNotFound
+            raise NoDocumentsFound
 
         if outline.is_valid_uuid(args.text):
             # A specific document id was passed, either manually or via autocomplete
             try:
                 doc = await self.client.fetch_document(args.text)
             except outline.NotFound:
-                raise DocumentNotFound
+                raise NoDocumentsFound
 
             if await has_document_access(ctx, doc):
                 return await self.paginate_document(ctx, doc)
@@ -202,7 +203,7 @@ class Outline(commands.Cog):
 
         search_results = await self.search_documents(args.text, args.collection)
         if not search_results:
-            raise DocumentNotFound
+            raise NoDocumentsFound
 
         raise OutlineException("Work in progress!")  # TODO: Complete & Test
 
@@ -225,7 +226,7 @@ class Outline(commands.Cog):
         else:
             collections = self.search_collections(current, list(accessible_collections.keys()))
             if not collections:
-                return [app_commands.Choice(name=CollectionNotFound.message, value="")]
+                return [app_commands.Choice(name=NoCollectionsFound.message, value="")]
 
         return [app_commands.Choice(name=collection.title(), value=collection) for collection in collections]
 
@@ -236,12 +237,12 @@ class Outline(commands.Cog):
 
         try:
             collection_id = await CollectionConverter.convert(ctx, interaction.namespace.collection)
-        except (MissingCommandPermission, CollectionNotFound) as e:
+        except (MissingCommandPermission, NoCollectionsFound) as e:
             return [app_commands.Choice(name=str(e), value="")]
 
         search_results = await self.search_documents(current, collection_id)
         if not search_results:
-            return [app_commands.Choice(name=DocumentNotFound.message, value="")]
+            return [app_commands.Choice(name=NoDocumentsFound.message, value="")]
 
         return [
             app_commands.Choice(name=self.format_choice_label(result.document), value=str(result.document.id))

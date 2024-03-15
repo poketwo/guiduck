@@ -4,7 +4,7 @@ import outline_api_wrapper as outline
 from helpers.context import GuiduckContext
 from helpers import checks
 from .converters import CollectionConverter
-from .exceptions import MissingCollectionPermission, MissingCommandPermission, EphemeralRequired
+from .exceptions import MissingCommandPermission, EphemeralRequired
 
 
 def has_outline_access():

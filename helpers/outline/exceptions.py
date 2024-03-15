@@ -22,11 +22,11 @@ class MissingCollectionPermission(OutlineException):
     message = "You do not have permission to view this collection."
 
 
-class DocumentNotFound(OutlineException):
+class NoDocumentsFound(OutlineException):
     message = "No documents found."
 
 
-class CollectionNotFound(OutlineException):
+class NoCollectionsFound(OutlineException):
     message = "No collections found."
 
 

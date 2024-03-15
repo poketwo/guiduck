@@ -4,7 +4,7 @@ from discord.ext import commands
 from helpers import checks
 from helpers.context import GuiduckContext
 from .constants import ACCESSIBLE_COLLECTIONS, COLLECTION_IDS, DEFAULT_COLLECTION
-from .exceptions import MissingCollectionPermission, CollectionNotFound, MissingCommandPermission
+from .exceptions import MissingCollectionPermission, NoCollectionsFound, MissingCommandPermission
 
 
 class CollectionConverter(commands.Converter):
@@ -53,7 +53,7 @@ class CollectionConverter(commands.Converter):
         if argument not in accessible_collections:
             if argument in COLLECTION_IDS or argument == "all":
                 raise MissingCollectionPermission
-            raise CollectionNotFound
+            raise NoCollectionsFound
         else:
             return accessible_collections[argument]
 
