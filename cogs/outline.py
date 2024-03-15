@@ -146,6 +146,9 @@ class Outline(commands.Cog):
         return results[0].document
 
     async def paginate_document(self, ctx: GuiduckContext, document: outline.Document):
+        if not await has_document_access(ctx, document):
+            return await ctx.send(MissingDocumentPermission.message, ephemeral=True)
+
         total_lines = len(document.text.split("\n"))
         total_pages = math.ceil(total_lines / LINES_PER_PAGE)
         paginator = Paginator(self.document_to_embed(document), total_pages, loop_pages=False)
@@ -176,13 +179,12 @@ class Outline(commands.Cog):
             except outline.NotFound:
                 raise NoDocumentsFound
 
-            if await has_document_access(ctx, doc):
-                return await self.paginate_document(ctx, doc)
+            return await self.paginate_document(ctx, doc)
 
         else:
             collection_id = args.collection
             doc = await self.find_document(args.text, collection_id)
-            await self.paginate_document(ctx, doc)
+            return await self.paginate_document(ctx, doc)
 
     @has_outline_access()
     @document.command(

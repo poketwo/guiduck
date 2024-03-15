@@ -22,7 +22,7 @@ def has_outline_access():
 async def has_document_access(ctx: GuiduckContext, document: outline.Document) -> bool:
     accessible_collections = await CollectionConverter.get_user_collections(ctx)
     if document.collection_id not in accessible_collections.values():
-        raise MissingCollectionPermission
+        return False
     return True
 
 
