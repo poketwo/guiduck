@@ -1,9 +1,10 @@
 from discord.ext import commands
 
+import outline_api_wrapper as outline
 from helpers.context import GuiduckContext
 from helpers import checks
 from .converters import CollectionConverter
-from .exceptions import MissingCommandPermission, EphemeralRequired
+from .exceptions import MissingCollectionPermission, MissingCommandPermission, EphemeralRequired
 
 
 def has_outline_access():
@@ -16,6 +17,13 @@ def has_outline_access():
         return True
 
     return commands.check(predicate)
+
+
+async def has_document_access(ctx: GuiduckContext, document: outline.Document) -> bool:
+    accessible_collections = await CollectionConverter.get_user_collections(ctx)
+    if document.collection_id not in accessible_collections.values():
+        raise MissingCollectionPermission
+    return True
 
 
 async def do_ephemeral(ctx: GuiduckContext):

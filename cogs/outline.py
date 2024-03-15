@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 import difflib
 import math
@@ -16,17 +17,23 @@ from helpers.pagination import Paginator
 from helpers.utils import full_format_dt
 
 import outline_api_wrapper as outline
-from helpers.outline.checks import do_ephemeral, has_outline_access
-from helpers.outline.constants import COLLECTION_NAMES, LINES_PER_PAGE
+from outline_api_wrapper.models.document import Document
+from helpers.outline.checks import do_ephemeral, has_outline_access, has_document_access
+from helpers.outline.constants import COLLECTION_NAMES, LINES_PER_PAGE, OPTIONS_LIMIT
 from helpers.outline.converters import CollectionConverter, DocumentArgs, SearchDocumentArgs
 from helpers.outline.decorators import remedy_args_bug, with_typing
 from helpers.outline.exceptions import (
     CollectionNotFound,
     DocumentNotFound,
-    MissingCollectionPermission,
     MissingCommandPermission,
     OutlineException,
 )
+
+
+@dataclass
+class SearchResult:
+    context: str
+    document: Document
 
 
 class Outline(commands.Cog):
@@ -94,43 +101,48 @@ class Outline(commands.Cog):
         collection = COLLECTION_NAMES.get(document.collection_id, "")
         return f"{collection.title()}　|　{document.title}"
 
-    def sort_by_collection(self, document: outline.Document) -> int:
-        return list(COLLECTION_NAMES.keys()).index(document.collection_id)
+    def search_collections(self, text: str, collections_list: List[str]) -> List[str]:
+        substring_results = list(sorted([c for c in collections_list if text in c], key=lambda c: c.index(text)))
+        close_results = difflib.get_close_matches(text, collections_list, n=OPTIONS_LIMIT)
 
-    def search_collections(self, text: str, collections_list: List[str]):
-        substring_search = sorted([c for c in collections_list if text in c], key=lambda c: c.index(text))
-        return substring_search or difflib.get_close_matches(text, collections_list, n=25)
+        total_results = substring_results + close_results
+        return total_results[:OPTIONS_LIMIT]
+
+    def collections_sort_key(self, document: outline.Document) -> int:
+        return list(COLLECTION_NAMES.keys()).index(document.collection_id)
 
     async def search_documents(
         self,
         query: str | None,
         collection_id: str | None,
         *,
+        limit: Optional[int] = OPTIONS_LIMIT,
         context_limit: Optional[int] = 100,
         ranking_threshold: Optional[int] = 0.6,
-    ) -> List[Tuple[str, outline.Document]]:
+    ) -> List[SearchResult]:
         """Search documents based on query"""
 
         query = query.strip().casefold()
         if not query:
-            documents = await self.client.list_documents(collection_id=collection_id)
-            documents.sort(key=self.sort_by_collection)
-            results = [(shorten(document.text, context_limit), document) for document in documents]
+            documents = await self.client.list_documents(collection_id=collection_id, limit=limit)
+            documents.sort(key=self.collections_sort_key)
+            results = [SearchResult(shorten(document.text, context_limit), document) for document in documents]
         else:
-            results = await self.client.search_documents(query, collection_id=collection_id)
+            results = await self.client.search_documents(query, collection_id=collection_id, limit=limit)
             results = [
-                (shorten(result.context, context_limit), result.document)
+                SearchResult(shorten(result.context, context_limit), result.document)
                 for result in results
                 if result.ranking >= ranking_threshold
             ]
 
         return results
 
-    async def has_document_access(self, ctx: GuiduckContext, document: outline.Document) -> bool:
-        accessible_collections = await CollectionConverter.get_user_collections(ctx)
-        if document.collection_id not in accessible_collections.values():
-            raise MissingCollectionPermission
-        return True
+    async def find_document(self, query: str | None, collection_id: str | None) -> Document:
+        results = await self.search_documents(query, collection_id, limit=1)
+        if not results:
+            raise DocumentNotFound
+
+        return results[0].document
 
     async def paginate_document(self, ctx: GuiduckContext, document: outline.Document):
         total_lines = len(document.text.split("\n"))
@@ -153,6 +165,9 @@ class Outline(commands.Cog):
         You must have the Trial Moderator role in order to use this.
         """
 
+        if not args.text:
+            raise DocumentNotFound
+
         if outline.is_valid_uuid(args.text):
             # A specific document id was passed, either manually or via autocomplete
             try:
@@ -160,16 +175,12 @@ class Outline(commands.Cog):
             except outline.NotFound:
                 raise DocumentNotFound
 
-            if await self.has_document_access(ctx, doc):
+            if await has_document_access(ctx, doc):
                 return await self.paginate_document(ctx, doc)
 
         else:
             collection_id = args.collection
-            docs = await self.client.search_documents(args.text, collection_id, limit=1)
-            if not docs:
-                raise DocumentNotFound
-
-            doc = docs[0].document
+            doc = await self.find_document(args.text, collection_id)
             await self.paginate_document(ctx, doc)
 
     @has_outline_access()
@@ -233,8 +244,8 @@ class Outline(commands.Cog):
             return [app_commands.Choice(name=DocumentNotFound.message, value="")]
 
         return [
-            app_commands.Choice(name=self.format_choice_label(document), value=str(document.id))
-            for context, document in search_results
+            app_commands.Choice(name=self.format_choice_label(result.document), value=str(result.document.id))
+            for result in search_results
         ]
 
 

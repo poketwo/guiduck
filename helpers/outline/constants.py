@@ -2,6 +2,7 @@ from helpers import checks
 from config import OUTLINE_COLLECTION_IDS as COLLECTION_IDS
 
 
+OPTIONS_LIMIT = 25
 LINES_PER_PAGE = 15
 DOCS_PER_PAGE = 5
 
