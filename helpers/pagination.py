@@ -145,16 +145,19 @@ class Paginator(discord.ui.View):
     loop_pages : bool
         If it should allow looping the pages. If False, it disables first/previous and next/last buttons
         if it's at the beginning and end of the pages, respectively.
+    timeout_after : int
+        After how many seconds of inactivity should the paginator stop
     """
 
-    def __init__(self, get_page: Callable[[int], discord.Embed | str], num_pages: int, *, loop_pages: Optional[bool] = True):
+    def __init__(self, get_page: Callable[[int], discord.Embed | str], num_pages: int, *, loop_pages: Optional[bool] = True, timeout_after: Optional[int] = 120):
         self.num_pages = num_pages
         self.get_page = get_page
         self.loop_pages = loop_pages
 
         self.current_page = 0
         self.message = None
-        super().__init__(timeout=120)
+        self.ctx = None
+        super().__init__(timeout=timeout_after)
 
     def is_paginating(self) -> bool:
         return self.num_pages > 1
@@ -194,6 +197,7 @@ class Paginator(discord.ui.View):
                 await self.message.edit(**kwargs, view=self)
 
     async def start(self, ctx: commands.Context, pidx: int = 0):
+        self.ctx = ctx
         self._update_labels()
         embed = await discord.utils.maybe_coroutine(self.get_page, pidx)
         self.message = await ctx.reply(embed=embed, view=self, mention_author=False)
@@ -248,3 +252,10 @@ class Paginator(discord.ui.View):
                 item.disabled = True
 
             await self.message.edit(view=self)
+
+    async def interaction_check(self, interaction):
+        if self.ctx:
+            if interaction.user.id != self.ctx.author.id:
+                await interaction.response.send_message("You can't use this!", ephemeral=True)
+                return False
+        return True
