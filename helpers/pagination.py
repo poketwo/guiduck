@@ -149,7 +149,14 @@ class Paginator(discord.ui.View):
         After how many seconds of inactivity should the paginator stop
     """
 
-    def __init__(self, get_page: Callable[[int], discord.Embed | str], num_pages: Optional[int] = None, *, loop_pages: Optional[bool] = True, timeout_after: Optional[int] = 120):
+    def __init__(
+        self,
+        get_page: Callable[[int], discord.Embed | str],
+        *,
+        num_pages: Optional[int] = None,
+        loop_pages: Optional[bool] = True,
+        timeout_after: Optional[int] = 120
+    ):
         self.get_page = get_page
         self.num_pages = num_pages
         self.loop_pages = loop_pages

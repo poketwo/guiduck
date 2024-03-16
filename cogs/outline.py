@@ -151,7 +151,7 @@ class Outline(commands.Cog):
 
         total_lines = len(document.text.split("\n"))
         total_pages = math.ceil(total_lines / LINES_PER_PAGE)
-        paginator = Paginator(self.document_to_embed(document), total_pages, loop_pages=False)
+        paginator = Paginator(self.document_to_embed(document), num_pages=total_pages, loop_pages=False)
         await paginator.start(ctx)
 
     @has_outline_access()
