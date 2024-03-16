@@ -219,7 +219,7 @@ class Outline(commands.Cog):
         except MissingCommandPermission as e:
             return [app_commands.Choice(name=str(e), value="")]
 
-        if checks.passes_check(checks.is_admin, ctx):
+        if await checks.passes_check(checks.is_admin, ctx):
             accessible_collections["all"] = None
 
         current = current.strip().casefold()
