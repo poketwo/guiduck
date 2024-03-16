@@ -178,9 +178,15 @@ class Paginator(discord.ui.View):
 
         return kwargs
 
+    def clear_buttons(self):
+        """Clears the pagination buttons"""
+
+        for button in (self.first, self.previous, self.stop_button, self.next, self.last, self.go):
+            self.remove_item(button)
+
     def _update_labels(self) -> None:
         if not self.is_paginating():
-            self.clear_items()
+            self.clear_buttons()
             return
 
         if not self.loop_pages:
