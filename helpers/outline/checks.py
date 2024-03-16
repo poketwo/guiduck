@@ -27,14 +27,12 @@ async def has_document_access(ctx: GuiduckContext, document: outline.Document) -
 
 
 async def do_ephemeral(ctx: GuiduckContext):
-    ephemeral_arg = (ctx.interaction.namespace if ctx.interaction else list(ctx.kwargs.values())[0]).ephemeral
+    ephemeral = (ctx.interaction.namespace if ctx.interaction else list(ctx.kwargs.values())[0]).ephemeral
 
-    if await checks.passes_check(checks.staff_categories_only, ctx):
-        ephemeral = False
-    else:
+    if not await checks.passes_check(checks.staff_categories_only, ctx):
         if ctx.interaction:
             ephemeral = True  # Force ephemeral incase it's outside staff categories if app command
         else:
             raise EphemeralRequired
 
-    return ephemeral or ephemeral_arg
+    return ephemeral
