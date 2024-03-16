@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Iterable, NamedTuple
+from typing import Iterable, List, NamedTuple
 
 import discord
 from discord.ext import commands
@@ -74,3 +74,18 @@ def full_format_dt(dt: datetime) -> str:
     """Formats datetime object to discord timestamp in `FULL (RELATIVE)` format"""
 
     return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
+
+
+def get_substring_matches(substring: str, strings: List[str]) -> List[str]:
+    """
+    Takes in a substring and a list of strings and returns those strings which have substring in it,
+    sorted by where in the string it appears.
+    """
+
+    matches = []
+    for string in strings:
+        if substring in string:
+            matches.append(string)
+
+    matches.sort(key=lambda c: c.index(substring))
+    return matches

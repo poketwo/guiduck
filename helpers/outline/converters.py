@@ -3,7 +3,7 @@ from discord.ext import commands
 
 from helpers import checks
 from helpers.context import GuiduckContext
-from .constants import ACCESSIBLE_COLLECTIONS, COLLECTION_IDS, DEFAULT_COLLECTION
+from .constants import ACCESSIBLE_COLLECTIONS, COLLECTION_IDS, COLLECTION_NAMES, DEFAULT_COLLECTION
 from .exceptions import MissingCollectionPermission, NoCollectionsFound, MissingCommandPermission
 
 
@@ -43,7 +43,7 @@ class CollectionConverter(commands.Converter):
         if not argument:
             return await CollectionConverter.get_default_collection(ctx)
 
-        argument = argument.strip().casefold()
+        argument = COLLECTION_NAMES.get(argument, argument).strip().casefold()
         if await checks.passes_check(checks.is_admin, ctx):
             if argument == "all":
                 return None

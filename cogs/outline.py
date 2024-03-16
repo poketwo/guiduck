@@ -102,12 +102,14 @@ class Outline(commands.Cog):
         collection = COLLECTION_NAMES.get(document.collection_id, "")
         return f"{collection.title()}　|　{document.title}"
 
-    def search_collections(self, text: str, collections_list: List[str]) -> List[str]:
-        substring_results = list(sorted([c for c in collections_list if text in c], key=lambda c: c.index(text)))
-        close_results = difflib.get_close_matches(text, collections_list, n=OPTIONS_LIMIT)
+    def search_collections(self, text: str, collections: Dict[str, str]) -> Dict[str, str]:
+        text = text.strip().casefold()
 
-        total_results = substring_results + close_results
-        return total_results[:OPTIONS_LIMIT]
+        substring_results = get_substring_matches(text, collections)
+        close_results = difflib.get_close_matches(text, collections)
+
+        total_results = list(dict.fromkeys(substring_results + close_results))
+        return {name: collections[name] for name in total_results[:OPTIONS_LIMIT]}
 
     def collections_sort_key(self, document: outline.Document) -> int:
         return list(COLLECTION_NAMES.keys()).index(document.collection_id)
@@ -179,6 +181,9 @@ class Outline(commands.Cog):
             except outline.NotFound:
                 raise NoDocumentsFound
 
+            if args.collection and doc.collection_id != args.collection:
+                raise NoDocumentsFound("No documents found in the selected collection.")
+
             return await self.paginate_document(ctx, doc)
 
         else:
@@ -220,17 +225,17 @@ class Outline(commands.Cog):
             return [app_commands.Choice(name=str(e), value="")]
 
         if await checks.passes_check(checks.is_admin, ctx):
-            accessible_collections["all"] = None
+            accessible_collections["all"] = "all"
 
         current = current.strip().casefold()
         if not current:
             collections = accessible_collections
         else:
-            collections = self.search_collections(current, list(accessible_collections.keys()))
+            collections = self.search_collections(current, accessible_collections)
             if not collections:
                 return [app_commands.Choice(name=NoCollectionsFound.message, value="")]
 
-        return [app_commands.Choice(name=collection.title(), value=collection) for collection in collections]
+        return [app_commands.Choice(name=collection.title(), value=_id) for collection, _id in collections.items()]
 
     @document.autocomplete("text")
     @document_search.autocomplete("text")
