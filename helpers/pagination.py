@@ -1,9 +1,9 @@
-import asyncio
 import contextlib
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, List, Optional
 
 import discord
 from discord.ext import commands, menus
+from discord.utils import maybe_coroutine
 
 
 class AsyncEmbedCodeBlockTablePageSource(menus.AsyncIteratorPageSource):
@@ -125,6 +125,10 @@ STOP_EMOJI = "⏹"
 GO_PAGE_EMOJI = "🔢"
 
 
+PageReturnType = discord.Embed | str
+KwargsReturnType = Dict[str, PageReturnType]
+
+
 class Paginator(discord.ui.View):
     """Simple paginator using buttons.
     Has the following pagination functionalities:
@@ -134,6 +138,7 @@ class Paginator(discord.ui.View):
     - next page
     - last page
     - go to page
+    - optional select menu for entry interaction
 
     Parameters
     ----------
@@ -147,15 +152,24 @@ class Paginator(discord.ui.View):
         if it's at the beginning and end of the pages, respectively.
     timeout_after : int
         After how many seconds of inactivity should the paginator stop
+
+    Methods
+    -------
+    add_select
+        Adds select menu that can allow the user to interact with the entries that are being paginated.
+    clear_buttons
+        Clears all the pagination buttons from the paginator.
+    start
+        Starts the paginator.
     """
 
     def __init__(
         self,
-        get_page: Callable[[int], discord.Embed | str],
+        get_page: Callable[[int], PageReturnType],
         *,
         num_pages: Optional[int] = None,
         loop_pages: Optional[bool] = True,
-        timeout_after: Optional[int] = 120
+        timeout_after: Optional[int] = 120,
     ):
         self.get_page = get_page
         self.num_pages = num_pages
@@ -164,14 +178,49 @@ class Paginator(discord.ui.View):
         self.current_page = 0
         self.message = None
         self.ctx = None
+
         super().__init__(timeout=timeout_after)
+        self.pagination_buttons = (self.first, self.previous, self.stop_button, self.next, self.last, self.go)
+        self.select = None
 
     def is_paginating(self) -> bool:
         if self.num_pages is not None:
             return self.num_pages > 1
         return True
 
-    def _get_page_kwargs(self, page:  discord.Embed | str) -> Dict[str, discord.Embed | str]:
+    def clear_buttons(self):
+        """Clears the pagination buttons"""
+
+        for button in self.pagination_buttons:
+            self.remove_item(button)
+
+    def add_select(self, select: discord.ui.Select, get_options: Callable[[int], List[discord.SelectOption]]):
+        """
+        Adds the provided select menu to the first row of the paginator.
+        This select menu can be used to allow the user to interact with the entries that are being paginated.
+
+        Parameters
+        ----------
+        select : discord.ui.Select
+            The select menu to be added.
+        get_options : Callable[[int], List[discord.SelectOption]]
+            The function (can be async) that will be called every time the page is changed to get the options
+            to show on the select menu for that page.
+            Current page number should be its sole argument, similar to get_page.
+        """
+
+        self.select = select
+        self.get_options = get_options
+
+        # Add the select to the first row
+        self.clear_items()
+        if self.select:
+            self.add_item(self.select)
+
+        for button in self.pagination_buttons:
+            self.add_item(button)
+
+    def _get_page_kwargs(self, page: PageReturnType) -> KwargsReturnType:
         kwargs = {}
 
         if isinstance(page, discord.Embed):
@@ -181,13 +230,8 @@ class Paginator(discord.ui.View):
 
         return kwargs
 
-    def clear_buttons(self):
-        """Clears the pagination buttons"""
-
-        for button in (self.first, self.previous, self.stop_button, self.next, self.last, self.go):
-            self.remove_item(button)
-
-    def _update_labels(self) -> None:
+    def _update_items(self) -> None:
+        pidx = self.current_page
         if not self.is_paginating():
             self.clear_buttons()
             return
@@ -199,13 +243,31 @@ class Paginator(discord.ui.View):
             self.go.disabled = False
 
         if not self.loop_pages:
-            pidx = self.current_page
             self.first.disabled = pidx == 0
             self.previous.disabled = pidx == 0
 
             if self.num_pages is not None:
                 self.next.disabled = (pidx + 1) >= self.num_pages
                 self.last.disabled = (pidx + 1) >= self.num_pages
+
+    async def _prepare_page(self, pidx: int) -> KwargsReturnType:
+        page = await maybe_coroutine(self.get_page, pidx)
+
+        if self.select:
+            select_options = await maybe_coroutine(self.get_options, pidx)
+            if select_options:
+                self.select.options = select_options
+                self.select.disabled = False
+            else:
+                self.select.options = [discord.SelectOption(label="None")]
+                self.select.disabled = True
+
+        kwargs = self._get_page_kwargs(page)
+        if kwargs:
+            self.current_page = pidx
+        self._update_items()
+
+        return kwargs
 
     async def show_page(self, interaction: discord.Interaction, pidx: int) -> None:
         if self.num_pages is not None:
@@ -215,12 +277,7 @@ class Paginator(discord.ui.View):
             with contextlib.suppress(discord.NotFound, discord.InteractionResponded):
                 return await interaction.response.defer()
 
-        page = await discord.utils.maybe_coroutine(self.get_page, pidx)
-        kwargs = self._get_page_kwargs(page)
-        if kwargs:
-            self.current_page = pidx
-        self._update_labels()
-
+        kwargs = await self._prepare_page(pidx)
         try:
             await interaction.response.edit_message(**kwargs, view=self)
         except (discord.NotFound, discord.InteractionResponded):
@@ -229,9 +286,7 @@ class Paginator(discord.ui.View):
 
     async def start(self, ctx: commands.Context, pidx: int = 0):
         self.ctx = ctx
-        page = await discord.utils.maybe_coroutine(self.get_page, pidx)
-        kwargs = self._get_page_kwargs(page)
-        self._update_labels()
+        kwargs = await self._prepare_page(pidx)
         self.message = await ctx.reply(**kwargs, view=self, mention_author=False)
 
     @discord.ui.button(emoji=FIRST_PAGE_EMOJI, style=discord.ButtonStyle.grey)
@@ -269,7 +324,7 @@ class Paginator(discord.ui.View):
             timeout=30,
         )
         try:
-            pidx = (int(message.content) - 1)
+            pidx = int(message.content) - 1
         except ValueError:
             return await interaction.followup.send("That's not a valid page number!")
         else:
