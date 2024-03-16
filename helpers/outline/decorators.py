@@ -1,20 +1,21 @@
 import functools
-from typing import Callable
+from typing import Awaitable, Callable
 
 import discord
 from discord.ext import commands
+from discord.utils import maybe_coroutine
 
 from helpers.context import GuiduckContext
 
 
-def with_typing(do_ephemeral: Callable[[GuiduckContext], bool]):
+def with_typing(do_ephemeral: Callable[[GuiduckContext], Awaitable[bool] | bool]):
     """Run command with calling ctx.typing, and make it ephemeral depending on check"""
 
     def decorator(func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             ctx = discord.utils.find(lambda a: isinstance(a, commands.Context), args)
-            ephemeral = await do_ephemeral(ctx)
+            ephemeral = await maybe_coroutine(do_ephemeral, ctx)
 
             try:
                 async with ctx.typing(ephemeral=ephemeral):
