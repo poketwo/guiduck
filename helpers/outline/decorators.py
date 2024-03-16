@@ -29,7 +29,7 @@ def with_typing(do_ephemeral: Callable[[GuiduckContext], Awaitable[bool] | bool]
 
 
 def remedy_args_bug(func):
-    """This decorators is to remedy a bug in discord.py (https://github.com/Rapptz/discord.py/issues/9641)
+    """This decorator is to remedy a bug in discord.py (https://github.com/Rapptz/discord.py/issues/9641)
     that makes it so that callable default values of flags aren't called in case of slash commands. So this decorator
     sets these for the FlagConverter object before the command's callback is ran."""
 
