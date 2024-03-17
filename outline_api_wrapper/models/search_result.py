@@ -39,3 +39,9 @@ class DocumentSearchResult:
         self.context = data["context"]
         self.ranking = data["ranking"]
         self.document = Document(data["document"])
+
+    def __str__(self) -> str:
+        return f"<DocumentSearchResult ranking={self.ranking} document_id={self.document.id}>"
+
+    def __repr__(self) -> str:
+        return str(self)

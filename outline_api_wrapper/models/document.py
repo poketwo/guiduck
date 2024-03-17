@@ -135,5 +135,11 @@ class Document:
         self.insights_enabled: bool = data["insightsEnabled"]
         self.full_width: bool = data["fullWidth"]
 
+    def __str__(self) -> str:
+        return f"<Document title={self.title} id={self.id} collection_id={self.collection_id}>"
+
+    def __repr__(self) -> str:
+        return str(self)
+
     def full_url(self, base_url: str) -> str:
         return urljoin(base_url, self.url)

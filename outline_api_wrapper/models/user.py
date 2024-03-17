@@ -73,3 +73,9 @@ class User:
         self.last_active_at: datetime = dt_from_iso(data["lastActiveAt"])
 
         self.updated_at: datetime | None = dt_from_iso(data["updatedAt"]) if data.get("updatedAt") else None
+
+    def __str__(self) -> str:
+        return f"<User id={self.id} name={self.name}>"
+
+    def __repr__(self) -> str:
+        return str(self)
