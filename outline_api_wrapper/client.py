@@ -85,6 +85,7 @@ class Client:
         include_archived: Optional[bool] = None,
         include_drafts: Optional[bool] = None,
         date_filter: Optional[DateFilter] = None,
+        ranking_threshold: Optional[float] = 0.0,
     ) -> List[DocumentSearchResult]:
         """Search documents
 
@@ -100,6 +101,8 @@ class Client:
             How many results to skip when searching. Useful for pagination.
         limit : Optional[int] = 25
             How many results to retrieve. Useful for pagination.
+        ranking_threshold : Optional[int] = 0.0
+            How close the documents need to match the given query. This should be a float from 0.0 to 1.0.
         """
 
         data = {"query": query}
@@ -126,7 +129,13 @@ class Client:
         except (NotFound, BadRequest):
             return []
         else:
-            return [DocumentSearchResult(search_result) for search_result in search_data["data"]]
+            results = [
+                DocumentSearchResult(search_result)
+                for search_result in search_data["data"]
+                if search_result["ranking"] >= ranking_threshold
+            ]
+
+            return results
 
     async def list_documents(
         self,
