@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Iterable, List, NamedTuple
+from textwrap import shorten
+from typing import Iterable, List, NamedTuple, Optional
 
 import discord
 from discord.ext import commands
@@ -74,6 +75,36 @@ def full_format_dt(dt: datetime) -> str:
     """Formats datetime object to discord timestamp in `FULL (RELATIVE)` format"""
 
     return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
+
+
+def shorten_around(
+    substring: str,
+    string: str,
+    length: int,
+    *,
+    placeholder: Optional[str] = "[...]",
+    words_before: Optional[int] = 3,
+) -> str:
+    """
+    Function to shorten a string around a given substring. Helpful for things like showing search results.
+    """
+
+    words_before += 1
+    words = string.split()
+    for i, word in enumerate(words):
+        if substring in word:
+            start = max(0, i - words_before)
+            break
+    else:
+        return shorten(string, length, placeholder=placeholder)
+
+    new_words = []
+    if start != 0:
+        new_words.append(placeholder)
+
+    new_words.extend(words[start:])
+
+    return shorten(" ".join(new_words), length, placeholder=placeholder)
 
 
 def get_substring_matches(substring: str, strings: List[str]) -> List[str]:

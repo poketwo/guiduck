@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional
 import difflib
 import math
 import re
@@ -13,13 +12,20 @@ from discord import app_commands
 
 from helpers import checks
 from helpers.context import GuiduckContext
+from helpers.outline.pagination import SearchPaginator, SearchResult
 from helpers.pagination import Paginator
-from helpers.utils import full_format_dt
+from helpers.utils import full_format_dt, get_substring_matches, shorten_around
 
 import outline_api_wrapper as outline
-from outline_api_wrapper.models.document import Document
 from helpers.outline.checks import do_ephemeral, has_outline_access, has_document_access
-from helpers.outline.constants import COLLECTION_NAMES, LINES_PER_PAGE, OPTIONS_LIMIT
+from helpers.outline.constants import (
+    COLLECTION_NAMES,
+    CONTEXT_HIGHLIGHT_PATTERN,
+    CONTEXT_LIMIT,
+    LINES_PER_PAGE,
+    OPTIONS_LIMIT,
+    RANKING_THRESHOLD,
+)
 from helpers.outline.converters import CollectionConverter, DocumentArgs, SearchDocumentArgs
 from helpers.outline.decorators import remedy_args_bug, with_typing
 from helpers.outline.exceptions import (
@@ -27,14 +33,7 @@ from helpers.outline.exceptions import (
     NoCollectionsFound,
     NoDocumentsFound,
     MissingCommandPermission,
-    OutlineException,
 )
-
-
-@dataclass
-class SearchResult:
-    context: str
-    document: Document
 
 
 class Outline(commands.Cog):
@@ -114,33 +113,45 @@ class Outline(commands.Cog):
     def collections_sort_key(self, document: outline.Document) -> int:
         return list(COLLECTION_NAMES.keys()).index(document.collection_id)
 
+    def process_context(self, context: str) -> str:
+        """Processes Outline search result context into a Discord-usable version"""
+
+        query_match = re.search(CONTEXT_HIGHLIGHT_PATTERN, context)
+        if query_match:
+            context = shorten_around(query_match.group(), context, CONTEXT_LIMIT)
+            context = re.sub(CONTEXT_HIGHLIGHT_PATTERN, r"*\1*", context)
+        else:
+            context = shorten(context, CONTEXT_LIMIT)
+
+        context = self.translate_markdown(context)
+
+        return context or "*Empty*"
+
     async def search_documents(
         self,
         query: str | None,
         collection_id: str | None,
         *,
+        offset: Optional[int] = None,
         limit: Optional[int] = OPTIONS_LIMIT,
-        context_limit: Optional[int] = 100,
-        ranking_threshold: Optional[int] = 0.6,
     ) -> List[SearchResult]:
         """Search documents based on query"""
 
         query = query.strip().casefold()
         if not query:
-            documents = await self.client.list_documents(collection_id=collection_id, limit=limit)
+            documents = await self.client.list_documents(collection_id=collection_id, offset=offset, limit=limit)
             documents.sort(key=self.collections_sort_key)
-            results = [SearchResult(shorten(document.text, context_limit), document) for document in documents]
+            results = [SearchResult(self.process_context(document.text), document) for document in documents]
         else:
-            results = await self.client.search_documents(query, collection_id=collection_id, limit=limit)
-            results = [
-                SearchResult(shorten(result.context, context_limit), result.document)
-                for result in results
-                if result.ranking >= ranking_threshold
-            ]
+            results = await self.client.search_documents(
+                query, collection_id=collection_id, offset=offset, limit=limit, ranking_threshold=RANKING_THRESHOLD
+            )
+            results = [result for result in results]
+            results = [SearchResult(self.process_context(result.context), result.document) for result in results]
 
         return results
 
-    async def find_document(self, query: str | None, collection_id: str | None) -> Document:
+    async def find_document(self, query: str | None, collection_id: str | None) -> outline.Document:
         results = await self.search_documents(query, collection_id, limit=1)
         if not results:
             raise NoDocumentsFound
@@ -149,7 +160,7 @@ class Outline(commands.Cog):
 
     async def paginate_document(self, ctx: GuiduckContext, document: outline.Document):
         if not await has_document_access(ctx, document):
-            return await ctx.send(MissingDocumentPermission.message, ephemeral=True)
+            raise MissingDocumentPermission
 
         total_lines = len(document.text.split("\n"))
         total_pages = math.ceil(total_lines / LINES_PER_PAGE)
@@ -191,6 +202,17 @@ class Outline(commands.Cog):
             doc = await self.find_document(args.text, collection_id)
             return await self.paginate_document(ctx, doc)
 
+    async def paginate_search(
+        self,
+        ctx: GuiduckContext,
+        query: str | None,
+        collection_id: str | None,
+        *,
+        ephemeral: Optional[bool] = False,
+    ):
+        paginator = SearchPaginator(self, query, collection_id, ephemeral=ephemeral)
+        await paginator.start(ctx)
+
     @has_outline_access()
     @document.command(
         "search",
@@ -208,11 +230,7 @@ class Outline(commands.Cog):
         if outline.is_valid_uuid(args.text):
             return await ctx.invoke(self.document, args=args)
 
-        search_results = await self.search_documents(args.text, args.collection)
-        if not search_results:
-            raise NoDocumentsFound
-
-        raise OutlineException("Work in progress!")  # TODO: Complete & Test
+        await self.paginate_search(ctx, args.text, args.collection, ephemeral=args.ephemeral)
 
     @document.autocomplete("collection")
     @document_search.autocomplete("collection")
