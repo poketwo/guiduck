@@ -9,7 +9,7 @@ import discord
 
 from config import OUTLINE_BASE_URL
 from helpers.outline.checks import do_ephemeral, has_document_access
-from helpers.outline.constants import CONTEXT_LIMIT, OPTIONS_LIMIT, RESULTS_PER_PAGE
+from helpers.outline.constants import COLLECTION_NAMES, CONTEXT_LIMIT, OPTIONS_LIMIT, RESULTS_PER_PAGE
 from helpers.outline.exceptions import NoDocumentsFound
 from helpers.pagination import Paginator
 import outline_api_wrapper as outline
@@ -23,6 +23,11 @@ if TYPE_CHECKING:
 class SearchResult:
     context: str
     document: outline.Document
+
+
+def format_document_label(document: outline.Document) -> str:
+    collection = COLLECTION_NAMES.get(document.collection_id, "")
+    return shorten(f"{collection.title()}　/　{document.title}", CONTEXT_LIMIT)
 
 
 class DocumentSelect(discord.ui.Select):
@@ -40,7 +45,7 @@ class DocumentSelect(discord.ui.Select):
         options = []
         results = await paginator._fetch_results(start, end)
         for i, result in enumerate(results, start=start + 1):
-            label = f"{i}. {shorten(result.document.title, CONTEXT_LIMIT)}"
+            label = f"{i}. {format_document_label(result.document)}"
             options.append(
                 discord.SelectOption(
                     label=label,
@@ -134,7 +139,7 @@ class SearchPaginator(Paginator):
         for i, result in enumerate(results, start=start + 1):
             timestamp = discord.utils.format_dt(result.document.created_at)
 
-            label = f"{i}. {shorten(result.document.title, CONTEXT_LIMIT)}"
+            label = f"{i}. {format_document_label(result.document)}"
             values = (f"[{timestamp}]({result.document.full_url(OUTLINE_BASE_URL)})", f">>> {result.context}")
 
             embed.add_field(

@@ -12,7 +12,7 @@ from discord import app_commands
 
 from helpers import checks
 from helpers.context import GuiduckContext
-from helpers.outline.pagination import SearchPaginator, SearchResult
+from helpers.outline.pagination import SearchPaginator, SearchResult, format_document_label
 from helpers.pagination import Paginator
 from helpers.utils import full_format_dt, get_substring_matches, shorten_around
 
@@ -96,10 +96,6 @@ class Outline(commands.Cog):
             return embed
 
         return get_page
-
-    def format_choice_label(self, document: outline.Document) -> str:
-        collection = COLLECTION_NAMES.get(document.collection_id, "")
-        return f"{collection.title()}　|　{document.title}"
 
     def search_collections(self, text: str, collections: Dict[str, str]) -> Dict[str, str]:
         text = text.strip().casefold()
@@ -270,7 +266,7 @@ class Outline(commands.Cog):
             return [app_commands.Choice(name=NoDocumentsFound.message, value="")]
 
         return [
-            app_commands.Choice(name=self.format_choice_label(result.document), value=str(result.document.id))
+            app_commands.Choice(name=format_document_label(result.document), value=str(result.document.id))
             for result in search_results
         ]
 
