@@ -81,7 +81,7 @@ class Bot(commands.Cog):
         if ctx.guild is not None and isinstance(user, discord.User):
             user = ctx.guild.get_member(user.id) or user
 
-        embed = discord.Embed()
+        embed = discord.Embed(title=user.display_name)
         embed.set_author(name=str(user))
 
         embed.add_field(name="ID", value=user.id, inline=False)
