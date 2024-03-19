@@ -114,18 +114,23 @@ class ServerInvites(AutomodModule):
 class Spamming(AutomodModule):
     bucket = "spamming"
     punishments = {
-        1: ("ban", None),
-        0: ("timeout", timedelta(days=1)),
+        5: ("ban", None),
+        4: ("timeout", timedelta(days=3)),
+        3: ("timeout", timedelta(days=1)),
+        2: ("timeout", timedelta(hours=12)),
+        1: ("timeout", timedelta(hours=6)),
+        0: ("timeout", timedelta(hours=1)),
     }
+    message_count = 10
 
     def __init__(self):
-        self.cooldown = commands.CooldownMapping.from_cooldown(15, 17.0, commands.BucketType.member)
+        self.cooldown = commands.CooldownMapping.from_cooldown(self.message_count, 12.0, commands.BucketType.member)
 
     async def check(self, ctx):
         bucket = self.cooldown.get_bucket(ctx.message)
         if bucket.update_rate_limit():
             self.cooldown._cache[self.cooldown._bucket_key(ctx.message)].reset()
-            await ctx.channel.purge(limit=15, check=lambda m: m.author == ctx.author)
+            await ctx.channel.purge(limit=self.message_count, check=lambda m: m.author == ctx.author)
             return "Spamming"
 
 
