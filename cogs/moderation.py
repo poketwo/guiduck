@@ -511,7 +511,7 @@ class Moderation(commands.Cog):
 
         if limit > 10000:
             await ctx.send("Too many messages to purge.", ephemeral=True)
-        elif limit > 100:
+        elif limit >= 50:
             view = ConfirmPurgeView()
             await ctx.send(f"Are you sure you want to purge up to {limit} messages?", view=view, ephemeral=True)
         else:
