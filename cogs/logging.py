@@ -200,7 +200,7 @@ class Logging(commands.Cog):
         )
 
     @commands.hybrid_group(fallback="get")
-    # @checks.is_trial_moderator()
+    @checks.is_trial_moderator()
     @commands.guild_only()
     async def logs(
         self,
