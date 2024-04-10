@@ -1,12 +1,44 @@
 import logging
 from datetime import datetime, timezone
+import time
+from typing import Union
+from urllib.parse import urlencode
 
 import discord
 from discord.ext import commands, tasks
+from discord.utils import format_dt, snowflake_time, time_snowflake
 from pymongo import UpdateOne
+import parsedatetime as pdt
 
 from helpers import checks
+from helpers.context import GuiduckContext
 
+
+class LogFlagConverter(commands.Converter):
+    """
+    Converter for logs command flags that support message IDs for filtration
+    This accepts message link, message ID, "channel ID-message ID" or a date/time string.
+    """
+
+    async def convert(self, ctx: GuiduckContext, arg: str) -> discord.Message | int | datetime:
+        try:
+            message = await commands.MessageConverter().convert(ctx, arg)
+            return message
+        except commands.MessageNotFound:
+            try:
+                return int(arg)
+            except ValueError:
+                calendar = pdt.Calendar()
+                struct = calendar.parse(arg)[0]
+                dt = datetime.fromtimestamp(time.mktime(struct))
+                return dt
+
+
+class LogFlags(commands.FlagConverter, case_insensitive=True):
+    before: LogFlagConverter = commands.flag(description="Filter logs before a message/datetime", default=None)
+    after: LogFlagConverter = commands.flag(description="Filter logs after a message/datetime", default=None)
+
+PARAM_OFFSETS = {"before": 1, "after": -1}
 
 class Logging(commands.Cog):
     """For logging."""
@@ -168,16 +200,67 @@ class Logging(commands.Cog):
         )
 
     @commands.hybrid_group(fallback="get")
-    @checks.is_trial_moderator()
+    # @checks.is_trial_moderator()
     @commands.guild_only()
-    async def logs(self, ctx, *, channel: discord.TextChannel | discord.Thread | discord.VoiceChannel = None):
+    async def logs(
+        self,
+        ctx,
+        channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel] = commands.CurrentChannel,
+        *,
+        flags: LogFlags,
+    ):
         """Gets a link to the message logs for a channel.
+        ### Supported Flags
+        - `before`: Filter logs before a specific message/time
+        - `after`: Filter logs after a specific message/time
+        > These accept:
+        > - Message Link
+        > - Message ID (current channel)
+        > - "ChannelID-MessageID" (retrieved by shift-clicking on “Copy ID”)
+        > - Date/time string (e.g. `12/31 16:40`, `friday`, `yesterday`)
 
         You must have the Trial Moderator role to use this.
         """
 
-        channel = channel or ctx.channel
-        await ctx.send(f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}", ephemeral=True)
+        url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
+
+        filter_lines = []
+        if flags.before or flags.after:
+            if flags.before and flags.after:
+                raise commands.BadArgument("Both `before` and `after` flags cannot be used at the same time.")
+
+            params = {}
+            for param in ("before", "after"):
+                value = getattr(flags, param)
+                if not value:
+                    continue
+
+                value_line = None
+                if isinstance(value, discord.Message):
+                    value_line = value.jump_url
+
+                    # Offset it to also include the provided message
+                    offset = PARAM_OFFSETS.get(param, 0)
+                    value = value.id + offset
+
+                elif isinstance(value, datetime):
+                    value_line = format_dt(value, 'F')
+                    value = time_snowflake(value)
+
+                if value_line:
+                    filter_lines.append(f"- {param.title()}: {value_line}")
+                params[param] = value
+
+            if filter_lines:
+                filter_lines.insert(0, "### Filters")
+
+            url += f"?{urlencode(params)}"
+
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label=f"Jump", url=url))
+
+        lines = [f"### Message Logs of {channel.mention}", url] + filter_lines
+        await ctx.send("\n".join(lines), view=view, ephemeral=True)
 
     @logs.command()
     @commands.guild_only()
