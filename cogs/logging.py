@@ -36,8 +36,8 @@ class LogFlagConverter(commands.Converter):
 
 class LogFlags(commands.FlagConverter, case_insensitive=True):
     user: discord.Member | discord.User = commands.flag(description="Show logs of a specific user", default=None)
-    before: LogFlagConverter = commands.flag(description="Filter logs before a message/datetime", default=None)
-    after: LogFlagConverter = commands.flag(description="Filter logs after a message/datetime", default=None)
+    before: LogFlagConverter = commands.flag(description="Filter logs before a specific message/time", default=None)
+    after: LogFlagConverter = commands.flag(description="Filter logs after a specific message/time", default=None)
     limit: int = commands.flag(description="Limit how many logs to show (50 by default)", default=None)
     deleted: bool = commands.flag(description="Whether to show deleted messages only", default=None)
 
