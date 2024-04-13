@@ -39,6 +39,7 @@ class LogFlags(commands.FlagConverter, case_insensitive=True):
     before: LogFlagConverter = commands.flag(description="Filter logs before a message/datetime", default=None)
     after: LogFlagConverter = commands.flag(description="Filter logs after a message/datetime", default=None)
     limit: int = commands.flag(description="Limit how many logs to show (50 by default)", default=None)
+    deleted: bool = commands.flag(description="Whether to show deleted messages only", default=None)
 
 PARAM_OFFSETS = {"before": 1, "after": -1}
 
@@ -222,6 +223,7 @@ class Logging(commands.Cog):
         > - "ChannelID-MessageID" (retrieved by shift-clicking on “Copy ID”)
         > - Date/time string (e.g. `12/31 16:40`, `friday`, `yesterday`)
         - `limit`: Limit how many logs to show (50 by default)
+        - `deleted`: Whether to show deleted messages only
 
         You must have the Trial Moderator role to use this.
         """
@@ -263,6 +265,10 @@ class Logging(commands.Cog):
         if flags.limit is not None:
             params["limit"] = flags.limit
             filter_texts["Limit"] = flags.limit
+
+        if flags.deleted:
+            params["deleted"] = flags.deleted
+            filter_texts["Deleted Only"] = flags.deleted
 
         if params:
             url += f"?{urlencode(params)}"
