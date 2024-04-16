@@ -281,7 +281,7 @@ class Logging(commands.Cog):
             lines.append("### Filters")
             lines.extend([f"- **{name}**: {text}" for name, text in filter_texts.items()])
 
-        await ctx.send("\n".join(lines), view=view, ephemeral=True)
+        await ctx.send("\n".join(lines), view=view, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
 
     @logs.command()
     @commands.guild_only()
