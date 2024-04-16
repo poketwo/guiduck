@@ -35,8 +35,11 @@ class LogFlagConverter(commands.Converter):
 
 
 class LogFlags(commands.FlagConverter, case_insensitive=True):
-    before: LogFlagConverter = commands.flag(description="Filter logs before a message/datetime", default=None)
-    after: LogFlagConverter = commands.flag(description="Filter logs after a message/datetime", default=None)
+    user: discord.Member | discord.User = commands.flag(description="Show logs of a specific user", default=None)
+    before: LogFlagConverter = commands.flag(description="Filter logs before a specific message/time", default=None)
+    after: LogFlagConverter = commands.flag(description="Filter logs after a specific message/time", default=None)
+    limit: int = commands.flag(description="Limit how many logs to show (50 by default)", default=None)
+    deleted: bool = commands.flag(description="Whether to show deleted messages only", default=None)
 
 PARAM_OFFSETS = {"before": 1, "after": -1}
 
@@ -211,6 +214,7 @@ class Logging(commands.Cog):
     ):
         """Gets a link to the message logs for a channel.
         ### Supported Flags
+        - `user`: Show logs of a specific user
         - `before`: Filter logs before a specific message/time
         - `after`: Filter logs after a specific message/time
         > These accept:
@@ -218,18 +222,25 @@ class Logging(commands.Cog):
         > - Message ID (current channel)
         > - "ChannelID-MessageID" (retrieved by shift-clicking on “Copy ID”)
         > - Date/time string (e.g. `12/31 16:40`, `friday`, `yesterday`)
+        - `limit`: Limit how many logs to show (50 by default)
+        - `deleted`: Whether to show deleted messages only
 
         You must have the Trial Moderator role to use this.
         """
 
         url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
 
-        filter_lines = []
+        params = {}
+        filter_texts = {}
+
+        if flags.user:
+            params["user"] = flags.user.id
+            filter_texts["User"] = flags.user.mention
+
         if flags.before or flags.after:
             if flags.before and flags.after:
                 raise commands.BadArgument("Both `before` and `after` flags cannot be used at the same time.")
 
-            params = {}
             for param in ("before", "after"):
                 value = getattr(flags, param)
                 if not value:
@@ -247,19 +258,29 @@ class Logging(commands.Cog):
                     value_line = format_dt(value, 'F')
                     value = time_snowflake(value)
 
-                if value_line:
-                    filter_lines.append(f"- {param.title()}: {value_line}")
                 params[param] = value
+                if value_line:
+                    filter_texts[param.title()] = value_line
 
-            if filter_lines:
-                filter_lines.insert(0, "### Filters")
+        if flags.limit is not None:
+            params["limit"] = flags.limit
+            filter_texts["Limit"] = flags.limit
 
+        if flags.deleted:
+            params["deleted"] = flags.deleted
+            filter_texts["Deleted Only"] = flags.deleted
+
+        if params:
             url += f"?{urlencode(params)}"
 
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label=f"Jump", url=url))
 
-        lines = [f"### Message Logs of {channel.mention}", url] + filter_lines
+        lines = [f"### Message Logs of {channel.mention}", url]
+        if filter_texts:
+            lines.append("### Filters")
+            lines.extend([f"- **{name}**: {text}" for name, text in filter_texts.items()])
+
         await ctx.send("\n".join(lines), view=view, ephemeral=True)
 
     @logs.command()
