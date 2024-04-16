@@ -143,12 +143,15 @@ class Ticket(abc.ABC):
             description=f"The ticket has been claimed by {self.agent.mention}. You will be assisted shortly.",
         )
 
-    def to_closed_embed(self):
-        return discord.Embed(
+    def to_closed_embed(self, user: discord.Member):
+        embed = discord.Embed(
             title="Ticket Closed",
             color=discord.Color.red(),
             description="The ticket has been closed, and the thread has been archived. Please open another support ticket if you require further assistance.",
         )
+        embed.set_footer(text=f"Closed by {user} ({user.id}).")
+
+        return embed
 
     @classmethod
     async def open(
@@ -248,7 +251,7 @@ class Ticket(abc.ABC):
             else:
                 await original.edit(embed=self.to_status_embed(), view=StatusView(self))
 
-    async def close(self):
+    async def close(self, user: discord.Member):
         if self.closed_at is not None:
             return False
 
@@ -256,7 +259,7 @@ class Ticket(abc.ABC):
 
         await self.edit(closed_at=datetime.now(timezone.utc), status_channel_id=guild_data["ticket_closed_channel_id"])
         with contextlib.suppress(discord.HTTPException):
-            await self.thread.send(embed=self.to_closed_embed())
+            await self.thread.send(embed=self.to_closed_embed(user))
         await self.thread.edit(archived=True, locked=True)
 
         return True
@@ -315,7 +318,7 @@ class CloseTicketButton(discord.ui.Button):
         if interaction.user == self.ticket.user or any(
             x.id in constants.TRIAL_MODERATOR_ROLES for x in interaction.user.roles
         ):
-            await self.ticket.close()
+            await self.ticket.close(interaction.user)
             await interaction.response.defer()
 
 
@@ -821,7 +824,7 @@ class HelpDesk(commands.Cog):
             return await ctx.send("Could not find ticket!", ephemeral=True)
 
         if ctx.author == ticket.user or any(x.id in constants.TRIAL_MODERATOR_ROLES for x in ctx.author.roles):
-            result = await ticket.close()
+            result = await ticket.close(ctx.author)
             if ctx.channel != ticket_thread:
                 if result:
                     await ctx.send("Successfully closed ticket.")
