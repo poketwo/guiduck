@@ -143,7 +143,7 @@ class Ticket(abc.ABC):
             description=f"The ticket has been claimed by {self.agent.mention}. You will be assisted shortly.",
         )
 
-    def to_closed_embed(self, user: discord.User):
+    def to_closed_embed(self, user: discord.Member):
         embed = discord.Embed(
             title="Ticket Closed",
             color=discord.Color.red(),
