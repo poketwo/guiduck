@@ -20,9 +20,9 @@ class LogFlagConverter(commands.Converter):
     This accepts message link, message ID, "channel ID-message ID" or a date/time string.
     """
 
-    async def convert(self, ctx: GuiduckContext, arg: str) -> discord.Message | int | datetime:
+    async def convert(self, ctx: GuiduckContext, arg: str) -> discord.PartialMessage | int | datetime:
         try:
-            message = await commands.MessageConverter().convert(ctx, arg)
+            message = await commands.PartialMessageConverter().convert(ctx, arg)
             return message
         except commands.MessageNotFound:
             try:
@@ -247,7 +247,7 @@ class Logging(commands.Cog):
                     continue
 
                 value_line = None
-                if isinstance(value, discord.Message):
+                if isinstance(value, discord.PartialMessage):
                     value_line = value.jump_url
 
                     # Offset it to also include the provided message
