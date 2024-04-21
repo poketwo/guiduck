@@ -675,6 +675,26 @@ class ServerReport(HelpDeskCategory):
     hidden = True
     modal_cls = OpenReportModal
 
+    async def on_open(self, ticket: Ticket):
+        if ticket.thread is None:
+            return
+        embed = discord.Embed(
+            title="User Report Instructions",
+            color=discord.Color.blurple(),
+            description=textwrap.dedent(
+                """
+                We're sorry about any inconvenience that you've experienced! Please help us understand the situation better by mentioning:
+
+                1. User ID of the user you're reporting (use `?tag find-id` to learn more),
+                2. Context and explanation for the report (like what happened, how you think they've violated our rules, etc) and
+                3. Evidence to back your report (such as message links, full unedited screenshots and/or screen recordings).
+
+                After you submit these pieces of documentation, a staff member will assist you with the report shortly. Thank you!
+                """
+            ),
+        )
+        await ticket.thread.send(embed=embed)
+
 
 class HelpDeskSelect(discord.ui.Select):
     def __init__(self, bot):
