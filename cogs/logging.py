@@ -20,9 +20,9 @@ class LogFlagConverter(commands.Converter):
     This accepts message link, message ID, "channel ID-message ID" or a date/time string.
     """
 
-    async def convert(self, ctx: GuiduckContext, arg: str) -> discord.Message | int | datetime:
+    async def convert(self, ctx: GuiduckContext, arg: str) -> discord.PartialMessage | int | datetime:
         try:
-            message = await commands.MessageConverter().convert(ctx, arg)
+            message = await commands.PartialMessageConverter().convert(ctx, arg)
             return message
         except commands.MessageNotFound:
             try:
@@ -35,7 +35,7 @@ class LogFlagConverter(commands.Converter):
 
 
 class LogFlags(commands.FlagConverter, case_insensitive=True):
-    user: discord.Member | discord.User = commands.flag(description="Show logs of a specific user", default=None)
+    user: discord.Member | discord.User = commands.flag(description="Show logs of a specific user", default=None, aliases=("from",))
     before: LogFlagConverter = commands.flag(description="Filter logs before a specific message/time", default=None)
     after: LogFlagConverter = commands.flag(description="Filter logs after a specific message/time", default=None)
     limit: int = commands.flag(description="Limit how many logs to show (50 by default)", default=None)
@@ -247,7 +247,7 @@ class Logging(commands.Cog):
                     continue
 
                 value_line = None
-                if isinstance(value, discord.Message):
+                if isinstance(value, discord.PartialMessage):
                     value_line = value.jump_url
 
                     # Offset it to also include the provided message
