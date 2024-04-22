@@ -30,8 +30,8 @@ class LogFlagConverter(commands.Converter):
             except ValueError:
                 calendar = pdt.Calendar()
                 struct = calendar.parse(arg)[0]
-                dt = datetime.fromtimestamp(time.mktime(struct))
                 now = datetime.now()
+                dt = datetime.fromtimestamp(time.mktime(struct))
                 if (now - dt).microseconds <= 50 :  # dt is current time when input is not valid
                     raise ValueError("Invalid input for before/after flag")
 
