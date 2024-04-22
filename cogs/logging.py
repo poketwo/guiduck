@@ -31,7 +31,8 @@ class LogFlagConverter(commands.Converter):
                 calendar = pdt.Calendar()
                 struct = calendar.parse(arg)[0]
                 dt = datetime.fromtimestamp(time.mktime(struct))
-                if dt == datetime.now():  # It gives now when input is not valid
+                now = datetime.now()
+                if (now - dt).microseconds <= 50 :  # dt is current time when input is not valid
                     raise ValueError("Invalid input for before/after flag")
 
                 return dt
