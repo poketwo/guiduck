@@ -21,10 +21,10 @@ POSTS = [
 
         To ensure you get a fair deal, you are highly encouraged to do the following:
 
-        • Research trades, market listings, and auctions with similar pokémon from the past.
-        • Ask for other trainers' opinions if unsure about the fairness of a trade.
-        • Don't give into pressure to buy or sell immediately. You can always try again later.
-        • Read through the trading tips document linked in the <#754774504571666534> channel.
+        - Research trades, market listings, and auctions with similar pokémon from the past.
+        - Ask for other trainers' opinions if unsure about the fairness of a trade.
+        - Don't give into pressure to buy or sell immediately. You can always try again later.
+        - Read through the trading tips document linked in the <#754774504571666534> channel.
         """,
     ),
     AutoPost(
@@ -45,9 +45,9 @@ POSTS = [
         """
         **Reminder:** This channel is for catching only.
 
-        • Spamming is not allowed here or anywhere else in the server.
-        • Do not run generic bot commands here, there are multiple channels for that. <#720029048381767751> and <#784148997593890836>
-        • Auctions and market advertisements are not allowed. Use <#741712512113967214> and <#768161635096461362>.
+        - Spamming is not allowed here or anywhere else in the server.
+        - Do not run generic bot commands here, there are multiple channels for that. <#720029048381767751> and <#784148997593890836>
+        - Auctions and market advertisements are not allowed. Use <#741712512113967214> and <#768161635096461362>.
         """,
     ),
 ]
