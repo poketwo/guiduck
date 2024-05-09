@@ -53,8 +53,8 @@ POSTS = [
 ]
 
 
-class PriceCheck(commands.Cog):
-    """For price checking."""
+class Autopost(commands.Cog):
+    """For autoposting important messages."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -89,4 +89,4 @@ class PriceCheck(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(PriceCheck(bot))
+    await bot.add_cog(Autopost(bot))
