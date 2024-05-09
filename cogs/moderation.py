@@ -423,6 +423,10 @@ class Moderation(commands.Cog):
             action=discord.AuditLogAction.member_update,
             retry=3,
         )
+
+        if entry is None:
+            return
+
         if entry.user == self.bot.user:
             return
 
@@ -978,7 +982,7 @@ class Moderation(commands.Cog):
             return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
 
         reset = note.lower() == "reset"
-        
+
         result = await self.bot.mongo.db.action.find_one_and_update(
             {"_id": id, "guild_id": ctx.guild.id},
             {"$set": {"note": note}} if not reset else {"$unset": {"note": 1}},
