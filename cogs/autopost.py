@@ -28,7 +28,7 @@ POSTS = [
         """,
     ),
     AutoPost(
-        [741712512113967214],
+        [741712512113967214, 720331733949743176, 768161635096461362],
         """
         **Reminder:** Check pins for full rules. Advertisements in violation will be removed.
         """,
