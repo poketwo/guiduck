@@ -72,11 +72,16 @@ class Logging(commands.Cog):
             "position": role.position,
         }
 
+    async def bulk_write(self, collection_name: str, updates: list):
+        collection = self.bot.mongo.db.get_collection(collection_name)
+        if updates:
+            await collection.bulk_write(updates)
+
     async def full_cache_guild(self, guild):
-        await self.bot.mongo.db.guild.bulk_write([self.make_cache_guild(guild)])
-        await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(channel) for channel in guild.channels])
-        await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(channel) for channel in guild.threads])
-        await self.bot.mongo.db.member.bulk_write([self.make_cache_member(member) for member in guild.members])
+        await self.bulk_write("guild", [self.make_cache_guild(guild)])
+        await self.bulk_write("channel", [self.make_cache_channel(channel) for channel in guild.channels])
+        await self.bulk_write("channel", [self.make_cache_channel(channel) for channel in guild.threads])
+        await self.bulk_write("member", [self.make_cache_member(member) for member in guild.members])
 
     def make_cache_guild(self, guild):
         return UpdateOne(
