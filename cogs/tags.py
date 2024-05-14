@@ -120,6 +120,9 @@ class Tags(commands.Cog):
         else:
             embed.add_field(name="Uses", value=tag.uses)
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
+        
+        embed.set_footer(text="Created at")
+        embed.timestamp = tag.id.generation_time
 
         await ctx.send(embed=embed)
 
