@@ -111,6 +111,8 @@ class ServerInvites(AutomodModule):
                     return f"Sending invites to another server."
 
 
+CATCHING_CATEGORY_ID = 717872471411261510
+
 class Spamming(AutomodModule):
     bucket = "spamming"
     punishments = {
@@ -125,11 +127,14 @@ class Spamming(AutomodModule):
 
     def __init__(self):
         self.cooldown = commands.CooldownMapping.from_cooldown(self.message_count, 12.0, commands.BucketType.member)
+        self.catching_cooldown = commands.CooldownMapping.from_cooldown(self.message_count, 9.0, commands.BucketType.member)
 
     async def check(self, ctx):
-        bucket = self.cooldown.get_bucket(ctx.message)
+        cooldown = self.catching_cooldown if (ctx.channel.category and ctx.channel.category.id == CATCHING_CATEGORY_ID) else self.cooldown
+
+        bucket = cooldown.get_bucket(ctx.message)
         if bucket.update_rate_limit():
-            self.cooldown._cache[self.cooldown._bucket_key(ctx.message)].reset()
+            cooldown._cache[cooldown._bucket_key(ctx.message)].reset()
             await ctx.channel.purge(limit=self.message_count, check=lambda m: m.author == ctx.author)
             return "Spamming"
 
