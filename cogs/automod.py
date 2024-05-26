@@ -113,6 +113,7 @@ class ServerInvites(AutomodModule):
 
 CATCHING_CATEGORY_ID = 717872471411261510
 
+
 class Spamming(AutomodModule):
     bucket = "spamming"
     punishments = {
@@ -124,13 +125,24 @@ class Spamming(AutomodModule):
         0: ("timeout", timedelta(hours=1)),
     }
     message_count = 10
+    message_rate = 12.0  # seconds
 
     def __init__(self):
-        self.cooldown = commands.CooldownMapping.from_cooldown(self.message_count, 12.0, commands.BucketType.member)
-        self.catching_cooldown = commands.CooldownMapping.from_cooldown(self.message_count, 9.0, commands.BucketType.member)
+        self.cooldown = commands.CooldownMapping.from_cooldown(
+            self.message_count, self.message_rate, commands.BucketType.member
+        )
+        self.catching_cooldown = commands.CooldownMapping.from_cooldown(
+            self.message_count,
+            self.message_rate,
+            lambda msg: (commands.BucketType.channel(msg), commands.BucketType.member(msg)),
+        )
 
     async def check(self, ctx):
-        cooldown = self.catching_cooldown if (ctx.channel.category and ctx.channel.category.id == CATCHING_CATEGORY_ID) else self.cooldown
+        cooldown = (
+            self.catching_cooldown
+            if (ctx.channel.category and ctx.channel.category.id == CATCHING_CATEGORY_ID)
+            else self.cooldown
+        )
 
         bucket = cooldown.get_bucket(ctx.message)
         if bucket.update_rate_limit():
