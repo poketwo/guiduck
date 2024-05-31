@@ -120,7 +120,7 @@ class Tags(commands.Cog):
         else:
             embed.add_field(name="Uses", value=tag.uses)
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
-        
+
         embed.set_footer(text="Created at")
         embed.timestamp = tag.id.generation_time
 
@@ -286,7 +286,7 @@ class Tags(commands.Cog):
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": member.id}})
         await ctx.send(f"Successfully transferred tag.")
 
-    @tag.command()
+    @tag.command(aliases=("ft",))
     @checks.is_trial_moderator()
     async def forcetransfer(self, ctx, member: discord.Member, *, name):
         """Transfers a tag to another user by force.
