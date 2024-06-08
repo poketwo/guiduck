@@ -3,6 +3,7 @@ from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import textwrap
 from typing import Optional, Union
 
 import discord
@@ -12,6 +13,7 @@ from discord.ext.menus.views import ViewMenuPages
 from discord.ui import button
 
 from helpers import checks, constants, time
+from helpers.context import GuiduckContext
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
@@ -327,6 +329,51 @@ class TradingUnmute(Action):
         await super().execute(ctx)
 
 
+class EmergencyAlertBan(Action):
+    type = "emergency_alert_ban"
+    past_tense = "permanently banned from emergency staff alerts"
+    emoji = "\N{BELL WITH CANCELLATION STROKE}"
+    color = discord.Color.magenta()
+
+    async def execute(self, ctx):
+        await ctx.bot.mongo.db.member.update_one(
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$set": {"emergency_alert_banned": True}, "$unset": {"emergency_alert_banned_until": 1}},
+            upsert=True,
+        )
+        await super().execute(ctx)
+
+
+class EmergencyAlertTempBan(Action):
+    type = "emergency_alert_temporary_ban"
+    past_tense = "banned from emergency staff alerts"
+    emoji = "\N{BELL WITH CANCELLATION STROKE}"
+    color = discord.Color.magenta()
+
+    async def execute(self, ctx):
+        await ctx.bot.mongo.db.member.update_one(
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$set": {"emergency_alert_banned_until": self.expires_at}, "$unset": {"emergency_alert_banned": 1}},
+            upsert=True,
+        )
+        await super().execute(ctx)
+
+
+class EmergencyAlertUnban(Action):
+    type = "emergency_alert_unban"
+    past_tense = "removed from emergency staff alert ban"
+    emoji = "\N{BELL}"
+    color = discord.Color.green()
+
+    async def execute(self, ctx):
+        await ctx.bot.mongo.db.member.update_one(
+            {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
+            {"$unset": {"emergency_alert_banned": 1, "emergency_alert_banned_until": 1}},
+            upsert=True,
+        )
+        await super().execute(ctx)
+
+
 @dataclass
 class FakeContext:
     bot: commands.Bot
@@ -334,7 +381,23 @@ class FakeContext:
 
 
 cls_dict = {
-    x.type: x for x in (Kick, Ban, Unban, Warn, Note, Timeout, Untimeout, Mute, Unmute, TradingMute, TradingUnmute)
+    x.type: x
+    for x in (
+        Kick,
+        Ban,
+        Unban,
+        Warn,
+        Note,
+        Timeout,
+        Untimeout,
+        Mute,
+        Unmute,
+        TradingMute,
+        TradingUnmute,
+        EmergencyAlertBan,
+        EmergencyAlertTempBan,
+        EmergencyAlertUnban,
+    )
 }
 
 
@@ -363,6 +426,40 @@ class MemberOrIdConverter(commands.Converter):
             return FakeUser(int(arg))
         except ValueError:
             raise commands.MemberNotFound(arg)
+
+
+EMERGENCY_COOLDOWN_HOURS = 1
+EMERGENCY_ROLE_NAME = "Emergency Staff"
+
+
+class EmergencyView(discord.ui.View):
+    def __init__(self, ctx: GuiduckContext):
+        super().__init__(timeout=None)
+        self.ctx = ctx
+        self.message: discord.Message
+
+    @discord.ui.button(label="Resolve", style=discord.ButtonStyle.green)
+    async def resolve(self, interaction: discord.Interaction, button: discord.Button):
+        await interaction.response.defer()
+        button.label = "Resolved"
+        button.disabled = True
+
+        embed = self.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"Resolved by @{interaction.user} ({interaction.user.id})")
+        await self.message.edit(embed=embed, view=self)
+
+    async def interaction_check(self, interaction: discord.Interaction):
+        user = interaction.user
+        checks = any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(user, "roles", [])) or user.id in {
+            self.ctx.bot.owner_id,
+            self.ctx.author.id,
+            *self.ctx.bot.owner_ids,
+        }
+        if not checks:
+            await interaction.response.send_message("You can't use this!", ephemeral=True)
+            return False
+        return True
 
 
 class Moderation(commands.Cog):
@@ -495,6 +592,142 @@ class Moderation(commands.Cog):
             created_at=entry.created_at,
         )
         await self.save_action(action)
+
+    @commands.hybrid_group(
+        aliases=("emergency-staff", "alert", "alert-staff"),
+        help=textwrap.dedent(
+            f"""
+            Emergency command to alert staff members with the *{EMERGENCY_ROLE_NAME}* role.
+
+            Do no abuse. Meant for use during emergencies that need immediate staff attention.
+            """
+        ),
+        cooldown_after_parsing=True,
+        fallback="send",
+        invoke_without_subcommand=True,
+    )
+    @commands.cooldown(1, EMERGENCY_COOLDOWN_HOURS * 60 * 60, commands.BucketType.guild)  # Cooldown per guild
+    @checks.is_not_emergency_alert_banned()
+    @commands.guild_only()
+    async def emergency(self, ctx: GuiduckContext, *, reason: str):
+        """Emergency command to alert staff members with the role."""
+
+        role = discord.utils.get(ctx.guild.roles, name=EMERGENCY_ROLE_NAME)
+        if role is None:
+            ctx.command.reset_cooldown(ctx)
+            return await ctx.send(
+                f"No role name *{EMERGENCY_ROLE_NAME}* found in this server. Please ask an Administrator to create one.",
+                ephemeral=True,
+            )
+
+        number_staff = len(role.members)
+        confirm_embed = discord.Embed(
+            color=discord.Color.red(),
+            title="🚨 Emergency Staff Alert",
+            description=(
+                f"This command is designed for use in case of emergencies actively happening in our server(s) that need"
+                f" immediate staff attention. This will ping **{number_staff}** staff member{'' if number_staff == 1 else 's'}"
+                f" currently assigned to the {role.mention} role, and you will be assisted shortly."
+            ),
+        ).add_field(
+            name="Are you sure that you want to send an Emergency Staff Alert for the following reason?",
+            value=reason,
+            inline=False,
+        )
+
+        if not await ctx.confirm(timeout=120, embeds=[confirm_embed, constants.EMERGENCY_RULES_EMBED], ephemeral=True):
+            ctx.command.reset_cooldown(ctx)
+            return await ctx.send("Aborted.", ephemeral=True)
+
+        alert_embed = discord.Embed(color=discord.Color.red(), title="🚨 Emergency Staff Alert Issued", description="")
+        alert_embed.set_author(
+            name=f"{ctx.author} ({ctx.author.id})",
+            icon_url=ctx.author.display_avatar,
+        )
+        alert_embed.add_field(name="Reason", value=reason, inline=False)
+        view = EmergencyView(ctx)
+        view.add_item(
+            discord.ui.Button(
+                label="Logs",
+                url=f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}",
+            )
+        )
+        view.message = await ctx.reply(
+            role.mention,
+            embed=alert_embed,
+            view=view,
+            mention_author=False,
+            allowed_mentions=discord.AllowedMentions(roles=[role]),
+        )
+
+    @emergency.error
+    async def emergency_error(self, ctx: GuiduckContext, error):
+        if isinstance(error, commands.CommandOnCooldown):
+            await ctx.send(
+                f"An Emergency Staff Alert has already been issued recently and is currently on cooldown. Please use `?report` instead if necessary.",
+                ephemeral=True,
+            )
+
+    @emergency.command(name="ban", usage="<target> [expires_at] [reason]")
+    @checks.is_trial_moderator()
+    @commands.guild_only()
+    async def emergency_ban(self, ctx: GuiduckContext, target: discord.Member, *, time_and_reason):
+        """Temporarily or permanently bans a member from using the Emergency Staff Alert command.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        if any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(target, "roles", [])):
+            return await ctx.send("You can't punish that person!", ephemeral=True)
+
+        expires_at, reason = await self.parse_time_and_reason(ctx, time_and_reason)
+
+        permanent_ban = expires_at is None
+        action_cls = EmergencyAlertBan if permanent_ban else EmergencyAlertTempBan
+        action = action_cls(
+            target=target,
+            user=ctx.author,
+            reason=reason,
+            guild_id=ctx.guild.id,
+            created_at=ctx.message.created_at,
+            expires_at=expires_at,
+        )
+        await action.execute(ctx)
+        await action.notify()
+
+        if permanent_ban:
+            return await ctx.send(
+                f"Permanently banned **{target}** from issuing emergency staff alerts (Case #{action._id}).",
+                ephemeral=True,
+            )
+        else:
+            return await ctx.send(
+                f"Banned **{target}** from issuing emergency staff alerts for **{time.human_timedelta(action.duration)}** (Case #{action._id}).",
+                ephemeral=True,
+            )
+
+    @emergency.command(name="unban", usage="<target> [reason]")
+    @checks.is_trial_moderator()
+    @commands.guild_only()
+    async def emergency_unban(self, ctx: GuiduckContext, target: discord.Member, *, reason=None):
+        """Unbans a member who has been banned from using the Emergency Staff Alert command.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        action = EmergencyAlertUnban(
+            target=target,
+            user=ctx.author,
+            reason=reason,
+            guild_id=ctx.guild.id,
+        )
+        await action.execute(ctx)
+        await action.notify()
+
+        await ctx.send(
+            f"Unbanned **{target}** from issuing emergency staff alerts (Case #{action._id}).",
+            ephemeral=True,
+        )
 
     async def run_purge(self, ctx, limit, check):
         class ConfirmPurgeView(discord.ui.View):
@@ -630,7 +863,9 @@ class Moderation(commands.Cog):
         if len(note) == 0:
             return await ctx.send_help(ctx.command)
         elif len(note) > constants.EMBED_FIELD_CHAR_LIMIT:
-            return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
+            return await ctx.send(
+                f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters."
+            )
 
         action = Note(
             target=target,
@@ -885,6 +1120,8 @@ class Moderation(commands.Cog):
             action_type = SymbolicUntimeout
         elif action.type == "trading_mute":
             action_type = TradingUnmute
+        elif action.type in ("emergency_alert_ban", "emergency_alert_temporary_ban"):
+            action_type = EmergencyAlertUnban
         else:
             return
 
@@ -979,7 +1216,9 @@ class Moderation(commands.Cog):
         if len(note) == 0:
             return await ctx.send_help(ctx.command)
         elif len(note) > constants.EMBED_FIELD_CHAR_LIMIT:
-            return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
+            return await ctx.send(
+                f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters."
+            )
 
         reset = note.lower() == "reset"
 
