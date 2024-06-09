@@ -34,3 +34,12 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 
 POKETWO_REDIS_URI = os.environ["POKETWO_REDIS_URI"]
 POKETWO_REDIS_PASSWORD = os.getenv("POKETWO_REDIS_PASSWORD")
+
+OUTLINE_BASE_URL = os.getenv("OUTLINE_BASE_URL")
+OUTLINE_API_TOKEN = os.getenv("OUTLINE_API_TOKEN")
+OUTLINE_COLLECTION_IDS = {
+    "development": os.getenv("OUTLINE_COL_DEV"),
+    "moderators": os.getenv("OUTLINE_COL_MOD"),
+    "moderator wiki": os.getenv("OUTLINE_COL_MODWIKI"),
+    "management": os.getenv("OUTLINE_COL_ADMIN"),
+}

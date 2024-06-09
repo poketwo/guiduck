@@ -1,7 +1,9 @@
-import asyncio
+import contextlib
+from typing import Callable, Dict, List, Optional
 
 import discord
 from discord.ext import commands, menus
+from discord.utils import maybe_coroutine
 
 
 class AsyncEmbedCodeBlockTablePageSource(menus.AsyncIteratorPageSource):
@@ -115,68 +117,232 @@ class AsyncEmbedFieldsPageSource(menus.AsyncIteratorPageSource):
         return embed
 
 
-class Paginator:
-    def __init__(self, get_page, num_pages):
-        self.num_pages = num_pages
+FIRST_PAGE_EMOJI = "⏮️"
+LAST_PAGE_EMOJI = "⏭️"
+PREVIOUS_PAGE_EMOJI = "◀"
+NEXT_PAGE_EMOJI = "▶"
+STOP_EMOJI = "⏹"
+GO_PAGE_EMOJI = "🔢"
+
+
+PageReturnType = discord.Embed | str
+KwargsReturnType = Dict[str, PageReturnType]
+
+
+class Paginator(discord.ui.View):
+    """Simple paginator using buttons.
+    Has the following pagination functionalities:
+    - first page
+    - previous page
+    - stop paginator
+    - next page
+    - last page
+    - go to page
+    - optional select menu for entry interaction
+
+    Parameters
+    ----------
+    get_page : Callable[[int], discord.Embed | str]
+        The function that takes in the page number and returns what to show for that page.
+        It should return either a string or an embed.
+    num_pages : int
+        The total number of pages. If not provided, disables last button and page looping.
+    loop_pages : bool
+        If it should allow looping the pages. If False, it disables first/previous and next/last buttons
+        if it's at the beginning and end of the pages, respectively.
+    timeout_after : int
+        After how many seconds of inactivity should the paginator stop
+
+    Methods
+    -------
+    add_select
+        Adds select menu that can allow the user to interact with the entries that are being paginated.
+    clear_buttons
+        Clears all the pagination buttons from the paginator.
+    start
+        Starts the paginator.
+    """
+
+    def __init__(
+        self,
+        get_page: Callable[[int], PageReturnType],
+        *,
+        num_pages: Optional[int] = None,
+        loop_pages: Optional[bool] = True,
+        timeout_after: Optional[int] = 120,
+    ):
         self.get_page = get_page
+        self.num_pages = num_pages
+        self.loop_pages = loop_pages and self.num_pages is not None
 
-    async def send(self, ctx: commands.Context, pidx: int = 0):
+        self.current_page = 0
+        self.message = None
+        self.ctx = None
 
-        embed = await self.get_page(pidx)
-        message = await ctx.send(embed=embed)
+        super().__init__(timeout=timeout_after)
+        self.pagination_buttons = (self.first, self.previous, self.stop_button, self.next, self.last, self.go)
+        self.select = None
 
-        if self.num_pages <= 1:
+    def is_paginating(self) -> bool:
+        if self.num_pages is not None:
+            return self.num_pages > 1
+        return True
+
+    def clear_buttons(self):
+        """Clears the pagination buttons"""
+
+        for button in self.pagination_buttons:
+            self.remove_item(button)
+
+    def add_select(self, select: discord.ui.Select, get_options: Callable[[int], List[discord.SelectOption]]):
+        """
+        Adds the provided select menu to the first row of the paginator.
+        This select menu can be used to allow the user to interact with the entries that are being paginated.
+
+        Parameters
+        ----------
+        select : discord.ui.Select
+            The select menu to be added.
+        get_options : Callable[[int], List[discord.SelectOption]]
+            The function (can be async) that will be called every time the page is changed to get the options
+            to show on the select menu for that page.
+            Current page number should be its sole argument, similar to get_page.
+        """
+
+        self.select = select
+        self.get_options = get_options
+
+        # Add the select to the first row
+        self.clear_items()
+        if self.select:
+            self.add_item(self.select)
+
+        for button in self.pagination_buttons:
+            self.add_item(button)
+
+    def _get_page_kwargs(self, page: PageReturnType) -> KwargsReturnType:
+        kwargs = {}
+
+        if isinstance(page, discord.Embed):
+            kwargs["embed"] = page
+        elif isinstance(page, str):
+            kwargs["content"] = page
+
+        return kwargs
+
+    def _update_items(self) -> None:
+        pidx = self.current_page
+        if not self.is_paginating():
+            self.clear_buttons()
             return
 
-        await message.add_reaction("⏮️")
-        await message.add_reaction("◀")
-        await message.add_reaction("▶")
-        await message.add_reaction("⏭️")
-        await message.add_reaction("🔢")
-        await message.add_reaction("⏹")
+        if self.num_pages is None:
+            self.last.disabled = True
+            self.go.disabled = True
+        else:
+            self.go.disabled = False
 
+        if not self.loop_pages:
+            self.first.disabled = pidx == 0
+            self.previous.disabled = pidx == 0
+
+            if self.num_pages is not None:
+                self.next.disabled = (pidx + 1) >= self.num_pages
+                self.last.disabled = (pidx + 1) >= self.num_pages
+
+    async def _prepare_page(self, pidx: int) -> KwargsReturnType:
+        page = await maybe_coroutine(self.get_page, pidx)
+
+        if self.select:
+            select_options = await maybe_coroutine(self.get_options, pidx)
+            if select_options:
+                self.select.options = select_options
+                self.select.disabled = False
+            else:
+                self.select.options = [discord.SelectOption(label="None")]
+                self.select.disabled = True
+
+        kwargs = self._get_page_kwargs(page)
+        if kwargs:
+            self.current_page = pidx
+        self._update_items()
+
+        return kwargs
+
+    async def show_page(self, interaction: discord.Interaction, pidx: int) -> None:
+        if self.num_pages is not None:
+            pidx = pidx % self.num_pages
+
+        if self.current_page == pidx:
+            with contextlib.suppress(discord.NotFound, discord.InteractionResponded):
+                return await interaction.response.defer()
+
+        kwargs = await self._prepare_page(pidx)
         try:
-            while True:
-                reaction, user = await ctx.bot.wait_for(
-                    "reaction_add",
-                    check=lambda r, u: r.message.id == message.id and u.id == ctx.author.id,
-                    timeout=120,
-                )
-                try:
-                    await reaction.remove(user)
-                except:
-                    pass
+            await interaction.response.edit_message(**kwargs, view=self)
+        except (discord.NotFound, discord.InteractionResponded):
+            if self.message:
+                await self.message.edit(**kwargs, view=self)
 
-                if reaction.emoji == "⏹":
-                    await message.delete()
-                    return
+    async def start(self, ctx: commands.Context, pidx: int = 0):
+        self.ctx = ctx
+        kwargs = await self._prepare_page(pidx)
+        self.message = await ctx.reply(**kwargs, view=self, mention_author=False)
 
-                elif reaction.emoji == "🔢":
-                    ask_message = await ctx.send("What page would you like to go to?")
-                    message = await ctx.bot.wait_for(
-                        "message",
-                        check=lambda m: m.author == ctx.author and m.channel == ctx.channel,
-                        timeout=30,
-                    )
-                    try:
-                        pidx = (int(message.content) - 1) % self.num_pages
-                    except ValueError:
-                        await ctx.send("That's not a valid page number!")
-                        continue
+    @discord.ui.button(emoji=FIRST_PAGE_EMOJI, style=discord.ButtonStyle.grey)
+    async def first(self, interaction: discord.Interaction, button: discord.Button):
+        await self.show_page(interaction, 0)
 
-                    ctx.bot.loop.create_task(ask_message.delete())
-                    ctx.bot.loop.create_task(message.delete())
+    @discord.ui.button(emoji=PREVIOUS_PAGE_EMOJI, style=discord.ButtonStyle.grey)
+    async def previous(self, interaction: discord.Interaction, button: discord.Button):
+        await self.show_page(interaction, self.current_page - 1)
 
-                else:
-                    pidx = {
-                        "⏮️": 0,
-                        "◀": pidx - 1,
-                        "▶": pidx + 1,
-                        "⏭️": self.num_pages - 1,
-                    }[reaction.emoji] % self.num_pages
+    @discord.ui.button(emoji=STOP_EMOJI, style=discord.ButtonStyle.grey)
+    async def stop_button(self, interaction: discord.Interaction, button: discord.Button):
+        await interaction.response.defer()
+        self.stop()
+        try:
+            await interaction.delete_original_response()
+        except (discord.NotFound, discord.InteractionResponded):
+            if self.message:
+                await self.message.delete()
 
-                embed = await self.get_page(pidx)
-                await message.edit(embed=embed)
+    @discord.ui.button(emoji=NEXT_PAGE_EMOJI, style=discord.ButtonStyle.grey)
+    async def next(self, interaction: discord.Interaction, button: discord.Button):
+        await self.show_page(interaction, self.current_page + 1)
 
-        except asyncio.TimeoutError:
-            await message.add_reaction("❌")
+    @discord.ui.button(emoji=LAST_PAGE_EMOJI, style=discord.ButtonStyle.grey)
+    async def last(self, interaction: discord.Interaction, button: discord.Button):
+        await self.show_page(interaction, self.num_pages - 1)
+
+    @discord.ui.button(emoji=GO_PAGE_EMOJI, style=discord.ButtonStyle.grey)
+    async def go(self, interaction: discord.Interaction, button: discord.Button):
+        await interaction.response.send_message("What page would you like to go to?")
+        message = await interaction.client.wait_for(
+            "message",
+            check=lambda m: m.author == interaction.user and m.channel == interaction.channel,
+            timeout=30,
+        )
+        try:
+            pidx = int(message.content) - 1
+        except ValueError:
+            return await interaction.followup.send("That's not a valid page number!")
+        else:
+            await self.show_page(interaction, pidx)
+
+        interaction.client.loop.create_task(interaction.delete_original_response())
+        interaction.client.loop.create_task(message.delete())
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            for item in self.children:
+                item.disabled = True
+
+            await self.message.edit(view=self)
+
+    async def interaction_check(self, interaction):
+        if self.ctx:
+            if interaction.user.id != self.ctx.author.id:
+                await interaction.response.send_message("You can't use this!", ephemeral=True)
+                return False
+        return True
