@@ -16,7 +16,7 @@ ACCESSIBLE_COLLECTIONS = {
     checks.is_developer: ("development",),
     checks.is_trial_moderator: ("moderators", "moderator wiki"),
     checks.is_moderator: ("moderators", "moderator wiki"),
-    checks.is_community_manager: ("management",),
+    checks.is_community_manager: ("management", "in-progress", "information archive"),
 }
 
 DEFAULT_COLLECTION = ACCESSIBLE_COLLECTIONS[checks.is_trial_moderator][0]

@@ -38,6 +38,8 @@ POKETWO_REDIS_PASSWORD = os.getenv("POKETWO_REDIS_PASSWORD")
 OUTLINE_BASE_URL = os.getenv("OUTLINE_BASE_URL")
 OUTLINE_API_TOKEN = os.getenv("OUTLINE_API_TOKEN")
 OUTLINE_COLLECTION_IDS = {
+    "in-progress": "e724cdc4-32a0-4348-af1e-dad2caa50dd2",
+    "information archive": "ce16b7ad-c843-4f10-8d07-817364be3f69",
     "development": "2edf0a2f-6e73-43f4-be71-34046af0396f",
     "moderators": "fd94ab37-1937-4c50-954e-577916bf0103",
     "moderator wiki": "9b748311-7743-4980-b3ec-4950465be763",

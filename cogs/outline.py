@@ -107,6 +107,9 @@ class Outline(commands.Cog):
         return {name: collections[name] for name in total_results[:OPTIONS_LIMIT]}
 
     def collections_sort_key(self, document: outline.Document) -> int:
+        if document.collection_id not in COLLECTION_NAMES.keys():
+            return -1
+
         return list(COLLECTION_NAMES.keys()).index(document.collection_id)
 
     def process_context(self, context: str) -> str:
