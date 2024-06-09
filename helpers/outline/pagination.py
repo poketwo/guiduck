@@ -26,8 +26,7 @@ class SearchResult:
 
 
 def format_document_label(document: outline.Document) -> str:
-    collection = COLLECTION_NAMES.get(document.collection_id, "")
-    return shorten(f"{collection.title()}　/　{document.title}", CONTEXT_LIMIT)
+    return shorten(document.title, CONTEXT_LIMIT)
 
 
 class DocumentSelect(discord.ui.Select):
@@ -140,7 +139,8 @@ class SearchPaginator(Paginator):
             timestamp = discord.utils.format_dt(result.document.created_at)
 
             label = f"{i}. {format_document_label(result.document)}"
-            values = (f"[{timestamp}]({result.document.full_url(OUTLINE_BASE_URL)})", f">>> {result.context}")
+            collection = COLLECTION_NAMES.get(result.document.collection_id, "")
+            values = (f"*{collection.title()}* \u200c • \u200c [Jump]({result.document.full_url(OUTLINE_BASE_URL)})", f">>> {result.context}")
 
             embed.add_field(
                 name=label,
