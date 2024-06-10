@@ -61,8 +61,9 @@ class CollectionConverter(commands.Converter):
 class DocumentArgs(commands.FlagConverter):
     """Base flags for the Outline document commands"""
 
-    MSG_CMD_USAGE = f'text: <text> collection: [collection="{DEFAULT_COLLECTION.title()}"]'
+    MSG_CMD_USAGE = f'<search_text> [collection: collection="{DEFAULT_COLLECTION.title()}"]'
     text: str = commands.flag(
+        positional=True,
         aliases=("t", "txt"),
         description="Search for text in documents (type a space to refresh)",
         max_args=1,
@@ -83,8 +84,9 @@ class DocumentArgs(commands.FlagConverter):
 class SearchDocumentArgs(DocumentArgs):
     """Flags for the Outline document search command"""
 
-    MSG_CMD_USAGE = f'text: [text] collection: [collection="{DEFAULT_COLLECTION.title()}"]'
+    MSG_CMD_USAGE = f'[search_text] [collection: collection="{DEFAULT_COLLECTION.title()}"]'
     text: str = commands.flag(
+        positional=True,
         aliases=("t", "txt"),
         description="Search for text in documents (type a space to refresh)",
         max_args=1,
