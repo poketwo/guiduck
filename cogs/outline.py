@@ -50,8 +50,14 @@ class Outline(commands.Cog):
     def translate_markdown(self, text: str) -> str:
         """Method to translate Outline markdown syntax to Discord markdown syntax"""
 
-        # Replace double line breaks in front of headers with single
-        text = re.sub(r"\n\n(#+ )", r"\n\1", text)
+        # Replace double line breaks in front of and after headers with single
+        text = re.sub(r"\n\n?(#+ .+?)\n\n?", r"\n\1\n", text)
+
+        # Replace h2 headers with h3 headers to make them less obtrusive
+        text = re.sub(r"(^|\n)## ", r"\1### ", text)
+
+        # Replace h1 headers with h2 headers to make them less obtrusive
+        text = re.sub(r"(^|\n)# ", r"\1## ", text)
 
         # Replace highlights with italics
         text = re.sub(r"==(.+?)==", r"*\1*", text)
@@ -59,6 +65,9 @@ class Outline(commands.Cog):
         # Replace new command lines
         while re.search(command_symbol := "\n\\\+\n", text) is not None:
             text = re.sub(command_symbol, "\n", text)
+
+        # Trim leading/trailing whitespace characters
+        text = re.sub(r"^\s+|\s+$", r"", text)
 
         return text
 
@@ -77,14 +86,14 @@ class Outline(commands.Cog):
             f"Created at: {full_format_dt(document.created_at, plain_text=True)}",
         ]
 
+        document_text = self.translate_markdown(document.text)
         def get_page(pidx: Optional[int] = 0) -> discord.Embed:
-            total_lines = len(document.text.split("\n"))
+            total_lines = len(document_text.split("\n"))
             total_pages = math.ceil(total_lines / LINES_PER_PAGE)
             offset = pidx * LINES_PER_PAGE
             limit = offset + LINES_PER_PAGE
 
-            text = self.translate_markdown(document.text)
-            lines = text.split("\n")[offset:limit]
+            lines = document_text.split("\n")[offset:limit]
             embed.description = "\n".join(lines)
             embed.set_footer(text="\n".join([*footer, f"Page {pidx + 1}/{total_pages}"]))
 
