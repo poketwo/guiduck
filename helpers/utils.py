@@ -5,6 +5,8 @@ from typing import Iterable, List, NamedTuple, Optional
 import discord
 from discord.ext import commands
 
+from . import time
+
 
 class FakeAvatar(NamedTuple):
     url: str
@@ -71,10 +73,17 @@ def with_attachment_urls(content: str, attachments: Iterable[discord.Attachment]
     return content
 
 
-def full_format_dt(dt: datetime) -> str:
-    """Formats datetime object to discord timestamp in `FULL (RELATIVE)` format"""
+DISCORD_DT_FORMAT = "%d %B %Y %H:%M %Z"
 
-    return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
+
+def full_format_dt(dt: datetime, plain_text: Optional[bool] = False) -> str:
+    """Formats datetime object to discord/text timestamp in `FULL (RELATIVE)` format"""
+
+    if plain_text:
+        relative = time.human_timedelta(dt, accuracy=2, brief=True)
+        return f"{dt:{DISCORD_DT_FORMAT}} ({relative})"
+    else:
+        return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
 
 
 def shorten_around(
