@@ -71,16 +71,11 @@ class Outline(commands.Cog):
             url=document.full_url(self.client.base_url),
         )
         embed.set_author(name=document.created_by.name, icon_url=document.created_by.avatar_url)
-        embed.add_field(
-            name="Information",
-            value=dedent(
-                f"""
-                Created At: {full_format_dt(document.created_at)}
-                Updated At: {full_format_dt(document.updated_at)}
-                """
-            ),
-            inline=False,
-        )
+
+        footer = [
+            f"Updated at: {full_format_dt(document.updated_at, plain_text=True)}",
+            f"Created at: {full_format_dt(document.created_at, plain_text=True)}",
+        ]
 
         def get_page(pidx: Optional[int] = 0) -> discord.Embed:
             total_lines = len(document.text.split("\n"))
@@ -91,7 +86,7 @@ class Outline(commands.Cog):
             text = self.translate_markdown(document.text)
             lines = text.split("\n")[offset:limit]
             embed.description = "\n".join(lines)
-            embed.set_footer(text=f"Page {pidx + 1}/{total_pages}")
+            embed.set_footer(text="\n".join([*footer, f"Page {pidx + 1}/{total_pages}"]))
 
             return embed
 
