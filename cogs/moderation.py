@@ -146,7 +146,7 @@ class Action(abc.ABC):
             embed.add_field(name="Logs", value=f"[Link]({self.logs_url})", inline=False)
         if self.duration is not None:
             duration = f"{time.human_timedelta(self.duration)}"
-            expires_at = f"{discord.utils.format_dt(self.expires_at)} ({discord.utils.format_dt(self.expires_at, 'R')}"
+            expires_at = f"{discord.utils.format_dt(self.expires_at)} ({discord.utils.format_dt(self.expires_at, 'R')})"
             embed.add_field(name="Duration", value=duration, inline=False)
             embed.add_field(name="Expires At", value=expires_at, inline=False)
         embed.timestamp = self.created_at
