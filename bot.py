@@ -89,4 +89,5 @@ class Bot(commands.Bot, events.EventsMixin):
 
 if __name__ == "__main__":
     bot = Bot()
+    bot.connector = aiohttp.TCPConnector(limit=0)
     bot.run(config.BOT_TOKEN)
