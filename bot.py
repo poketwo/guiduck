@@ -48,6 +48,10 @@ class Bot(commands.Bot, events.EventsMixin):
 
         self.config = config
 
+    async def _async_setup_hook(self):
+        await super()._async_setup_hook()
+        self.http.connector = aiohttp.TCPConnector(limit=0)
+
     async def setup_hook(self):
         self.http_session = aiohttp.ClientSession()
         await self.load_extension("jishaku")
@@ -89,5 +93,4 @@ class Bot(commands.Bot, events.EventsMixin):
 
 if __name__ == "__main__":
     bot = Bot()
-    bot.connector = aiohttp.TCPConnector(limit=0)
     bot.run(config.BOT_TOKEN)
