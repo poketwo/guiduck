@@ -362,7 +362,7 @@ class Giveaways(commands.Cog):
         species = self.bot.data.species_by_number(p["species_id"])
         iv_total = p["iv_hp"] + p["iv_atk"] + p["iv_defn"] + p["iv_satk"] + p["iv_sdef"] + p["iv_spd"]
         conditions = [
-            (species.mythical or species.legendary or species.ultra_beast) and iv_total >= 112,
+            any((species.mythical, species.legendary, species.ultra_beast, "-alola" in species.slug, "-galar" in species.slug, "-hisui" in species.slug, "-paldea" in species.slug)) and iv_total >= 112,
             species.event and iv_total >= 112,
             iv_total >= 168 or iv_total <= 18,
             p.get("shiny"),
