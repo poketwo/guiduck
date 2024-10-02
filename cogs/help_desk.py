@@ -583,11 +583,13 @@ class IncenseRefunds(HelpDeskCategory):
             color=discord.Color.blurple(),
             description=textwrap.dedent(
                 """
-                Thank you for submitting an incense refund request. We're sorry for the trouble you've encountered with your incense. In order for us to process your request, please submit the following:
+                Thank you for submitting an incense refund request. We're sorry for the trouble you've encountered with your incense. In order for us to process your request, please submit the following *for each incense to be refunded*:
 
-                1) A screenshot of you purchasing the incense,
-                2) A screenshot of the bot malfunctioning—not sending spawns, not responding to commands, or something else—and
-                3) The number of spawns lost in total, and screenshots to back this up.
+                1. A screenshot of you purchasing the incense,
+                2. A screenshot of the bot malfunctioning—not sending spawns, not responding to commands, or something else,
+                3. The number of spawns lost in total, and screenshots to back this up—and
+                4. A screenshot of you permanently stopping the incense using `@‌Pokétwo#8236 incense stop`
+                  - If the incense has already ended, run that command now and send a screenshot to show that.
 
                 After you submit these pieces of documentation, someone will come by to refund you shortly. Thank you!
                 """
