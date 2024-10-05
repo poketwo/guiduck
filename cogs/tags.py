@@ -97,6 +97,7 @@ class Tags(commands.Cog):
             tag.content,
             allowed_mentions=discord.AllowedMentions.none(),
             reference=ctx.message.reference,
+            ephemeral=True,
         )
         if ctx.guild is not None:
             await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
@@ -124,7 +125,7 @@ class Tags(commands.Cog):
         embed.set_footer(text="Created at")
         embed.timestamp = tag.id.generation_time
 
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embed, ephemeral=True)
 
     @tag.command()
     async def raw(self, ctx, *, name):
@@ -138,6 +139,7 @@ class Tags(commands.Cog):
             escaped,
             allowed_mentions=discord.AllowedMentions.none(),
             reference=ctx.message.reference,
+            ephemeral=True,
         )
 
     # Searching tags
