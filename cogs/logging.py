@@ -1,17 +1,17 @@
 import logging
 from datetime import datetime, timezone
 import time
-from typing import Union
 from urllib.parse import urlencode
 
 import discord
 from discord.ext import commands, tasks
-from discord.utils import format_dt, snowflake_time, time_snowflake
+from discord.utils import format_dt, time_snowflake
 from pymongo import UpdateOne
 import parsedatetime as pdt
 
 from helpers import checks
 from helpers.context import GuiduckContext
+from helpers.converters import FetchChannelOrThreadConverter
 
 
 class LogFlagConverter(commands.Converter):
@@ -39,6 +39,8 @@ class LogFlagConverter(commands.Converter):
 
 
 class LogFlags(commands.FlagConverter, case_insensitive=True):
+    channel: FetchChannelOrThreadConverter = commands.flag(description="The channel whose logs to show", default=None, positional=True)
+
     user: discord.Member | discord.User = commands.flag(description="Show logs of a specific user", default=None, aliases=("from",))
     before: LogFlagConverter = commands.flag(description="Filter logs before a specific message/time", default=None)
     after: LogFlagConverter = commands.flag(description="Filter logs after a specific message/time", default=None)
@@ -217,7 +219,6 @@ class Logging(commands.Cog):
     async def logs(
         self,
         ctx,
-        channel: Union[discord.TextChannel, discord.Thread, discord.VoiceChannel] = commands.CurrentChannel,
         *,
         flags: LogFlags,
     ):
@@ -237,6 +238,7 @@ class Logging(commands.Cog):
         You must have the Trial Moderator role to use this.
         """
 
+        channel = flags.channel or ctx.channel
         url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
 
         params = {}
