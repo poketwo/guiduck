@@ -94,10 +94,12 @@ class Levels(commands.Cog):
 
             roles = [message.guild.get_role(x) for x in ROLES[new_level]]
             await message.author.add_roles(*roles)
-            await self.bot.mongo.db.member.update_one(
-                {"_id": {"id": message.author.id, "guild_id": message.guild.id}},
+            u = await self.bot.mongo.db.member.update_one(
+                {"_id": {"id": message.author.id, "guild_id": message.guild.id}, "level": user.get("level", None)},
                 {"$inc": {"level": 1}},
             )
+            if not u.modified_count:
+                return
 
             msg = f"Congratulations {message.author.mention}, you are now level **{new_level}**!"
             for role in roles:
