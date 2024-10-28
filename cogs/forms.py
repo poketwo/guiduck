@@ -12,7 +12,10 @@ class SubmissionStatus(Enum):
     UNDER_REVIEW = 0
     REJECTED = 1
     ACCEPTED = 2
-    MARKED = 3
+    MARKED_ORANGE = 4
+    MARKED_YELLOW = 5
+    MARKED_BLUE = 3
+    MARKED_PURPLE = 6
 
 
 CHANNEL_ID = 888320631890931732
@@ -21,14 +24,20 @@ COLORS = {
     SubmissionStatus.UNDER_REVIEW.value: None,
     SubmissionStatus.REJECTED.value: discord.Color.red(),
     SubmissionStatus.ACCEPTED.value: discord.Color.green(),
-    SubmissionStatus.MARKED.value: discord.Color.blurple(),
+    SubmissionStatus.MARKED_ORANGE.value: discord.Color.orange(),
+    SubmissionStatus.MARKED_YELLOW.value: discord.Color.yellow(),
+    SubmissionStatus.MARKED_BLUE.value: discord.Color.blue(),
+    SubmissionStatus.MARKED_PURPLE.value: discord.Color.purple(),
 }
 
 TEXT = {
     SubmissionStatus.UNDER_REVIEW.value: "New Form Submission",
     SubmissionStatus.REJECTED.value: "Rejected",
     SubmissionStatus.ACCEPTED.value: "Accepted",
-    SubmissionStatus.MARKED.value: "Marked for Review",
+    SubmissionStatus.MARKED_ORANGE.value: "Marked for Review (Orange)",
+    SubmissionStatus.MARKED_YELLOW.value: "Marked for Review (Yellow)",
+    SubmissionStatus.MARKED_BLUE.value: "Marked for Review (Blue)",
+    SubmissionStatus.MARKED_PURPLE.value: "Marked for Review (Purple)",
 }
 
 
