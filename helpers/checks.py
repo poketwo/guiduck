@@ -18,6 +18,14 @@ def is_community_manager():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.COMMUNITY_MANAGER_ROLES))
 
 
+def is_bot_manager():
+    return commands.check_any(commands.is_owner(), commands.has_role(constants.BOT_MANAGER_ROLE))
+
+
+def is_server_manager():
+    return commands.check_any(commands.is_owner(), commands.has_role(constants.SERVER_MANAGER_ROLE))
+
+
 def is_moderator():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.MODERATOR_ROLES))
 
