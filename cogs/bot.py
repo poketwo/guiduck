@@ -48,6 +48,8 @@ class Bot(commands.Cog):
                 ephemeral=True,
             )
         elif isinstance(error, commands.BadFlagArgument):
+            if isinstance(error.original, commands.ConversionError):
+                return await ctx.send(error.original.original, ephemeral=True)
             await ctx.send(error.original, ephemeral=True)
         elif isinstance(error, commands.CheckFailure):
             await ctx.send(error, ephemeral=True)
