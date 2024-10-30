@@ -15,6 +15,8 @@ from helpers.poketwo import format_pokemon_details
 
 REFUND_CHANNEL_ID = 973239955784614008
 
+MANAGEMENT_LOGS_CHANNEL_ID = 1301202435380871230
+
 IV_FLAGS = "iv_hp", "iv_atk", "iv_defn", "iv_satk", "iv_sdef", "iv_spd"
 random_level = lambda ctx: max(1, min(int(random.normalvariate(20, 10)), 100))
 random_nature = lambda ctx: random.choice(constants.POKEMON_NATURES)
@@ -371,6 +373,21 @@ class PoketwoAdministration(commands.Cog):
         await refund.execute(self.bot)
         await self.save_refund(refund)
         await ctx.send(embed=refund.to_embed(self.bot))
+
+
+    @commands.hybrid_group(aliases=["manage", "management"])
+    @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
+    async def manager(self, ctx):
+        """Management commands
+
+        You must have the Server Manager or Bot Manager role to use this."""
+
+        await ctx.send_help(ctx.command)
+
+    @manager.command()
+    @checks.is_server_manager()
+    async def givecoins
+
 
 
 async def setup(bot):

@@ -4,6 +4,8 @@ from uuid import UUID
 
 import aiohttp
 
+from outline_api_wrapper.models.collection import Collection
+
 
 from .constants import DateFilter, Endpoint, Direction
 from .http import HTTPClient, RequestMethod
@@ -203,3 +205,35 @@ class Client:
             return []
         else:
             return [Document(doc_data) for doc_data in documents["data"]]
+
+    async def list_collections(
+        self,
+        *,
+        offset: Optional[int] = None,
+        limit: Optional[int] = 25,
+    ) -> List[DocumentSearchResult]:
+        """Search documents
+
+        Parameters
+        ----------
+        offset : Optional[int]
+            How many results to skip when searching. Useful for pagination.
+        limit : Optional[int] = 25
+            How many results to retrieve. Useful for pagination.
+        """
+
+        data = {}
+
+        if offset is not None:
+            data["offset"] = offset
+        if limit is not None:
+            data["limit"] = limit
+
+        try:
+            collections = await self.http_client.request(
+                RequestMethod.POST, Endpoint.LIST_COLLECTIONS, data=data, authentication=True
+            )
+        except (NotFound, BadRequest):
+            return []
+        else:
+            return [Collection(col_data) for col_data in collections["data"]]

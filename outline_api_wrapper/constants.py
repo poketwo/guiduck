@@ -25,3 +25,8 @@ class DateFilter(Enum):
 class Direction(Enum):
     ASCENDING = "ASC"
     DESCENDING = "DESC"
+
+
+class Permission(Enum):
+    READ = "read"
+    READ_WRITE = "read_write"
