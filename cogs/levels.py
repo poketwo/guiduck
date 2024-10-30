@@ -1,3 +1,4 @@
+import contextlib
 import itertools
 import random
 from collections import defaultdict
@@ -50,7 +51,9 @@ class Levels(commands.Cog):
         role_ids = {x.id for x in member.roles}
         if level_role_ids <= role_ids:
             return
-        await member.add_roles(*[discord.Object(x) for x in level_role_ids])
+
+        with contextlib.suppress(discord.NotFound):
+            await member.add_roles(*[discord.Object(x) for x in level_role_ids])
 
     @commands.Cog.listener()
     async def on_member_join(self, member):

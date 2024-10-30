@@ -27,6 +27,9 @@ class AutoLockThreads(commands.Cog):
     @tasks.loop(seconds=15)
     async def lock_threads(self):
         guild = self.bot.get_guild(constants.COMMUNITY_SERVER_ID)
+        if not guild:
+            return
+
         channel = guild.get_channel(1019656562119295098)
 
         for thread in channel.threads:

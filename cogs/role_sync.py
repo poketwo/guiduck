@@ -37,6 +37,9 @@ class RoleSync(commands.Cog):
 
     async def sync_all(self):
         guild = self.bot.get_guild(constants.COMMUNITY_SERVER_ID)
+        if not guild:
+            return
+
         for member in guild.members:
             await self.sync_member(member)
 

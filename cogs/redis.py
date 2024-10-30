@@ -8,6 +8,7 @@ class Redis(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.pool = None
+        self.poketwo_pool = None
         self.ready = False
         self._connect_task = self.bot.loop.create_task(self.connect())
 
