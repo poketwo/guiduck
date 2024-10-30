@@ -71,7 +71,7 @@ class Collection:
 
         self.name: str = data["name"]
         self.description: str = data["description"]
-        self.sort: dict = {"field": data["sort"]["field"], "direction": Direction(data["sort"]["direction"].upper())}  # TODO: dont upper
+        self.sort: dict = {"field": data["sort"]["field"], "direction": Direction(data["sort"]["direction"])}
         self.index: int = data["index"]
         self.color: int = int(data["color"][1:], 16)  # [1:] because it starts with #
         self.icon: str = data["icon"]

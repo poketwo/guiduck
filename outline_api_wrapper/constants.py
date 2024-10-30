@@ -23,8 +23,8 @@ class DateFilter(Enum):
 
 
 class Direction(Enum):
-    ASCENDING = "ASC"
-    DESCENDING = "DESC"
+    ASCENDING = "asc"
+    DESCENDING = "desc"
 
 
 class Permission(Enum):
