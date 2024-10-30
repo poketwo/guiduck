@@ -13,7 +13,7 @@ from cogs.mongo import PrivateVariableNotFound
 from data.models import Species
 from helpers import checks, constants
 from helpers.converters import SpeciesConverter
-from helpers.outline.converters import ActivityDateArgs, MonthConverter
+from helpers.converters import ActivityDateArgs, MonthConverter
 from helpers.poketwo import format_pokemon_details
 from helpers.utils import FetchUserConverter
 
