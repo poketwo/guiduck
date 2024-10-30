@@ -12,6 +12,7 @@ from data.models import Species
 from helpers import checks, constants
 from helpers.converters import SpeciesConverter
 from helpers.poketwo import format_pokemon_details
+from helpers.utils import FetchUserConverter
 
 REFUND_CHANNEL_ID = 973239955784614008
 
@@ -374,6 +375,20 @@ class PoketwoAdministration(commands.Cog):
         await self.save_refund(refund)
         await ctx.send(embed=refund.to_embed(self.bot))
 
+    def logs_embed(self, user: discord.User, target: str, title: str, description: str, notes: Optional[str] = None):
+        embed = discord.Embed(
+            title=f"{title} {target} (ID: {target.id})",
+            description=description,
+            timestamp=datetime.now(timezone.utc),
+            color=discord.Color.blurple(),
+        )
+        embed.set_author(name=f"{user} (ID: {user.id})", icon_url=user.display_avatar.url)
+        embed.set_thumbnail(url=target.display_avatar.url)
+
+        if notes is not None:
+            embed.add_field(name="Notes", value=notes)
+
+        return embed
 
     @commands.hybrid_group(aliases=["manage", "management"])
     @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
@@ -384,10 +399,22 @@ class PoketwoAdministration(commands.Cog):
 
         await ctx.send_help(ctx.command)
 
-    @manager.command()
-    @checks.is_server_manager()
-    async def givecoins
+    @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
+    @manager.command(aliases=("givecoins", "ac", "gc"))
+    async def addcoins(self, ctx, user: FetchUserConverter, amt: int, *, notes: Optional[str] = None):
+        """Add to a user's balance."""
 
+        await self.bot.mongo.poketwo_db.member.update_one({"_id": user.id}, {"$inc": {"balance": amt}})
+        await self.bot.poketwo_redis.hdel(f"db:member", user.id)
+
+        await ctx.send(f"Gave **{user}** {amt:,} Pokécoins.")
+
+        channel = self.bot.get_channel(MANAGEMENT_LOGS_CHANNEL_ID)
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label="Jump", url=ctx.message.jump_url))
+        await channel.send(
+            embed=self.logs_embed(ctx.author, user, "Gave pokécoins to", f"**Pokécoins:** {amt}", notes), view=view
+        )
 
 
 async def setup(bot):
