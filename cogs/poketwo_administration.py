@@ -9,11 +9,10 @@ import discord
 from bson.objectid import ObjectId
 from discord.ext import commands
 
-from cogs.mongo import PrivateVariableNotFound
 from data.models import Species
 from helpers import checks, constants
 from helpers.converters import SpeciesConverter
-from helpers.converters import ActivityDateArgs, MonthConverter
+from helpers.converters import ActivityArgs
 from helpers.poketwo import format_pokemon_details
 from helpers.utils import FetchUserConverter
 
@@ -432,35 +431,36 @@ class PoketwoAdministration(commands.Cog):
             embed=self.logs_embed(ctx.author, user, "Gave pokécoins to", f"**Pokécoins:** {amt}", notes), view=view
         )
 
-    @manager.command()
+    @manager.command(usage="[role=Moderator] [users: USER1 USER2 ...] [month: MONTH] [year: YEAR]")
     @checks.is_server_manager()
     @checks.staff_categories_only()
     async def activity(
         self,
         ctx,
-        role_or_user: Optional[discord.Role | discord.Member | discord.User] = None,
         *,
-        date: ActivityDateArgs,
+        args: ActivityArgs,
     ):
         """Get ticket and bot-logs activity"""
 
-        role_or_user = role_or_user or next(
-            (r for r_id in constants.MODERATOR_ROLES[-2:] if (r := ctx.guild.get_role(r_id))), None
-        )
-        if not role_or_user:
-            return await ctx.send("Role/user not found.")
+        role = args.role
+        if not (role or args.users):
+            role = next(
+                (r for r_id in constants.MODERATOR_ROLES[-2:] if (r := ctx.guild.get_role(r_id))), None
+            )
+            if not role:
+                return await ctx.send("Role/users not found.")
 
-        if isinstance(role_or_user, discord.Role):
-            members = role_or_user.members
-        elif isinstance(role_or_user, (discord.Member, discord.User)):
-            members = [role_or_user]
+        if role:
+            members = role.members
+        elif args.users:
+            members = args.users
 
         now = discord.utils.utcnow()
 
-        from_month = date.month
+        from_month = args.month
         to_month = now.month
 
-        from_year = date.year if date.year is not None else now.year
+        from_year = args.year if args.year is not None else now.year
         to_year = from_year
 
         if from_month:
@@ -512,14 +512,14 @@ class PoketwoAdministration(commands.Cog):
         msgs = [
             dedent(
                 f"""
-            ### Number of Bot Logs And Tickets By {role_or_user.mention}
-            No. of actions in #bot-logs and tickets (both SS and OS, *latest agent only*) by each {role_or_user.name} in {from_dt:%B}
-            > **From**: {discord.utils.format_dt(from_dt)}
-            > **To**: {discord.utils.format_dt(to_dt)}
-            > **Min Cut-off**: {min_total}
-            > **Formula**: `(bot-logs * {bnet} + tickets * {tnet}) * 100`
-            > **Max Amount**: {max_amount}
-            """
+                ### Number of Bot Logs And Tickets By {role.mention if role else f'{len(args.users)} Users'}
+                No. of actions in #bot-logs and tickets (both SS and OS, *latest agent only*) by each {role.name if role else 'user'} in {from_dt:%B}
+                > **From**: {discord.utils.format_dt(from_dt)}
+                > **To**: {discord.utils.format_dt(to_dt)}
+                > **Min Cut-off**: {min_total}
+                > **Formula**: `(bot-logs * {bnet} + tickets * {tnet}) * 100`
+                > **Max Amount**: {max_amount}
+                """
             ),
             f"""{"`"*3}py\n{table}\n{"`"*3}""",
         ]

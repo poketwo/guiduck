@@ -1,9 +1,10 @@
 import contextlib
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 import discord
 from discord.ext import commands
 
+from helpers import constants
 from helpers.context import GuiduckContext
 
 
@@ -62,9 +63,54 @@ class MonthConverter(commands.Converter):
         return dt.month
 
 
-class ActivityDateArgs(commands.FlagConverter):
+class GreedyMemberOrUserConverter(commands.Converter):
+    async def convert(self, ctx: GuiduckContext, argument: str) -> List[discord.User | discord.Member]:
+        words = argument.split()
+
+        results = []
+        start = 0
+        end = 1
+        while start < len(words):
+            sub = " ".join(words[start:end])
+
+            result = None
+            try:
+                result = await commands.MemberConverter().convert(ctx, sub)
+            except commands.MemberNotFound:
+                try:
+                    result = await commands.UserConverter().convert(ctx, sub)
+                except commands.UserNotFound:
+                    pass
+
+            if result:
+                results.append(result)
+                start = end
+                end += 1
+            else:
+                if end >= len(words):
+                    start += 1
+                    end = start + 1
+                else:
+                    end += 1
+
+        return results
+
+
+class ActivityArgs(commands.FlagConverter):
     """Date flags for activity command"""
 
+    role: Optional[discord.Role] = commands.flag(
+        positional=True,
+        description="The role whose members' activity to show",
+        max_args=1,
+        default=None,
+    )
+    users: GreedyMemberOrUserConverter = commands.flag(
+        aliases=("user", "u", "members", "member"),
+        description="The users whose activities to show",
+        max_args=1,
+        default=None,
+    )
     month: MonthConverter = commands.flag(
         aliases=("m", "mo"),
         description="The month",
