@@ -2,15 +2,18 @@ import collections
 import random
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from textwrap import dedent
 from typing import Any, Dict, List, Literal, Optional
 
 import discord
 from bson.objectid import ObjectId
 from discord.ext import commands
 
+from cogs.mongo import PrivateVariableNotFound
 from data.models import Species
 from helpers import checks, constants
 from helpers.converters import SpeciesConverter
+from helpers.outline.converters import ActivityDateArgs, MonthConverter
 from helpers.poketwo import format_pokemon_details
 from helpers.utils import FetchUserConverter
 
@@ -30,6 +33,19 @@ def update(d, u):
         else:
             d[k] = v
     return d
+
+
+def tabulate(data: List[List[str]]):
+    """Function to tabulate data. The data"""
+
+    ncols = len(data[0])
+    header_lens = [max([len(str(d[i])) for d in data]) for i in range(ncols)]
+
+    row_format = "| " + " | ".join(["{:<%s}" % header_lens[i] for i in range(ncols)]) + " |"
+    border = "+-" + "-+-".join([f"{'':-<{hl}}" for hl in header_lens]) + "-+"
+
+    table = [border, row_format.format(*data[0]), border, *[row_format.format(*row) for row in data[1:]], border]
+    return "\n".join(table)
 
 
 class PokemonRefundFlags(commands.FlagConverter, case_insensitive=True):
@@ -399,8 +415,8 @@ class PoketwoAdministration(commands.Cog):
 
         await ctx.send_help(ctx.command)
 
-    @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
     @manager.command(aliases=("givecoins", "ac", "gc"))
+    @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
     async def addcoins(self, ctx, user: FetchUserConverter, amt: int, *, notes: Optional[str] = None):
         """Add to a user's balance."""
 
@@ -415,6 +431,108 @@ class PoketwoAdministration(commands.Cog):
         await channel.send(
             embed=self.logs_embed(ctx.author, user, "Gave pokécoins to", f"**Pokécoins:** {amt}", notes), view=view
         )
+
+    @manager.command()
+    @checks.is_server_manager()
+    @checks.staff_categories_only()
+    async def activity(
+        self,
+        ctx,
+        role_or_user: Optional[discord.Role | discord.Member | discord.User] = None,
+        *,
+        date: ActivityDateArgs,
+    ):
+        """Get ticket and bot-logs activity"""
+
+        role_or_user = role_or_user or next(
+            (r for r_id in constants.MODERATOR_ROLES[-2:] if (r := ctx.guild.get_role(r_id))), None
+        )
+        if not role_or_user:
+            return await ctx.send("Role/user not found.")
+
+        if isinstance(role_or_user, discord.Role):
+            members = role_or_user.members
+        elif isinstance(role_or_user, (discord.Member, discord.User)):
+            members = [role_or_user]
+
+        now = discord.utils.utcnow()
+
+        from_month = date.month
+        to_month = now.month
+
+        from_year = date.year if date.year is not None else now.year
+        to_year = from_year
+
+        if from_month:
+            # If user passed in a month value, should check logs from that month
+            to_month = from_month + 1
+            if to_month > 12:
+                # Incase until_month exceeds 12, increase year and loop it forward
+                to_year += 1
+                to_month = to_month - from_month
+        else:
+            # If user passed in a month value, should check logs from previous month
+            from_month = now.month - 1
+            if from_month < 1:
+                # Incase month goes below 1, decrease year and loop it backwards
+                from_year -= 1
+                from_month = 12
+
+        from_dt = now.replace(year=from_year, month=from_month, day=1, hour=0, minute=0, second=0)
+        to_dt = from_dt.replace(year=to_year, month=to_month)
+        _filter = {"$gte": from_dt, "$lt": to_dt}
+
+        cols = await self.bot.mongo.fetch_private_variable("activity_columns")
+        bnet = await self.bot.mongo.fetch_private_variable("activity_bot_logs_net")
+        tnet = await self.bot.mongo.fetch_private_variable("activity_tickets_net")
+        max_amount = await self.bot.mongo.fetch_private_variable("activity_max_amount")
+        min_total = await self.bot.mongo.fetch_private_variable("activity_min_total")
+
+        net = lambda b, t: b * bnet + t * tnet
+        data = []
+        for member in members:
+            tickets = await self.bot.mongo.db.ticket.count_documents({"agent_id": member.id, "closed_at": _filter})
+            bot_logs = await self.bot.mongo.db.action.count_documents({"user_id": member.id, "created_at": _filter})
+            total = net(bot_logs, tickets)
+
+            raw = round(total * 100)
+            amount = min(max_amount, raw if total >= min_total else 0)
+
+            data.append([member.name, bot_logs, tickets, total, raw, amount])
+
+        data.sort(key=lambda t: t[4], reverse=True)
+
+        if len(members) > 1:
+            data.append(["" for _ in cols])
+            data.append(
+                ["TOTAL", *[sum([d[i] if not isinstance(d[i], str) else 0 for d in data]) for i in range(1, len(cols))]]
+            )
+
+        table = tabulate([cols, *data])
+        msgs = [
+            dedent(
+                f"""
+            ### Number of Bot Logs And Tickets By {role_or_user.mention}
+            No. of actions in #bot-logs and tickets (both SS and OS, *latest agent only*) by each {role_or_user.name} in {from_dt:%B}
+            > **From**: {discord.utils.format_dt(from_dt)}
+            > **To**: {discord.utils.format_dt(to_dt)}
+            > **Min Cut-off**: {min_total}
+            > **Formula**: `(bot-logs * {bnet} + tickets * {tnet}) * 100`
+            > **Max Amount**: {max_amount}
+            """
+            ),
+            f"""{"`"*3}py\n{table}\n{"`"*3}""",
+        ]
+
+        if len("".join(msgs)) < constants.CONTENT_CHAR_LIMIT:
+            msgs = ["".join(msgs)]
+
+        og = ctx
+        for msg in msgs:
+            og = await og.reply(
+                msg,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
 
 
 async def setup(bot):

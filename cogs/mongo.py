@@ -1,9 +1,15 @@
+from dataclasses import MISSING
 from datetime import timezone
+from typing import Any, Optional
 
 import discord
 from bson.codec_options import CodecOptions
 from discord.ext import commands
 from motor.motor_asyncio import AsyncIOMotorClient
+
+
+class PrivateVariableNotFound(Exception):
+    pass
 
 
 class Mongo(commands.Cog):
@@ -17,6 +23,9 @@ class Mongo(commands.Cog):
         )
         self.poketwo_client = AsyncIOMotorClient(bot.config.POKETWO_DATABASE_URI, io_loop=bot.loop)
         self.poketwo_db = self.poketwo_client[bot.config.POKETWO_DATABASE_NAME]
+
+    async def cog_load(self):
+        await self.db.private_variable.create_index([("name", 1)], unique=True)
 
     async def reserve_id(self, name, reserve=1):
         result = await self.db.counter.find_one_and_update({"_id": name}, {"$inc": {"next": reserve}}, upsert=True)
@@ -32,6 +41,17 @@ class Mongo(commands.Cog):
         )
         await self.bot.poketwo_redis.hdel(f"db:member", member.id)
         return result["next_idx"]
+
+    async def fetch_private_variable(self, name: str, default: Optional[Any] = MISSING) -> Any:
+        doc = await self.db.private_variable.find_one({"name": name})
+        if not doc:
+            if default is MISSING:
+                raise PrivateVariableNotFound(
+                    f"No private variable with name '{name}' found, please ask a Developer to set it in the 'private_variable' collection first."
+                )
+            else:
+                return default
+        return doc["value"]
 
 
 async def setup(bot):
