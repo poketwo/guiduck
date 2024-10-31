@@ -111,6 +111,13 @@ class ActivityArgs(commands.FlagConverter):
         max_args=1,
         default=None,
     )
+    show_all: Optional[bool] = commands.flag(
+        name="all",
+        aliases=("all-agents", "all-users", "all-members"),
+        description="Whether or not to show all agents in the database regardless of role. Only usable with the role flag.",
+        max_args=1,
+        default=False,
+    )
     month: MonthConverter = commands.flag(
         aliases=("m", "mo"),
         description="The month",

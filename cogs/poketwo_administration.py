@@ -442,18 +442,7 @@ class PoketwoAdministration(commands.Cog):
     ):
         """Get ticket and bot-logs activity"""
 
-        role = args.role
-        if not (role or args.users):
-            role = next(
-                (r for r_id in constants.MODERATOR_ROLES[-2:] if (r := ctx.guild.get_role(r_id))), None
-            )
-            if not role:
-                return await ctx.send("Role/users not found.")
-
-        if role:
-            members = role.members
-        elif args.users:
-            members = args.users
+        # Timeframe determination
 
         now = discord.utils.utcnow()
 
@@ -482,6 +471,34 @@ class PoketwoAdministration(commands.Cog):
         to_dt = from_dt.replace(year=to_year, month=to_month)
         _filter = {"$gte": from_dt, "$lt": to_dt}
 
+        # Members determination
+
+        role = args.role
+        if not (role or args.users or args.show_all):
+            role = next((r for r_id in constants.MODERATOR_ROLES[-2:] if (r := ctx.guild.get_role(r_id))), None)
+
+        members = []
+        if role:
+            members = role.members
+        elif args.users:
+            members = args.users
+
+        if args.show_all:
+            if args.users:
+                raise ValueError("Can't use the 'all' flag with the 'users' flag!")
+
+            bot_logs_member_ids = set(await self.bot.mongo.db.action.distinct("user_id", {"created_at": _filter}))
+            tickets_member_ids = set(await self.bot.mongo.db.ticket.distinct("agent_id", {"closed_at": _filter}))
+            members.extend(
+                [
+                    self.bot.get_user(mid) or await self.bot.fetch_user(mid)
+                    for mid in bot_logs_member_ids | tickets_member_ids
+                ]
+            )
+
+        if not members:
+            return await ctx.send("Role/users not found.")
+
         cols = await self.bot.mongo.fetch_private_variable("activity_columns")
         bnet = await self.bot.mongo.fetch_private_variable("activity_bot_logs_net")
         tnet = await self.bot.mongo.fetch_private_variable("activity_tickets_net")
@@ -490,7 +507,7 @@ class PoketwoAdministration(commands.Cog):
 
         net = lambda b, t: b * bnet + t * tnet
         data = []
-        for member in members:
+        for member in set(members):
             tickets = await self.bot.mongo.db.ticket.count_documents({"agent_id": member.id, "closed_at": _filter})
             bot_logs = await self.bot.mongo.db.action.count_documents({"user_id": member.id, "created_at": _filter})
             total = net(bot_logs, tickets)
@@ -498,7 +515,16 @@ class PoketwoAdministration(commands.Cog):
             raw = round(total * 100)
             amount = min(max_amount, raw if total >= min_total else 0)
 
-            data.append([member.name, bot_logs, tickets, total, raw, amount])
+            data.append(
+                [
+                    member.name + ("" if role and member in role.members else "*"),
+                    bot_logs,
+                    tickets,
+                    total,
+                    raw,
+                    amount,
+                ]
+            )
 
         data.sort(key=lambda t: t[4], reverse=True)
 
@@ -512,8 +538,8 @@ class PoketwoAdministration(commands.Cog):
         msgs = [
             dedent(
                 f"""
-                ### Number of Bot Logs And Tickets By {role.mention if role else f'{len(args.users)} Users'}
-                No. of actions in #bot-logs and tickets (both SS and OS, *latest agent only*) by each {role.name if role else 'user'} in {from_dt:%B}
+                ### Number of Bot Logs And Tickets By {role.mention if role else members[0].mention if len(members) == 1 else f'{len(members)} Users'}
+                No. of actions in #bot-logs and tickets (both SS and OS, *latest agent only*) by {members[0].name if len(members) == 1 else f"each user"} in {from_dt:%B}
                 > **From**: {discord.utils.format_dt(from_dt)}
                 > **To**: {discord.utils.format_dt(to_dt)}
                 > **Min Cut-off**: {min_total}
