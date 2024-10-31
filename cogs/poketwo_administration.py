@@ -431,6 +431,23 @@ class PoketwoAdministration(commands.Cog):
             embed=self.logs_embed(ctx.author, user, "Gave pokécoins to", f"**Pokécoins:** {amt}", notes), view=view
         )
 
+    @manager.command(aliases=("giveshard", "as", "gs"))
+    @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
+    async def addshards(self, ctx, user: FetchUserConverter, amt: int, *, notes: Optional[str] = None):
+        """Add to a user's shard balance."""
+
+        await self.bot.mongo.poketwo_db.member.update_one({"_id": user.id}, {"$inc": {"premium_balance": amt}})
+        await self.bot.poketwo_redis.hdel(f"db:member", user.id)
+
+        await ctx.send(f"Gave **{user}** {amt:,} shards.")
+
+        channel = self.bot.get_channel(MANAGEMENT_LOGS_CHANNEL_ID)
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label="Jump", url=ctx.message.jump_url))
+        await channel.send(
+            embed=self.logs_embed(ctx.author, user, "Gave shards to", f"**Shards:** {amt}", notes), view=view
+        )
+
     @manager.command(usage="[role=Moderator] [users: USER1 USER2 ...] [month: MONTH] [year: YEAR]")
     @checks.is_server_manager()
     @checks.staff_categories_only()
