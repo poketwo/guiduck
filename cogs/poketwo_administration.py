@@ -405,7 +405,7 @@ class PoketwoAdministration(commands.Cog):
 
         return embed
 
-    @commands.hybrid_group(aliases=["manage", "management"])
+    @commands.hybrid_group(aliases=["manage", "management"], invoke_without_command=True)
     @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
     async def manager(self, ctx):
         """Management commands
