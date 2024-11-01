@@ -13,6 +13,7 @@ from data.models import Species
 from helpers import checks, constants
 from helpers.converters import SpeciesConverter
 from helpers.converters import ActivityArgs
+from helpers.outline.decorators import with_typing
 from helpers.poketwo import format_pokemon_details
 from helpers.utils import FetchUserConverter
 
@@ -451,6 +452,7 @@ class PoketwoAdministration(commands.Cog):
     @manager.command(usage="[role=Moderator] [users: USER1 USER2 ...] [month: MONTH] [year: YEAR] [all-users: yes/no]")
     @checks.staff_categories_only()
     @checks.is_server_manager()
+    @with_typing()
     async def activity(
         self,
         ctx,
