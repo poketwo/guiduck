@@ -448,7 +448,7 @@ class PoketwoAdministration(commands.Cog):
             embed=self.logs_embed(ctx.author, user, "Gave shards to", f"**Shards:** {amt}", notes), view=view
         )
 
-    @manager.command(usage="[role=Moderator] [users: USER1 USER2 ...] [month: MONTH] [year: YEAR]")
+    @manager.command(usage="[role=Moderator] [users: USER1 USER2 ...] [month: MONTH] [year: YEAR] [all-users: yes/no]")
     @checks.staff_categories_only()
     @checks.is_server_manager()
     async def activity(
