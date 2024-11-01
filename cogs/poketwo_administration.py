@@ -551,17 +551,20 @@ class PoketwoAdministration(commands.Cog):
                 if not args.show_ids
                 else str(member.id)
             )
-            if tickets or bot_logs:
-                data.append(
-                    [
-                        name + ("*" if role and member not in role.members else ""),
-                        bot_logs,
-                        tickets,
-                        total,
-                        raw,
-                        amount,
-                    ]
-                )
+            ex_member = role and member not in role.members
+            if ex_member and not (tickets or bot_logs):
+                continue
+
+            data.append(
+                [
+                    name + ("*" if ex_member else ""),
+                    bot_logs,
+                    tickets,
+                    total,
+                    raw,
+                    amount,
+                ]
+            )
 
         data.sort(key=lambda t: t[4], reverse=True)
 
