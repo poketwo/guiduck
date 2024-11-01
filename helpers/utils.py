@@ -129,3 +129,21 @@ def get_substring_matches(substring: str, strings: List[str]) -> List[str]:
 
     matches.sort(key=lambda c: c.index(substring))
     return matches
+
+
+def as_line_chunks_by_len(text: str, char_limit: int):
+    """Split a string into chunks by line based on the character limit"""
+
+    chunks = []
+
+    chunk = []
+    for line in text.splitlines():
+        if len("\n".join(chunk + [line])) > char_limit:
+            chunks.append("\n".join(chunk))
+            chunk.clear()
+        chunk.append(line)
+
+    if chunk:
+        chunks.append("\n".join(chunk))
+
+    return chunks

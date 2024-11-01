@@ -15,7 +15,7 @@ from helpers.converters import SpeciesConverter
 from helpers.converters import ActivityArgs
 from helpers.outline.decorators import with_typing
 from helpers.poketwo import format_pokemon_details
-from helpers.utils import FetchUserConverter
+from helpers.utils import FetchUserConverter, as_line_chunks_by_len
 
 REFUND_CHANNEL_ID = 973239955784614008
 
@@ -554,7 +554,6 @@ class PoketwoAdministration(commands.Cog):
             )
 
         table = tabulate([cols, *data])
-        NL = "\n"
         msgs = [
             dedent(
                 f"""
@@ -566,7 +565,10 @@ class PoketwoAdministration(commands.Cog):
                 > **Formula**: `(bot-logs * {bnet} + tickets * {tnet}) * 100`
                 > **Max Amount**: {max_amount}"""
             ),
-            *[f"""{"`"*3}py\n{NL.join(lines)}\n{"`"*3}""" for lines in discord.utils.as_chunks(table.split("\n"), 25)],
+            *[
+                f"""{"`"*3}py\n{chunk}\n{"`"*3}"""
+                for chunk in as_line_chunks_by_len(table, constants.CONTENT_CHAR_LIMIT - 10)
+            ],  # - 10 because of the code block
         ]
 
         if len("\n".join(msgs)) < constants.CONTENT_CHAR_LIMIT:
