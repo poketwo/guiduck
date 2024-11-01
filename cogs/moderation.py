@@ -778,6 +778,9 @@ class Moderation(commands.Cog):
         else:
             action_cls = Untimeout
 
+            if not target.is_timed_out():
+                return await ctx.send("This member is not timed out or muted.")
+
         action = action_cls(
             target=target,
             user=ctx.author,
