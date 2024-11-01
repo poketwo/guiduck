@@ -340,15 +340,17 @@ cls_dict = {
 
 class BanConverter(commands.Converter):
     async def convert(self, ctx, arg):
+        mem = await commands.UserConverter().convert(ctx, arg)
+
         try:
-            return await ctx.guild.fetch_ban(discord.Object(id=int(arg)))
+            return await ctx.guild.fetch_ban(mem)
         except discord.NotFound:
             raise commands.BadArgument("This member is not banned.")
         except ValueError:
             pass
 
-        bans = await ctx.guild.bans()
-        ban = discord.utils.find(lambda u: str(u.user) == arg, bans)
+        bans = [b async for b in ctx.guild.bans()]
+        ban = discord.utils.get(bans, user=mem)
         if ban is None:
             raise commands.BadArgument("This member is not banned.")
         return ban
