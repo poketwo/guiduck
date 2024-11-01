@@ -112,8 +112,8 @@ class ActivityArgs(commands.FlagConverter):
         default=None,
     )
     show_all: Optional[bool] = commands.flag(
-        name="all",
-        aliases=("all-agents", "all-users", "all-members"),
+        name="all-users",
+        aliases=("all", "all-agents", "all-members"),
         description="Whether or not to show all agents in the database regardless of role",
         max_args=1,
         default=False,
