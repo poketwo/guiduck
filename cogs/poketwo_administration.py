@@ -530,22 +530,30 @@ class PoketwoAdministration(commands.Cog):
         data = []
         for member in set(members):
             tickets = await self.bot.mongo.db.ticket.count_documents({"agent_id": member.id, "closed_at": _filter})
-            bot_logs = await self.bot.mongo.db.action.count_documents({"user_id": member.id, "created_at": _filter})
+            bot_logs = await self.bot.mongo.db.action.count_documents(
+                {"user_id": member.id, "created_at": _filter}
+                | (
+                    {"type": {"$nin": ["untimeout", "unmute", "trading_unmute", "unban"]}}
+                    if member == self.bot.user
+                    else {}
+                )
+            )
             total = net(bot_logs, tickets)
 
             raw = round(total * 100)
             amount = min(max_amount, raw if total >= min_total else 0)
 
-            data.append(
-                [
-                    member.name + ("" if role and member in role.members else "*"),
-                    bot_logs,
-                    tickets,
-                    total,
-                    raw,
-                    amount,
-                ]
-            )
+            if tickets or bot_logs:
+                data.append(
+                    [
+                        member.name + ("" if role and member in role.members else "*"),
+                        bot_logs,
+                        tickets,
+                        total,
+                        raw,
+                        amount,
+                    ]
+                )
 
         data.sort(key=lambda t: t[4], reverse=True)
 
