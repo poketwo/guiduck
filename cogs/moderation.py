@@ -861,6 +861,9 @@ class Moderation(commands.Cog):
         You must have the Trial Moderator role to use this.
         """
 
+        if not discord.utils.get(target.roles, name="Trading Muted"):
+            return await ctx.send("This member is not trading muted.")
+
         action = TradingUnmute(
             target=target,
             user=ctx.author,
