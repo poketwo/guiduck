@@ -449,7 +449,9 @@ class PoketwoAdministration(commands.Cog):
             embed=self.logs_embed(ctx.author, user, "Gave shards to", f"**Shards:** {amt}", notes), view=view
         )
 
-    @manager.command(usage="[role=Moderator] [users: USER1 USER2 ...] [month: MONTH] [year: YEAR] [all-users: yes/no]")
+    @manager.command(
+        usage="[role=Moderator] [users: USER1 USER2 ...] [month: MONTH] [year: YEAR] [all-users: yes/no] [show-ids: yes/no]"
+    )
     @checks.staff_categories_only()
     @checks.is_server_manager()
     @with_typing()
@@ -544,7 +546,11 @@ class PoketwoAdministration(commands.Cog):
             amount = min(max_amount, raw if total >= min_total else 0)
 
             MAX_NAME_LENGTH = 13
-            name = member.name[:MAX_NAME_LENGTH] + ("..." if len(member.name) > MAX_NAME_LENGTH else "")
+            name = (
+                (member.name[:MAX_NAME_LENGTH] + ("..." if len(member.name) > MAX_NAME_LENGTH else ""))
+                if not args.show_ids
+                else str(member.id)
+            )
             if tickets or bot_logs:
                 data.append(
                     [

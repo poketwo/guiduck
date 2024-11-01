@@ -118,6 +118,13 @@ class ActivityArgs(commands.FlagConverter):
         max_args=1,
         default=False,
     )
+    show_ids: Optional[bool] = commands.flag(
+        name="show-ids",
+        aliases=("ids", "id", "show-id"),
+        description="Whether or not to show user IDs instead of names.",
+        max_args=1,
+        default=False,
+    )
     month: MonthConverter = commands.flag(
         aliases=("m", "mo"),
         description="The month",
