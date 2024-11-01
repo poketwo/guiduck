@@ -518,11 +518,13 @@ class PoketwoAdministration(commands.Cog):
         if not members:
             return await ctx.send("Role/users not found.")
 
-        cols = await self.bot.mongo.fetch_private_variable("activity_columns")
-        bnet = await self.bot.mongo.fetch_private_variable("activity_bot_logs_net")
-        tnet = await self.bot.mongo.fetch_private_variable("activity_tickets_net")
-        max_amount = await self.bot.mongo.fetch_private_variable("activity_max_amount")
-        min_total = await self.bot.mongo.fetch_private_variable("activity_min_total")
+        priv_vars = await self.bot.mongo.fetch_private_variable("activity")
+
+        cols = priv_vars["columns"]
+        bnet = priv_vars["bot_logs_net"]
+        tnet = priv_vars["tickets_net"]
+        max_amount = priv_vars["max_amount"]
+        min_total = priv_vars["min_total"]
 
         net = lambda b, t: b * bnet + t * tnet
         data = []
