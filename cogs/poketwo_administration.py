@@ -449,8 +449,8 @@ class PoketwoAdministration(commands.Cog):
         )
 
     @manager.command(usage="[role=Moderator] [users: USER1 USER2 ...] [month: MONTH] [year: YEAR]")
-    @checks.is_server_manager()
     @checks.staff_categories_only()
+    @checks.is_server_manager()
     async def activity(
         self,
         ctx,

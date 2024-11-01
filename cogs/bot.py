@@ -53,6 +53,8 @@ class Bot(commands.Cog):
             if isinstance(error.original, commands.ConversionError):
                 return await ctx.send(error.original.original, ephemeral=True)
             await ctx.send(error.original, ephemeral=True)
+        elif isinstance(error, commands.CheckAnyFailure):
+            await ctx.send(error.errors[-1], ephemeral=True)
         elif isinstance(error, commands.CheckFailure):
             await ctx.send(error, ephemeral=True)
         elif isinstance(error, commands.UserInputError):
