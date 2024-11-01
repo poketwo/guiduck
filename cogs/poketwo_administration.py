@@ -534,7 +534,7 @@ class PoketwoAdministration(commands.Cog):
 
             data.append(
                 [
-                    member.name + ("*" if role and member not in role.members else ""),
+                    member.name + ("" if role and member in role.members else "*"),
                     bot_logs,
                     tickets,
                     total,
@@ -552,6 +552,7 @@ class PoketwoAdministration(commands.Cog):
             )
 
         table = tabulate([cols, *data])
+        NL = "\n"
         msgs = [
             dedent(
                 f"""
@@ -561,19 +562,18 @@ class PoketwoAdministration(commands.Cog):
                 > **To**: {discord.utils.format_dt(to_dt)}
                 > **Min Cut-off**: {min_total}
                 > **Formula**: `(bot-logs * {bnet} + tickets * {tnet}) * 100`
-                > **Max Amount**: {max_amount}
-                """
+                > **Max Amount**: {max_amount}"""
             ),
-            f"""{"`"*3}py\n{table}\n{"`"*3}""",
+            *[f"""{"`"*3}py\n{NL.join(lines)}\n{"`"*3}""" for lines in discord.utils.as_chunks(table.split("\n"), 25)],
         ]
 
-        if len("".join(msgs)) < constants.CONTENT_CHAR_LIMIT:
-            msgs = ["".join(msgs)]
+        if len("\n".join(msgs)) < constants.CONTENT_CHAR_LIMIT:
+            msgs = ["\n".join(msgs)]
 
-        og = ctx
-        for msg in msgs:
-            og = await og.reply(
+        for i, msg in enumerate(msgs):
+            await (ctx.reply if i == 0 else ctx.send)(
                 msg,
+                mention_author=True,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
 
