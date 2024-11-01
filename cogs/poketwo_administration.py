@@ -450,7 +450,7 @@ class PoketwoAdministration(commands.Cog):
         )
 
     @manager.command(
-        usage="[role=Moderator] [users: USER1 USER2 ...] [month: MONTH] [year: YEAR] [all-users: yes/no] [show-ids: yes/no]"
+        usage="[role: ROLE=Moderator] [users: USER1 USER2 ...] [month: MONTH=Previous] [year: YEAR=Current] [all-users: yes/no=no] [show-ids: yes/no=no]"
     )
     @checks.staff_categories_only()
     @checks.is_server_manager()
