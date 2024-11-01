@@ -543,10 +543,12 @@ class PoketwoAdministration(commands.Cog):
             raw = round(total * 100)
             amount = min(max_amount, raw if total >= min_total else 0)
 
+            MAX_NAME_LENGTH = 13
+            name = member.name[:MAX_NAME_LENGTH] + ("..." if len(member.name) > MAX_NAME_LENGTH else "")
             if tickets or bot_logs:
                 data.append(
                     [
-                        member.name + ("" if role and member in role.members else "*"),
+                        name + ("" if role and member in role.members else "*"),
                         bot_logs,
                         tickets,
                         total,
