@@ -100,7 +100,6 @@ class ActivityArgs(commands.FlagConverter):
     """Date flags for activity command"""
 
     role: Optional[discord.Role] = commands.flag(
-        positional=True,
         description="The role whose members' activity to show",
         max_args=1,
         default=None,
