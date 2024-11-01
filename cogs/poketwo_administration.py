@@ -534,7 +534,7 @@ class PoketwoAdministration(commands.Cog):
 
             data.append(
                 [
-                    member.name + ("" if role and member in role.members else "*"),
+                    member.name + ("*" if role and member not in role.members else ""),
                     bot_logs,
                     tickets,
                     total,
