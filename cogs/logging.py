@@ -296,7 +296,7 @@ class Logging(commands.Cog):
 
     @logs.command()
     @commands.guild_only()
-    @checks.is_community_manager()
+    @checks.is_server_manager()
     async def restrict(self, ctx, channel: discord.TextChannel | discord.Thread | discord.VoiceChannel = None):
         """Restricts the logs for a channel to Admins.
 

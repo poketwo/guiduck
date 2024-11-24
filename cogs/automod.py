@@ -213,14 +213,14 @@ class Automod(commands.Cog):
         await action.execute(ctx)
 
     @commands.hybrid_group()
-    @checks.is_community_manager()
+    @checks.is_server_manager()
     async def automod(self, ctx):
         """Utilities for automoderation."""
 
         await ctx.send_help(ctx.command)
 
     @automod.group(fallback="list")
-    @checks.is_community_manager()
+    @checks.is_server_manager()
     async def words(self, ctx):
         """Displays the banned words list.
 
@@ -237,7 +237,7 @@ class Automod(commands.Cog):
         await pages.start(ctx)
 
     @words.command()
-    @checks.is_community_manager()
+    @checks.is_server_manager()
     async def add(self, ctx, words):
         """Adds words to the banned words list.
 
@@ -250,7 +250,7 @@ class Automod(commands.Cog):
         await ctx.send(f"Added {words_msg} to the banned words list.")
 
     @words.command()
-    @checks.is_community_manager()
+    @checks.is_server_manager()
     async def remove(self, ctx, words):
         """Removes words from the banned words list.
 

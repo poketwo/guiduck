@@ -120,7 +120,7 @@ class Reputation(commands.Cog):
 
     @commands.hybrid_command()
     @commands.guild_only()
-    @checks.is_community_manager()
+    @checks.is_server_manager()
     async def setrep(self, ctx, member: discord.Member, value: int):
         """Sets a user's reputation to a given value.
 
