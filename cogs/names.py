@@ -29,7 +29,7 @@ class Names(commands.Cog):
     async def normalize_member(self, member):
         if member.bot:
             return
-        normalized = self.normalized(member.nick) or self.normalized(member.name) or LAST_RESORT
+        normalized = self.normalized(member.nick) or self.normalized(member.global_name) or self.normalized(member.name) or LAST_RESORT
         if normalized != member.display_name:
             await member.edit(nick=normalized)
 
