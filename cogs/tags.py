@@ -66,10 +66,14 @@ class Tags(commands.Cog):
         async for tag_data in tags:
             yield Tag(**tag_data)
 
-    async def send_tags(self, ctx, tags):
+    async def count_tags(self, query):
+        return await self.bot.mongo.db.tag.count_documents(query)
+
+    async def send_tags(self, ctx, tags, *, count: int = None):
         pages = ViewMenuPages(
             source=AsyncEmbedListPageSource(
                 tags,
+                count=count,
                 show_index=True,
                 format_item=lambda x: x.name,
             )
@@ -148,13 +152,15 @@ class Tags(commands.Cog):
     async def all(self, ctx):
         """Lists all tags."""
 
-        await self.send_tags(ctx, self.query_tags({}))
+        query = {}
+        await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
 
     @tag.command()
     async def search(self, ctx, *, text):
         """Searches for a tag."""
 
-        await self.send_tags(ctx, self.query_tags({"$text": {"$search": text}}, sort=False))
+        query = {"$text": {"$search": text}}
+        await self.send_tags(ctx, self.query_tags(query, sort=False), count=await self.count_tags(query))
 
     @tag.command()
     async def list(self, ctx, *, member: discord.Member = None):
@@ -162,7 +168,9 @@ class Tags(commands.Cog):
 
         if member is None:
             member = ctx.author
-        await self.send_tags(ctx, self.query_tags({"owner_id": member.id}))
+
+        query = {"owner_id": member.id}
+        await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
 
     # Writing tags
 
