@@ -90,7 +90,7 @@ class AsyncEmbedListPageSource(menus.AsyncIteratorPageSource):
         )
         footer = f"Showing entries {start + 1}–{start + len(lines)}"
         if self.count is not None:
-            footer += f" out of {self.count}"
+            footer += f" out of {self.count:,}"
         embed.set_footer(text=footer)
         return embed
 
