@@ -49,7 +49,7 @@ class DocumentSelect(discord.ui.Select):
                 discord.SelectOption(
                     label=label,
                     value=str(result.document.id),
-                    description=result.context,
+                    description=shorten(result.context, 100),
                 )
             )
 
