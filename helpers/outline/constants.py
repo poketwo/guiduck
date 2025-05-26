@@ -13,9 +13,9 @@ CONTEXT_HIGHLIGHT_PATTERN = r"<b>(.+?)</b>"
 
 COLLECTION_NAMES = {v: k for k, v in COLLECTION_IDS.items()}
 ACCESSIBLE_COLLECTIONS = {
-    checks.is_community_manager: ("admins", "in-progress", "information archive"),
-    checks.is_bot_manager: ("bot managers", "management",),
-    checks.is_server_manager: ("server managers", "management"),
+    checks.is_community_manager: ("old admins", "in-progress", "information archive"),
+    checks.is_bot_admin: ("bot admins", "administration",),
+    checks.is_server_admin: ("server admins", "administration"),
     checks.is_developer: ("development",),
     checks.is_trial_moderator: ("moderators", "moderator wiki"),
     checks.is_moderator: ("moderators", "moderator wiki"),

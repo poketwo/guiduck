@@ -406,17 +406,17 @@ class PoketwoAdministration(commands.Cog):
 
         return embed
 
-    @commands.hybrid_group(aliases=["manage", "management"], invoke_without_command=True)
-    @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
-    async def manager(self, ctx):
-        """Management commands
+    @commands.hybrid_group(aliases=["administration"], invoke_without_command=True)
+    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin())
+    async def admin(self, ctx):
+        """Administration commands
 
-        You must have the Server Manager or Bot Manager role to use this."""
+        You must have the Server Admin or Bot Admin role to use this."""
 
         await ctx.send_help(ctx.command)
 
-    @manager.command(aliases=("givecoins", "ac", "gc"))
-    @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
+    @admin.command(aliases=("givecoins", "ac", "gc"))
+    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin())
     async def addcoins(self, ctx, user: FetchUserConverter, amt: int, *, notes: Optional[str] = None):
         """Add to a user's balance."""
 
@@ -432,8 +432,8 @@ class PoketwoAdministration(commands.Cog):
             embed=self.logs_embed(ctx.author, user, "Gave pokécoins to", f"**Pokécoins:** {amt}", notes), view=view
         )
 
-    @manager.command(aliases=("giveshard", "as", "gs"))
-    @commands.check_any(checks.is_server_manager(), checks.is_bot_manager())
+    @admin.command(aliases=("giveshard", "as", "gs"))
+    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin())
     async def addshards(self, ctx, user: FetchUserConverter, amt: int, *, notes: Optional[str] = None):
         """Add to a user's shard balance."""
 
@@ -449,11 +449,11 @@ class PoketwoAdministration(commands.Cog):
             embed=self.logs_embed(ctx.author, user, "Gave shards to", f"**Shards:** {amt}", notes), view=view
         )
 
-    @manager.command(
+    @admin.command(
         usage="[role: ROLE=Moderator] [users: USER1 USER2 ...] [month: MONTH=Previous] [year: YEAR=Current] [all-users: yes/no=no] [show-ids: yes/no=no]"
     )
     @checks.staff_categories_only()
-    @checks.is_server_manager()
+    @checks.is_server_admin()
     @with_typing()
     async def activity(
         self,

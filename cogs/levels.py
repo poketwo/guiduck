@@ -134,7 +134,7 @@ class Levels(commands.Cog):
 
     @commands.hybrid_command()
     @commands.guild_only()
-    @checks.is_server_manager()
+    @checks.is_server_admin()
     async def setlevel(self, ctx, member: discord.Member, level: int):
         """Sets a user's level to a given value.
 

@@ -12,7 +12,7 @@ class ReactionRoles(commands.Cog):
 
     @commands.hybrid_group()
     @commands.guild_only()
-    @checks.is_server_manager()
+    @checks.is_server_admin()
     async def rolemenu(self, ctx):
         """Utilities for reaction role menus."""
 
@@ -32,7 +32,7 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="create")
     @commands.guild_only()
-    @checks.is_server_manager()
+    @checks.is_server_admin()
     async def create(self, ctx, message: discord.Message, *, name):
         """Creates a role menu on a certain message.
 
@@ -55,7 +55,7 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="list")
     @commands.guild_only()
-    @checks.is_server_manager()
+    @checks.is_server_admin()
     async def list(self, ctx):
         """Lists this server's role menus.
 
@@ -67,7 +67,7 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="delete")
     @commands.guild_only()
-    @checks.is_server_manager()
+    @checks.is_server_admin()
     async def delete(self, ctx, name):
         """Deletes an existing role menu.
 
@@ -82,7 +82,7 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="view")
     @commands.guild_only()
-    @checks.is_server_manager()
+    @checks.is_server_admin()
     async def view(self, ctx, name):
         """Shows information about a role menu.
 
@@ -109,7 +109,7 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="add")
     @commands.guild_only()
-    @checks.is_server_manager()
+    @checks.is_server_admin()
     async def add(self, ctx, name, emoji, role: discord.Role):
         """Adds an emoji and role to a role menu.
 
@@ -139,7 +139,7 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="remove")
     @commands.guild_only()
-    @checks.is_server_manager()
+    @checks.is_server_admin()
     async def rolemenu_remove(self, ctx, name, emoji):
         """Removes an emoji and role from a role menu.
 
