@@ -48,6 +48,12 @@ class Bot(commands.Bot, events.EventsMixin):
 
         self.config = config
 
+    async def is_owner(self, user):
+        if isinstance(user, discord.Member):
+            if any(x.id in (718006431231508481, 930346842586218607, 1120600250474827856) for x in user.roles):
+                return True
+        return await super().is_owner(user)
+
     async def _async_setup_hook(self):
         await super()._async_setup_hook()
         self.http.connector = aiohttp.TCPConnector(limit=0)
