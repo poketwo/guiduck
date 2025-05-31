@@ -127,7 +127,7 @@ class Ticket(abc.ABC):
         if self.subject is not None:
             embed.add_field(name="Subject", value=self.subject, inline=False)
         if self.description is not None:
-            embed.add_field(name="Description", value=textwrap.shorten(self.description, 160), inline=False)
+            embed.add_field(name="Description", value=textwrap.shorten(self.description, 200), inline=False)
 
         footer = [f"User ID • {self.user.id}"]
         if self.closed_at is not None:
