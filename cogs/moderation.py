@@ -27,6 +27,14 @@ def message_channel(ctx, message):
     message = message or ctx.message
     return dict(message_id=message.id, channel_id=message.channel.id)
 
+NO_PUBLIC = ["note"]
+FIRST_NAMES = [
+    "Bouncy", "Grumpy", "Wobbly", "Sneaky", "Zippy", "Goofy", "Loopy", "Sassy", "Jumpy", "Snappy", "Nifty", "Cheeky", "Clumsy", "Fluffy", "Witty", "Breezy", "Tipsy", "Chirpy", "Nerdy", "Quirky", "Hyper"
+]
+
+LAST_NAMES = [
+    "Muffin", "Nugget", "Waffle", "Tofu", "Sprinkle", "Biscuit", "Pudding", "Taco", "Bubble", "Crumpet", "Doodle", "Marshmallow", "Pumpkin", "Wiggle", "Popcorn", "Tater", "Jellybean", "Caramel", "Taxi"
+]
 
 @dataclass
 class Action(abc.ABC):
@@ -117,13 +125,19 @@ class Action(abc.ABC):
             embed.timestamp = self.expires_at
         return embed
 
-    def to_log_embed(self):
+    def to_log_embed(self, *, anonymous: bool = False):
         reason = self.reason or "No reason provided"
         if self.logs_url is not None:
             reason += f" ([Logs]({self.logs_url}))"
 
         embed = discord.Embed(color=self.color)
-        embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.display_avatar.url)
+
+        if anonymous:
+            anon = random.choice(FIRST_NAMES) + random.choice(LAST_NAMES)
+            embed.set_author(name=anon, icon_url=f"https://cdn.discordapp.com/embed/avatars/{random.randint(0, 5)}.png")
+        else:
+            embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.display_avatar.url)
+
         embed.set_thumbnail(url=self.target.display_avatar.url)
         embed.add_field(
             name=f"{self.emoji} {self.past_tense.title()} {self.target} (ID: {self.target.id})",
@@ -409,6 +423,11 @@ class Moderation(commands.Cog):
         channel = self.bot.get_channel(data["logs_channel_id"])
         if channel is not None:
             await channel.send(embed=action.to_log_embed())
+
+        public_channel = self.bot.get_channel(data["public_logs_channel_id"])
+        if public_channel is not None:
+            if action.type not in NO_PUBLIC:
+                await public_channel.send(embed=action.to_log_embed(anonymous=True))
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
