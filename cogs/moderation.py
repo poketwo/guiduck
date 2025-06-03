@@ -29,6 +29,9 @@ def message_channel(ctx, message):
     return dict(message_id=message.id, channel_id=message.channel.id)
 
 NO_PUBLIC = ["note"]
+
+FULL_NAMES = ["Sir Lancelot", "Sir Gawain", "Sir Percival", "Sir Bors the Younger", "Sir Lamorak", "Sir Kay", "Sir Gareth", "Sir Bedivere", "Sir Gaheris", "Sir Galahad", "Sir Tristan", "Sir Palamedes", "Sir Abrioris", "Sir Adragain", "Sir Agravain", "King Bagdemagus", "Sir Balin", "Sir Brastius", "Sir Caradoc", "Sir Constantine", "Sir Dagonet, the court jester", "Sir Daniel", "Sir Dinadan", "Sir Dornar", "Sir Ector de Maris", "Sir Galehaut", "Sir Gingalain", "Sir Griflet", "King Leodegrance", "Sir Lionel", "Sir Mador de la Porte", "Sir Maleagant", "Sir Mordred", "King Pellinore", "Sir Pinel", "Sir Sagramore le Desirous", "Sir Tor", "Sir Ulfius", "King Uriens", "Sir Yvain", "Sir Ywain"]
+
 FIRST_NAMES = [
     "Bouncy", "Grumpy", "Wobbly", "Sneaky", "Zippy", "Goofy", "Loopy", "Sassy", "Jumpy", "Snappy", "Nifty", "Cheeky", "Clumsy", "Fluffy", "Witty", "Breezy", "Tipsy", "Chirpy", "Nerdy", "Quirky", "Hyper"
 ]
@@ -134,7 +137,11 @@ class Action(abc.ABC):
         embed = discord.Embed(color=self.color)
 
         if anonymous:
-            anon = random.choice(FIRST_NAMES) + random.choice(LAST_NAMES)
+            if random.random() < 0.5:
+                anon = random.choice(FULL_NAMES)
+            else:
+                anon = random.choice(FIRST_NAMES) + random.choice(LAST_NAMES)
+
             embed.set_author(name=anon, icon_url=f"https://cdn.discordapp.com/embed/avatars/{random.randint(0, 5)}.png")
         else:
             embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.display_avatar.url)
