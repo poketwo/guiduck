@@ -17,6 +17,9 @@ from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
 
+BOT_ID = 753657623739629739
+
+
 class ModerationUserFriendlyTime(time.UserFriendlyTime):
     def __init__(self):
         super().__init__(commands.clean_content, default="No reason provided")
@@ -136,7 +139,7 @@ class Action(abc.ABC):
 
         embed = discord.Embed(color=self.color)
 
-        if anonymous:
+        if anonymous and self.user.id != BOT_ID:
             if random.random() < 0.5:
                 anon = random.choice(FULL_NAMES)
             else:
