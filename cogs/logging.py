@@ -322,7 +322,7 @@ class Logging(commands.Cog):
     @is_trial_moderator()
     @commands.guild_only()
     @commands.command()
-    async def snipe(ctx, skip: int = 0):
+    async def snipe(self, ctx, skip: int = 0):
         message = await _bot.mongo.db.message.find_one(
             {
                 "channel_id": ctx.channel.id,
