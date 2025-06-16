@@ -319,6 +319,30 @@ class Logging(commands.Cog):
         await self.full_cache_guild(ctx.guild)
         await ctx.send("Completed cache sync.")
 
+    @is_trial_moderator()
+    @commands.guild_only()
+    @commands.command()
+    async def snipe(ctx, skip: int = 0):
+        message = await _bot.mongo.db.message.find_one(
+            {
+                "channel_id": ctx.channel.id,
+                "deleted_at": {"$ne": None}
+            }, 
+            sort=[("_id", -1)],
+            skip=skip
+        )
+        if not message:
+            return await ctx.reply("No deleted message found.", mention_author=False)
+
+        user = ctx.guild.get_member(message["user_id"]) or await self.bot.fetch_user(message["user_id"])
+        content = list(message["history"].values())[-1]
+
+        embed = discord.Embed(description=content, color=getattr(user, "color", None))
+        embed.set_author(name=u.display_name, icon_url=user.display_avatar.url)
+        embed.timestamp = message["deleted_at"]
+
+        await ctx.reply(embed=embed, mention_author=False)
+
     async def cog_unload(self):
         self.cache_all.cancel()
 
