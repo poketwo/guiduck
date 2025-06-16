@@ -319,7 +319,7 @@ class Logging(commands.Cog):
         await self.full_cache_guild(ctx.guild)
         await ctx.send("Completed cache sync.")
 
-    @is_trial_moderator()
+    @checks.is_trial_moderator()
     @commands.guild_only()
     @commands.command()
     async def snipe(self, ctx, skip: int = 0):
