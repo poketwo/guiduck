@@ -323,7 +323,7 @@ class Logging(commands.Cog):
     @commands.guild_only()
     @commands.command()
     async def snipe(self, ctx, skip: int = 0):
-        message = await _bot.mongo.db.message.find_one(
+        message = await self.bot.mongo.db.message.find_one(
             {
                 "channel_id": ctx.channel.id,
                 "deleted_at": {"$ne": None}
@@ -338,7 +338,7 @@ class Logging(commands.Cog):
         content = list(message["history"].values())[-1]
 
         embed = discord.Embed(description=content, color=getattr(user, "color", None))
-        embed.set_author(name=u.display_name, icon_url=user.display_avatar.url)
+        embed.set_author(name=f"{user.display_name} ({user.id})", icon_url=user.display_avatar.url)
         embed.timestamp = message["deleted_at"]
 
         await ctx.reply(embed=embed, mention_author=False)
