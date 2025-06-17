@@ -322,14 +322,21 @@ class Logging(commands.Cog):
     @checks.is_trial_moderator()
     @commands.guild_only()
     @commands.command()
-    async def snipe(self, ctx, skip: int = 0):
+    async def snipe(self, ctx, channel: discord.Channel = commands.CurrentChannel, nth: int = 1):
+        permissions = channel.permissions_for(ctx.author)
+        if not all([getattr(permissions, perm, False) for perm in ("read_messages", "read_message_history")]):
+            return await ctx.reply("You don't have permissions to view that channel.")
+
+        if nth <= 0:
+            return await ctx.reply("The nth deleted message to show cannot be 0 or less.", mention_author=False)
+
         message = await self.bot.mongo.db.message.find_one(
             {
                 "channel_id": ctx.channel.id,
                 "deleted_at": {"$ne": None}
             }, 
             sort=[("_id", -1)],
-            skip=skip
+            skip=nth - 1
         )
         if not message:
             return await ctx.reply("No deleted message found.", mention_author=False)
