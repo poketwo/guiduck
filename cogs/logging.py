@@ -322,7 +322,7 @@ class Logging(commands.Cog):
     @checks.is_trial_moderator()
     @commands.guild_only()
     @commands.command()
-    async def snipe(self, ctx, channel: discord.GuildChannel = commands.CurrentChannel, nth: int = 1):
+    async def snipe(self, ctx, channel: discord.TextChannel | discord.Thread = commands.CurrentChannel, nth: int = 1):
         permissions = channel.permissions_for(ctx.author)
         if not all([getattr(permissions, perm, False) for perm in ("read_messages", "read_message_history")]):
             return await ctx.reply("You don't have permissions to view that channel.")
