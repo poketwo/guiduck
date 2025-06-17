@@ -332,7 +332,7 @@ class Logging(commands.Cog):
 
         message = await self.bot.mongo.db.message.find_one(
             {
-                "channel_id": ctx.channel.id,
+                "channel_id": channel.id,
                 "deleted_at": {"$ne": None}
             }, 
             sort=[("_id", -1)],
@@ -346,6 +346,7 @@ class Logging(commands.Cog):
 
         embed = discord.Embed(description=content, color=getattr(user, "color", None))
         embed.set_author(name=f"{user.display_name} ({user.id})", icon_url=user.display_avatar.url)
+        embed.set_footer(text=f"#{channel.name}")
         embed.timestamp = message["deleted_at"]
 
         await ctx.reply(embed=embed, mention_author=False)
