@@ -692,6 +692,7 @@ class ServerReport(HelpDeskCategory):
                 1. User ID of the user you're reporting (use `?tag find-id` to learn more),
                 2. Context and explanation for the report (like what happened, how you think they've violated our rules, etc) and
                 3. Evidence to back your report (such as message links, full unedited screen recordings).
+                  - Use `?tag proof` to see how and what it should look like.
 
                 After you submit these pieces of documentation, a staff member will assist you with the report shortly. Thank you!
                 """
