@@ -992,7 +992,7 @@ class Moderation(commands.Cog):
         )
 
         if ctx.interaction and flags.ephemeral:
-            await ctx.interaction.defer(ephemeral=True)
+            await ctx.interaction.response.defer(ephemeral=True)
 
         try:
             await pages.start(ctx)
