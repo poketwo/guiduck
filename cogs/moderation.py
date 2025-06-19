@@ -392,6 +392,11 @@ class MemberOrIdConverter(commands.Converter):
             raise commands.MemberNotFound(arg)
 
 
+class HistoryFlagConverter(commands.FlagConverter, case_insensitive=True):
+    target: FetchUserConverter = commands.flag(max_args=1, positional=True)
+    ephemeral: Optional[bool] = False
+
+
 class Moderation(commands.Cog):
     """For moderation."""
 
@@ -950,12 +955,13 @@ class Moderation(commands.Cog):
     @commands.hybrid_group(aliases=("his",), fallback="list")
     @commands.guild_only()
     @checks.is_trial_moderator()
-    async def history(self, ctx, *, target: FetchUserConverter):
+    async def history(self, ctx, *, flags: HistoryFlagConverter):
         """Views a member's punishment history.
 
         You must have the Trial Moderator role to use this.
         """
 
+        target = flags.target
         query = {"target_id": target.id, "guild_id": ctx.guild.id}
         count = await self.bot.mongo.db.action.count_documents(query)
 
@@ -984,6 +990,9 @@ class Moderation(commands.Cog):
                 count=count,
             )
         )
+
+        if ctx.interaction and flags.ephemeral:
+            await ctx.interaction.defer(ephemeral=True)
 
         try:
             await pages.start(ctx)
