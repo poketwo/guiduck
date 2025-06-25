@@ -124,7 +124,7 @@ class Tags(commands.Cog):
             embed.add_field(name="Original", value=tag.original)
         else:
             aliases = self.query_tags({"original": tag.name})
-            embed.add_field(name="Aliases", value="\n".join([t.name async for t in aliases]))
+            embed.add_field(name="Aliases", value=", ".join([t.name async for t in aliases]))
             embed.add_field(name="Uses", value=tag.uses)
 
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
