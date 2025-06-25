@@ -227,7 +227,7 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
         if tag.owner_id != ctx.author.id:
-            return await ctx.send(f"You do not own the tag `{tag.name)`.")
+            return await ctx.send(f"You do not own the tag `{tag.name}`.")
         if tag.alias:
             await ctx.send("Editing original tag of this alias...")
             return await ctx.invoke(self.edit, tag.original, content)
