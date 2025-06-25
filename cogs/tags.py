@@ -123,7 +123,10 @@ class Tags(commands.Cog):
         if tag.alias:
             embed.add_field(name="Original", value=tag.original)
         else:
+            aliases = await self.query_tags({"original": tag.name})
+            embed.add_field(name="Aliases", value="\n".join(t.name for t in aliases))
             embed.add_field(name="Uses", value=tag.uses)
+
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
 
         embed.set_footer(text="Created at")
