@@ -123,8 +123,8 @@ class Tags(commands.Cog):
         if tag.alias:
             embed.add_field(name="Original", value=tag.original)
         else:
-            aliases = await self.query_tags({"original": tag.name})
-            embed.add_field(name="Aliases", value="\n".join(t.name for t in aliases))
+            aliases = self.query_tags({"original": tag.name})
+            embed.add_field(name="Aliases", value="\n".join(t.name async for t in aliases))
             embed.add_field(name="Uses", value=tag.uses)
 
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
@@ -230,7 +230,7 @@ class Tags(commands.Cog):
             return await ctx.send(f"You do not own the tag `{tag.name}`.")
         if tag.alias:
             await ctx.send("Editing original tag of this alias...")
-            return await ctx.invoke(self.edit, tag.original, content)
+            return await ctx.invoke(self.edit, tag.original, content=content)
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"content": content}})
         await ctx.send(f"Successfully edited tag.")
