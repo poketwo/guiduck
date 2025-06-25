@@ -233,7 +233,7 @@ class Tags(commands.Cog):
             return await ctx.invoke(self.edit, tag.original, content=content)
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"content": content}})
-        await ctx.send(f"Successfully edited tag.")
+        await ctx.send(f"Successfully edited tag `{tag.name}`.")
 
     @tag.command(aliases=("fe",))
     @checks.is_trial_moderator()
