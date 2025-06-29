@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import textwrap
 
 import discord
 import pymongo
@@ -132,7 +133,7 @@ class Tags(commands.Cog):
                 suffix = f" [...{len(names) - N}]"
                 names = names[:N]
 
-            embed.add_field(name="Aliases", value=(", ".join(names) + suffix) if names else "None")
+            embed.add_field(name="Aliases", value=textwrap.shorten(", ".join(names) + suffix, 512) if names else "None")
             embed.add_field(name="Uses", value=tag.uses)
 
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
@@ -141,17 +142,6 @@ class Tags(commands.Cog):
         embed.timestamp = tag.id.generation_time
 
         await ctx.send(embed=embed, ephemeral=True)
-
-    @tag.command()
-    async def aliases(self, ctx, *, name):
-        """Shows all aliases of a tag."""
-
-        tag = await self.get_tag(name)
-        if tag is None:
-            return await ctx.send("Tag not found.")
-
-        query = {"original": tag.name}
-        await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
 
     @tag.command()
     async def raw(self, ctx, *, name):
@@ -192,6 +182,17 @@ class Tags(commands.Cog):
             member = ctx.author
 
         query = {"owner_id": member.id}
+        await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
+
+    @tag.command()
+    async def aliases(self, ctx, *, name):
+        """Shows all aliases of a tag."""
+
+        tag = await self.get_tag(name)
+        if tag is None:
+            return await ctx.send("Tag not found.")
+
+        query = {"original": tag.name}
         await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
 
     # Writing tags
