@@ -150,7 +150,7 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
 
-        query = {"original": tag}
+        query = {"original": tag.name}
         await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
 
     @tag.command()
