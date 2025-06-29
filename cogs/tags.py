@@ -123,8 +123,16 @@ class Tags(commands.Cog):
         if tag.alias:
             embed.add_field(name="Original", value=tag.original)
         else:
-            aliases = self.query_tags({"original": tag.name})
-            embed.add_field(name="Aliases", value=", ".join([t.name async for t in aliases]))
+            names = [t.name async for t in self.query_tags({"original": tag.name})]
+            names.sort(key=lambda n: len(n))
+
+            N = 25
+            suffix = ""
+            if len(names) > N:
+                suffix = f" [...{len(names) - N}]"
+                names = names[:N]
+
+            embed.add_field(name="Aliases", value=(", ".join(names) + suffix) if names else "None")
             embed.add_field(name="Uses", value=tag.uses)
 
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
@@ -133,6 +141,17 @@ class Tags(commands.Cog):
         embed.timestamp = tag.id.generation_time
 
         await ctx.send(embed=embed, ephemeral=True)
+
+    @tag.command()
+    async def aliases(self, ctx, *, name):
+        """Shows all aliases of a tag."""
+
+        tag = await self.get_tag(name)
+        if tag is None:
+            return await ctx.send("Tag not found.")
+
+        query = {"original": tag}
+        await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
 
     @tag.command()
     async def raw(self, ctx, *, name):
