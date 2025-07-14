@@ -468,11 +468,11 @@ class SetupHelp(HelpDeskCategory):
             """
             Welcome to Pokétwo! For some common configuration options, use the commands listed below:
 
-            • `p!prefix <new_prefix>` to change prefix.
-            • `p!serversilence` to silence level up messages server-wide.
-            • `p!location <new_location>` to change location of server (used for day/night calculation).
-            • `p!redirect #channel` to redirect to a certain channel
-            • `p!redirect #channel1 #channel2 #channel3` etc to redirect to multiple channels.
+            • `@Pokétwo prefix <new_prefix>` to change prefix.
+            • `@Pokétwo serversilence` to silence level up messages server-wide.
+            • `@Pokétwo location <new_location>` to change location of server (used for day/night calculation).
+            • `@Pokétwo redirect #channel` to redirect to a certain channel
+            • `@Pokétwo redirect #channel1 #channel2 #channel3` etc to redirect to multiple channels.
 
             Unfortunately, we're not able to handle setup questions in the support server at this time.
             Feel free to check out our Documentation site at <https://docs.poketwo.net/> for common information. However, note that this site is currently an early work in progress.
@@ -516,7 +516,38 @@ class BugReports(HelpDeskCategory):
             """,
         )
 
+    async def on_open(self, ticket: Ticket):
+        if ticket.thread is None:
+            return
+        embed = discord.Embed(
+            title="Bug Reports",
+            color=discord.Color.blurple(),
+            description=textwrap.dedent(
+                """
+                For losses of event boxes, voting boxes, daycare eggs, pokécoins, shards, etc., that you are requesting compensation for, please be sure to attach screenshots that show your before and after balances of the respective item.
+                """
+            ),
+        )
+        await ticket.thread.send(embed=embed)
 
+
+USER_REPORT_INSTRUCTIONS = textwrap.dedent(
+    """
+    Thank you for reporting! We're sorry for any inconveniences you may have experienced. Please provide the following pieces of information for the report you're making to help us understand the situation better:
+
+    1. User ID of the user you're reporting (use `?tag find-id` if you're not sure how),
+    2. Context and explanation regarding the report (e.g. what happened, how you think they've violated our rules, etc) and
+    3. Evidence to back your report. This can be in the form of:
+        - **For non-suspendable offences**:
+          - Full unedited screenshots, screen recordings, message links.
+        - **For suspendable offences** (such as autocatching, crosstrading, etc.):
+          - Uncropped, unedited **screen recordings** only
+            - Must be from the Discord application (mobile or desktop), **not** web browser
+            - The video must include the user's ID being copied and pasted, see `?tag proof` for an example. 
+
+    After you submit these pieces of documentation, a staff member will assist you with the report shortly. Thank you!
+    """
+)
 class Reports(HelpDeskCategory):
     id = "rpt"
     label = "User Reports"
@@ -541,20 +572,7 @@ class Reports(HelpDeskCategory):
         embed = discord.Embed(
             title="User Report Instructions",
             color=discord.Color.blurple(),
-            description=textwrap.dedent(
-                """
-                Thank you for reporting! We're sorry for any inconveniences you may have experienced. Please provide the following pieces of information for the report you're making to help us understand the situation better:
-
-                1. User ID of the user you're reporting (use `?tag find-id` if you're not sure how),
-                2. Context and explanation regarding the report (e.g. what happened, how you think they've violated our rules, etc) and
-                3. Evidence to back your report. This can be in the form of, but not limited to:
-                  - Full, unedited screenshots
-                  - Screen recordings
-                  - Message links
-
-                After you submit these pieces of documentation, a staff member will assist you with the report shortly. Thank you!
-                """
-            ),
+            description=USER_REPORT_INSTRUCTIONS,
         )
         await ticket.thread.send(embed=embed)
 
@@ -587,10 +605,12 @@ class IncenseRefunds(HelpDeskCategory):
                 """
                 Thank you for submitting an incense refund request. We're sorry for the trouble you've encountered with your incense. In order for us to process your request, please submit the following *for each incense to be refunded*:
 
-                1. A screenshot of you purchasing the incense,
+                ***Note: To qualify for a refund, a minimum of 14% of spawns must have been lost per incense (25/180 in standard incense).***
+
+                1. A screenshot of you purchasing the incense and the bot responding to the command,
                 2. A screenshot of the bot malfunctioning—not sending spawns, not responding to commands, or something else,
                 3. The number of spawns lost in total, and screenshots to back this up—and
-                4. A screenshot of you permanently stopping the incense using `@‌Pokétwo#8236 incense stop`
+                4. A screenshot of you permanently stopping the incense using `@‌Pokétwo#8236 incense stop` and the bot responding to the command,
                   - If the incense has already ended, run that command now and send a screenshot to show that.
 
                 After you submit these pieces of documentation, someone will come by to refund you shortly. Thank you!
@@ -685,18 +705,7 @@ class ServerReport(HelpDeskCategory):
         embed = discord.Embed(
             title="User Report Instructions",
             color=discord.Color.blurple(),
-            description=textwrap.dedent(
-                """
-                We're sorry about any inconvenience that you've experienced! Please help us understand the situation better by mentioning:
-
-                1. User ID of the user you're reporting (use `?tag find-id` to learn more),
-                2. Context and explanation for the report (like what happened, how you think they've violated our rules, etc) and
-                3. Evidence to back your report (such as message links, full unedited screen recordings).
-                  - Use `?tag proof` to see how and what it should look like.
-
-                After you submit these pieces of documentation, a staff member will assist you with the report shortly. Thank you!
-                """
-            ),
+            description=USER_REPORT_INSTRUCTIONS,
         )
         await ticket.thread.send(embed=embed)
 
