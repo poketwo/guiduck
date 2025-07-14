@@ -133,7 +133,7 @@ class Tags(commands.Cog):
                 suffix = f" [...{len(names) - N}]"
                 names = names[:N]
 
-            embed.add_field(name="Aliases", value=textwrap.shorten(", ".join(names) + suffix, 512) if names else "None")
+            embed.add_field(name="Aliases", value=textwrap.shorten(", ".join(names) + suffix, 512) if names else "*None*")
             embed.add_field(name="Uses", value=tag.uses)
 
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
