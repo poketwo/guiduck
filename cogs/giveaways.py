@@ -12,6 +12,9 @@ from helpers.poketwo import format_pokemon, format_pokemon_details
 from helpers.utils import FakeUser
 
 
+MAX_PENDING_GIVEAWAYS = 5
+
+
 @dataclass
 class Giveaway:
     duration = timedelta(hours=12)
@@ -396,6 +399,10 @@ class Giveaways(commands.Cog):
     @commands.hybrid_group(fallback="start")
     async def giveaway(self, ctx, pokemon: int, *, message):
         """Start a giveaway."""
+
+        user_pending_count = await self.bot.mongo.db.giveaway.count_documents({"user_id": ctx.author.id, "approval_status": None})
+        if user_pending_count >= MAX_PENDING_GIVEAWAYS:
+            return await ctx.reply(f"You already have the max number of giveways pending ({MAX_PENDING_GIVEAWAYS}). Please try again once those have been reviewed!")
 
         pokemon = await self.bot.mongo.poketwo_db.pokemon.find_one(
             {"owned_by": "user", "owner_id": ctx.author.id, "idx": pokemon}
