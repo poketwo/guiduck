@@ -400,6 +400,10 @@ class Giveaways(commands.Cog):
     async def giveaway(self, ctx, pokemon: int, *, message):
         """Start a giveaway."""
 
+        member = await self.bot.mongo.poketwo_db.member.find_one(ctx.author.id)
+        if member.get("suspended") or (member.get("suspended_until") and member.get("suspended_until") > datetime.utcnow()):
+            return await ctx.send("Your account is suspended from Pokétwo and can not do giveaways.")
+
         user_pending_count = await self.bot.mongo.db.giveaway.count_documents({"user_id": ctx.author.id, "approval_status": None})
         if user_pending_count >= MAX_PENDING_GIVEAWAYS:
             return await ctx.reply(f"You already have the max number of giveways pending ({MAX_PENDING_GIVEAWAYS}). Please try again once those have been reviewed!")
