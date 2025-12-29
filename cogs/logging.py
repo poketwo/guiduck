@@ -151,6 +151,17 @@ class Logging(commands.Cog):
             await self.bot.mongo.db.member.bulk_write([self.make_cache_member(member)])
 
     @commands.Cog.listener()
+    async def on_voice_state_update(member, before, after):
+        if before.channel == after.channel:
+            return
+
+        if before.channel:
+            await before.channel.send(f'**{member.display_name}** has left the voice channel.')
+
+        if after.channel:
+            await after.channel.send(f'**{member.display_name}** has joined the voice channel.')
+
+    @commands.Cog.listener()
     async def on_guild_join(self, guild):
         for channel in guild.channels:
             await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(channel)])
