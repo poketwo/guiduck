@@ -151,7 +151,7 @@ class Logging(commands.Cog):
             await self.bot.mongo.db.member.bulk_write([self.make_cache_member(member)])
 
     @commands.Cog.listener()
-    async def on_voice_state_update(member, before, after):
+    async def on_voice_state_update(self, member, before, after):
         if before.channel == after.channel:
             return
 
