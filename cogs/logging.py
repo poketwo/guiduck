@@ -156,10 +156,10 @@ class Logging(commands.Cog):
             return
 
         if before.channel:
-            await before.channel.send(f'**{member.display_name}** has left the voice channel.')
+            await before.channel.send(f'**{member.mention}** has left the voice channel.', allowed_mentions=discord.AllowedMentions.none())
 
         if after.channel:
-            await after.channel.send(f'**{member.display_name}** has joined the voice channel.')
+            await after.channel.send(f'**{member.mention}** has joined the voice channel.', allowed_mentions=discord.AllowedMentions.none())
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
