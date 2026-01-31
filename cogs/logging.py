@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 import time
 from urllib.parse import urlencode
+from typing import Optional
 
 import discord
 from discord.ext import commands, tasks
@@ -333,7 +334,7 @@ class Logging(commands.Cog):
     @checks.is_trial_moderator()
     @commands.guild_only()
     @commands.command()
-    async def snipe(self, ctx, channel: discord.TextChannel | discord.Thread | discord.VoiceChannel = commands.CurrentChannel, nth: int = 1):
+    async def snipe(self, ctx, channel: Optional[discord.TextChannel | discord.Thread | discord.VoiceChannel] = commands.CurrentChannel, nth: int = 1):
         permissions = channel.permissions_for(ctx.author)
         if not all([getattr(permissions, perm, False) for perm in ("read_messages", "read_message_history")]):
             return await ctx.reply("You don't have permissions to view that channel.")
@@ -357,7 +358,7 @@ class Logging(commands.Cog):
 
         embed = discord.Embed(description=content, color=getattr(user, "color", None))
         embed.set_author(name=f"{user.display_name} ({user.id})", icon_url=user.display_avatar.url)
-        embed.set_footer(text=f"#{channel.name}")
+        embed.set_footer(text=f"{m['_id']} • #{channel.name}")
         embed.timestamp = message["deleted_at"]
 
         await ctx.reply(embed=embed, mention_author=False)
