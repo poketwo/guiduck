@@ -358,7 +358,7 @@ class Logging(commands.Cog):
 
         embed = discord.Embed(description=content, color=getattr(user, "color", None))
         embed.set_author(name=f"{user.display_name} ({user.id})", icon_url=user.display_avatar.url)
-        embed.set_footer(text=f"{m['_id']} • #{channel.name}")
+        embed.set_footer(text=f"{message['_id']} • #{channel.name}")
         embed.timestamp = message["deleted_at"]
 
         await ctx.reply(embed=embed, mention_author=False)
