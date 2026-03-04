@@ -40,8 +40,11 @@ class LogFlagConverter(commands.Converter):
 
 
 class LogFlags(commands.FlagConverter, case_insensitive=True):
-    channel: FetchChannelOrThreadConverter = commands.flag(description="The channel whose logs to show", default=None, positional=True)
+    channel: FetchChannelOrThreadConverter = commands.flag(description="The channel whose logs to show", default=lambda ctx: ctx.channel, positional=True)
+    no_website: bool = commands.flag(name="no-website", description="Embed the logs directly in the channel", aliases=["n"], default=False)
+    ephemeral: bool = commands.flag(description="Hide the message shown (default True)", default=True)
 
+    
     user: discord.Member | discord.User = commands.flag(description="Show logs of a specific user", default=None, aliases=("from",))
     before: LogFlagConverter = commands.flag(description="Filter logs before a specific message/time", default=None)
     after: LogFlagConverter = commands.flag(description="Filter logs after a specific message/time", default=None)
@@ -236,21 +239,24 @@ class Logging(commands.Cog):
     ):
         """Gets a link to the message logs for a channel.
         ### Supported Flags
+        - `no-website`: Embed the logs directly in the channel
+        - `ephemeral`: Hide the shown message (default True)
+
         - `user`: Show logs of a specific user
         - `before`: Filter logs before a specific message/time
-        - `after`: Filter logs after a specific message/time
-        > These accept:
+        > This flag accepts:
         > - Message Link
         > - Message ID (current channel)
         > - "ChannelID-MessageID" (retrieved by shift-clicking on “Copy ID”)
         > - Date/time string (e.g. `12/31 16:40`, `friday`, `yesterday`)
+        - `after`: Filter logs after a specific message/time. Same inputs as `before`.
         - `limit`: Limit how many logs to show (50 by default)
         - `deleted`: Whether to show deleted messages only
 
         You must have the Trial Moderator role to use this.
         """
 
-        channel = flags.channel or ctx.channel
+        channel = flags.channel
         url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
 
         params = {}
@@ -304,7 +310,12 @@ class Logging(commands.Cog):
             lines.append("### Filters")
             lines.extend([f"- **{name}**: {text}" for name, text in filter_texts.items()])
 
-        await ctx.send("\n".join(lines), view=view, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
+        embed = None
+        if flags.no_website:
+            embed = discord.Embed(title=f"{channel.id}", description=desc)
+            embed.set_author(name=f"#{channel.name}")
+
+        await ctx.send("\n".join(lines), view=view, embed=embed, ephemeral=flags.ephemeral, allowed_mentions=discord.AllowedMentions.none())
 
     @logs.command()
     @commands.guild_only()
