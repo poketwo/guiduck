@@ -333,7 +333,8 @@ class Logging(commands.Cog):
                     filt.setdefault("_id", dict())[op] = params[f]
 
             PER_PAGE = 10
-            paginator = Paginator(None, loop_pages=False)
+            div = "—" * 30
+            paginator = Paginator(None, loop_pages=False, disable_go=True)
             paginator.add_item(discord.ui.Button(label=f"Jump", url=url))
 
             async def get_page(page: int):
@@ -366,7 +367,7 @@ class Logging(commands.Cog):
                     if edited:
                         line += (
                             "".join(
-                                "\n"
+                                f"\n{div}\n"
                                 + fmt_msg(datetime.fromtimestamp(float(k), tz=timezone.utc), v, show_indicators=False)
                                 for k, v in history[1:]
                             )
@@ -377,7 +378,7 @@ class Logging(commands.Cog):
                 if len(log_lines) < PER_PAGE:
                     paginator.num_pages = page + 1
 
-                desc = "\n".join(log_lines)
+                desc = f"\n{div}\n".join(log_lines)
 
                 embed = discord.Embed(title=f"#{channel.name}", description=desc)
                 embed.set_author(name=f"{channel.id}")

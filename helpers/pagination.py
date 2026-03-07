@@ -170,17 +170,24 @@ class Paginator(discord.ui.View):
         num_pages: Optional[int] = None,
         loop_pages: Optional[bool] = True,
         timeout_after: Optional[int] = 120,
+        disable_go: Optional[bool] = False,
     ):
         self.get_page = get_page
         self.num_pages = num_pages
         self.loop_pages = loop_pages and self.num_pages is not None
+        self.disable_go = disable_go
 
         self.current_page = 0
         self.message = None
         self.ctx = None
 
         super().__init__(timeout=timeout_after)
-        self.pagination_buttons = (self.first, self.previous, self.stop_button, self.next, self.last, self.go)
+        self.pagination_buttons = [self.first, self.previous, self.stop_button, self.next, self.last]
+        if self.disable_go:
+            self.remove_item(self.go)
+        else:
+            self.pagination_buttons.append(self.go)
+
         self.select = None
 
     def is_paginating(self) -> bool:
