@@ -170,10 +170,12 @@ class Paginator(discord.ui.View):
         num_pages: Optional[int] = None,
         loop_pages: Optional[bool] = True,
         timeout_after: Optional[int] = 120,
+        ephemeral: Optional[bool] = False,
     ):
         self.get_page = get_page
         self.num_pages = num_pages
         self.loop_pages = loop_pages and self.num_pages is not None
+        self.ephemeral = ephemeral
 
         self.current_page = 0
         self.message = None
@@ -287,7 +289,7 @@ class Paginator(discord.ui.View):
     async def start(self, ctx: commands.Context, pidx: int = 0):
         self.ctx = ctx
         kwargs = await self._prepare_page(pidx)
-        self.message = await ctx.reply(**kwargs, view=self, mention_author=False)
+        self.message = await ctx.reply(**kwargs, view=self, mention_author=False, ephemeral=self.ephemeral)
 
     @discord.ui.button(emoji=FIRST_PAGE_EMOJI, style=discord.ButtonStyle.grey)
     async def first(self, interaction: discord.Interaction, button: discord.Button):
