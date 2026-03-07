@@ -336,7 +336,7 @@ class Paginator(discord.ui.View):
     async def on_timeout(self) -> None:
         if self.message:
             for item in self.children:
-                item.disabled = True
+                item.disabled = False if getattr(item, 'url', None) else True
 
             await self.message.edit(view=self)
 
