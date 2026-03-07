@@ -170,17 +170,24 @@ class Paginator(discord.ui.View):
         num_pages: Optional[int] = None,
         loop_pages: Optional[bool] = True,
         timeout_after: Optional[int] = 120,
+        disable_go: Optional[bool] = False,
     ):
         self.get_page = get_page
         self.num_pages = num_pages
         self.loop_pages = loop_pages and self.num_pages is not None
+        self.disable_go = disable_go
 
         self.current_page = 0
         self.message = None
         self.ctx = None
 
         super().__init__(timeout=timeout_after)
-        self.pagination_buttons = (self.first, self.previous, self.stop_button, self.next, self.last, self.go)
+        self.pagination_buttons = [self.first, self.previous, self.stop_button, self.next, self.last]
+        if self.disable_go:
+            self.remove_item(self.go)
+        else:
+            self.pagination_buttons.append(self.go)
+
         self.select = None
 
     def is_paginating(self) -> bool:
@@ -284,10 +291,10 @@ class Paginator(discord.ui.View):
             if self.message:
                 await self.message.edit(**kwargs, view=self)
 
-    async def start(self, ctx: commands.Context, pidx: int = 0):
+    async def start(self, ctx: commands.Context, pidx: int = 0, **kw):
         self.ctx = ctx
         kwargs = await self._prepare_page(pidx)
-        self.message = await ctx.reply(**kwargs, view=self, mention_author=False)
+        self.message = await ctx.reply(**(kwargs | kw), view=self, mention_author=False)
 
     @discord.ui.button(emoji=FIRST_PAGE_EMOJI, style=discord.ButtonStyle.grey)
     async def first(self, interaction: discord.Interaction, button: discord.Button):
@@ -336,7 +343,7 @@ class Paginator(discord.ui.View):
     async def on_timeout(self) -> None:
         if self.message:
             for item in self.children:
-                item.disabled = True
+                item.disabled = False if getattr(item, 'url', None) else True
 
             await self.message.edit(view=self)
 

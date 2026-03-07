@@ -1,5 +1,7 @@
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+import math
+from textwrap import dedent
 import time
 from urllib.parse import urlencode
 from typing import Optional
@@ -13,6 +15,7 @@ import parsedatetime as pdt
 from helpers import checks
 from helpers.context import GuiduckContext
 from helpers.converters import FetchChannelOrThreadConverter
+from helpers.pagination import Paginator
 
 
 class LogFlagConverter(commands.Converter):
@@ -33,22 +36,32 @@ class LogFlagConverter(commands.Converter):
                 struct = calendar.parse(arg)[0]
                 now = datetime.now()
                 dt = datetime.fromtimestamp(time.mktime(struct))
-                if 0 < (now - dt).total_seconds() < 1 :  # dt is current time when input is not valid
+                if 0 < (now - dt).total_seconds() < 1:  # dt is current time when input is not valid
                     raise ValueError("Invalid input for before/after flag")
 
                 return dt
 
 
 class LogFlags(commands.FlagConverter, case_insensitive=True):
-    channel: FetchChannelOrThreadConverter = commands.flag(description="The channel whose logs to show", default=None, positional=True)
+    channel: FetchChannelOrThreadConverter = commands.flag(
+        description="The channel whose logs to show", default=None, positional=True
+    )
+    no_website: bool = commands.flag(
+        name="no-website", description="Embed the logs directly in the channel", aliases=["n"], default=False
+    )
+    ephemeral: bool = commands.flag(description="Hide the message shown (default True)", default=True)
 
-    user: discord.Member | discord.User = commands.flag(description="Show logs of a specific user", default=None, aliases=("from",))
+    user: discord.Member | discord.User = commands.flag(
+        description="Show logs of a specific user", default=None, aliases=("from",)
+    )
     before: LogFlagConverter = commands.flag(description="Filter logs before a specific message/time", default=None)
     after: LogFlagConverter = commands.flag(description="Filter logs after a specific message/time", default=None)
     limit: int = commands.flag(description="Limit how many logs to show (50 by default)", default=None)
     deleted: bool = commands.flag(description="Whether to show deleted messages only", default=None)
 
+
 PARAM_OFFSETS = {"before": 1, "after": -1}
+
 
 class Logging(commands.Cog):
     """For logging."""
@@ -157,10 +170,14 @@ class Logging(commands.Cog):
             return
 
         if before.channel:
-            await before.channel.send(f'**{member.mention}** has left the voice channel.', allowed_mentions=discord.AllowedMentions.none())
+            await before.channel.send(
+                f"**{member.mention}** has left the voice channel.", allowed_mentions=discord.AllowedMentions.none()
+            )
 
         if after.channel:
-            await after.channel.send(f'**{member.mention}** has joined the voice channel.', allowed_mentions=discord.AllowedMentions.none())
+            await after.channel.send(
+                f"**{member.mention}** has joined the voice channel.", allowed_mentions=discord.AllowedMentions.none()
+            )
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
@@ -236,14 +253,17 @@ class Logging(commands.Cog):
     ):
         """Gets a link to the message logs for a channel.
         ### Supported Flags
+        - `no-website`: Embed the logs directly in the channel
+        - `ephemeral`: Hide the shown message (default True)
+
         - `user`: Show logs of a specific user
         - `before`: Filter logs before a specific message/time
-        - `after`: Filter logs after a specific message/time
-        > These accept:
+        > This flag accepts:
         > - Message Link
         > - Message ID (current channel)
         > - "ChannelID-MessageID" (retrieved by shift-clicking on “Copy ID”)
         > - Date/time string (e.g. `12/31 16:40`, `friday`, `yesterday`)
+        - `after`: Filter logs after a specific message/time. Same inputs as `before`.
         - `limit`: Limit how many logs to show (50 by default)
         - `deleted`: Whether to show deleted messages only
 
@@ -278,7 +298,7 @@ class Logging(commands.Cog):
                     value = value.id + offset
 
                 elif isinstance(value, datetime):
-                    value_line = format_dt(value, 'F')
+                    value_line = format_dt(value, "F")
                     value = time_snowflake(value)
 
                 params[param] = value
@@ -296,15 +316,98 @@ class Logging(commands.Cog):
         if params:
             url += f"?{urlencode(params)}"
 
-        view = discord.ui.View()
-        view.add_item(discord.ui.Button(label=f"Jump", url=url))
-
         lines = [f"### Message Logs of {channel.mention}", url]
         if filter_texts:
             lines.append("### Filters")
             lines.extend([f"- **{name}**: {text}" for name, text in filter_texts.items()])
 
-        await ctx.send("\n".join(lines), view=view, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
+        if flags.no_website:
+            filt = {"channel_id": channel.id}
+            if params.get("user"):
+                filt["user_id"] = params.get("user")
+            if params.get("deleted"):
+                filt["deleted_at"] = {"$ne": None}
+
+            for f, op in zip(("before", "after"), ("$lte", "$gte")):
+                if params.get(f):
+                    filt.setdefault("_id", dict())[op] = params[f]
+
+            PER_PAGE = 10
+            div = "—" * 30
+            paginator = Paginator(None, loop_pages=False, disable_go=True)
+            paginator.add_item(discord.ui.Button(label=f"Jump", url=url))
+
+            async def get_page(page: int):
+                log_lines = []
+
+                offset = page * PER_PAGE
+                async for m in self.bot.mongo.db.message.find(filt).sort("_id", -1).skip(offset).limit(PER_PAGE):
+                    dt = discord.utils.snowflake_time(m["_id"])
+                    author = self.bot.get_user(m["user_id"]) or await self.bot.fetch_user(m["user_id"])
+
+                    history = list(sorted(m["history"].items(), key=lambda t: -int(t[0])))
+                    content = history[0][1]
+
+                    def fmt_msg(_dt, _content, *, show_indicators=True):
+                        ts_t = discord.utils.format_dt(_dt, "t")
+                        ts_d = (
+                            (" " + discord.utils.format_dt(_dt, "d"))
+                            if discord.utils.utcnow().date() != ctx.message.created_at.date()
+                            else ""
+                        )
+                        indicators = (
+                            f"{'`❌`' if m['deleted_at'] else ''}{'`✏️`' if edited else ''}" if show_indicators else ""
+                        )
+
+                        return f"[{ts_t}{ts_d}]{indicators} {author.mention}: {discord.utils.escape_markdown(_content)}"
+
+                    edited = len(m["history"]) > 1
+
+                    line = fmt_msg(dt, content)
+                    if edited:
+                        line += (
+                            "".join(
+                                f"\n{div}\n"
+                                + fmt_msg(datetime.fromtimestamp(float(k), tz=timezone.utc), v, show_indicators=False)
+                                for k, v in history[1:]
+                            )
+                        ).replace("\n", "\n> ")
+
+                    log_lines.append(line)
+
+                if len(log_lines) < PER_PAGE:
+                    paginator.num_pages = page + 1
+
+                desc = f"\n{div}\n".join(log_lines)
+
+                embed = discord.Embed(title=f"#{channel.name}", description=desc)
+                embed.set_author(name=f"{channel.id}")
+                embed.set_footer(
+                    text=dedent(
+                        f"""
+                        ✏️ - edited
+                        ❌ - deleted
+                        Page {page + 1}/{'?' if paginator.num_pages is None else paginator.num_pages}
+                        """
+                    )
+                )
+
+                return embed
+
+            paginator.get_page = get_page
+            await paginator.start(
+                ctx,
+                content="\n".join(lines),
+                ephemeral=flags.ephemeral,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        else:
+            view = discord.ui.View()
+            view.add_item(discord.ui.Button(label=f"Jump", url=url))
+
+            await ctx.send(
+                "\n".join(lines), view=view, ephemeral=flags.ephemeral, allowed_mentions=discord.AllowedMentions.none()
+            )
 
     @logs.command()
     @commands.guild_only()
@@ -334,7 +437,12 @@ class Logging(commands.Cog):
     @checks.is_trial_moderator()
     @commands.guild_only()
     @commands.command()
-    async def snipe(self, ctx, channel: Optional[discord.TextChannel | discord.Thread | discord.VoiceChannel] = commands.CurrentChannel, nth: int = 1):
+    async def snipe(
+        self,
+        ctx,
+        channel: Optional[discord.TextChannel | discord.Thread | discord.VoiceChannel] = commands.CurrentChannel,
+        nth: int = 1,
+    ):
         permissions = channel.permissions_for(ctx.author)
         if not all([getattr(permissions, perm, False) for perm in ("read_messages", "read_message_history")]):
             return await ctx.reply("You don't have permissions to view that channel.")
@@ -343,12 +451,7 @@ class Logging(commands.Cog):
             return await ctx.reply("The nth deleted message to show cannot be 0 or less.", mention_author=False)
 
         message = await self.bot.mongo.db.message.find_one(
-            {
-                "channel_id": channel.id,
-                "deleted_at": {"$ne": None}
-            }, 
-            sort=[("_id", -1)],
-            skip=nth - 1
+            {"channel_id": channel.id, "deleted_at": {"$ne": None}}, sort=[("_id", -1)], skip=nth - 1
         )
         if not message:
             return await ctx.reply("No deleted message found.", mention_author=False)
