@@ -46,8 +46,11 @@ class LogFlags(commands.FlagConverter, case_insensitive=True):
     channel: FetchChannelOrThreadConverter = commands.flag(
         description="The channel whose logs to show", default=None, positional=True
     )
-    no_website: bool = commands.flag(
-        name="no-website", description="Embed the logs directly in the channel", aliases=["n"], default=False
+    no_embed: bool = commands.flag(
+        name="no-embed",
+        description="Don't embed the logs directly in the channel. Default True for non-slash command.",
+        aliases=["n"],
+        default=None,
     )
     ephemeral: bool = commands.flag(description="Hide the message shown (default True)", default=True)
 
@@ -253,7 +256,7 @@ class Logging(commands.Cog):
     ):
         """Gets a link to the message logs for a channel.
         ### Supported Flags
-        - `no-website`: Embed the logs directly in the channel
+        - `no-embed`: Don't embed the logs directly in the channel
         - `ephemeral`: Hide the shown message (default True)
 
         - `user`: Show logs of a specific user
@@ -321,7 +324,8 @@ class Logging(commands.Cog):
             lines.append("### Filters")
             lines.extend([f"- **{name}**: {text}" for name, text in filter_texts.items()])
 
-        if flags.no_website:
+        no_embed = flags.no_embed if flags.no_embed is not None else (False if ctx.interaction else True)
+        if not no_embed:
             filt = {"channel_id": channel.id}
             if params.get("user"):
                 filt["user_id"] = params.get("user")
