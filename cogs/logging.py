@@ -44,7 +44,7 @@ class LogFlagConverter(commands.Converter):
 
 class LogFlags(commands.FlagConverter, case_insensitive=True):
     channel: FetchChannelOrThreadConverter = commands.flag(
-        description="The channel whose logs to show", default=lambda ctx: ctx.channel, positional=True
+        description="The channel whose logs to show", default=None, positional=True
     )
     no_website: bool = commands.flag(
         name="no-website", description="Embed the logs directly in the channel", aliases=["n"], default=False
@@ -270,7 +270,7 @@ class Logging(commands.Cog):
         You must have the Trial Moderator role to use this.
         """
 
-        channel = flags.channel
+        channel = flags.channel or ctx.channel
         url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
 
         params = {}
@@ -322,7 +322,7 @@ class Logging(commands.Cog):
             lines.extend([f"- **{name}**: {text}" for name, text in filter_texts.items()])
 
         if flags.no_website:
-            filt = {"channel_id": flags.channel.id}
+            filt = {"channel_id": channel.id}
             if params.get("user"):
                 filt["user_id"] = params.get("user")
             if params.get("deleted"):
