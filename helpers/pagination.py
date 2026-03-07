@@ -286,10 +286,10 @@ class Paginator(discord.ui.View):
             if self.message:
                 await self.message.edit(**kwargs, view=self)
 
-    async def start(self, ctx: commands.Context, pidx: int = 0):
+    async def start(self, ctx: commands.Context, pidx: int = 0, **kw):
         self.ctx = ctx
         kwargs = await self._prepare_page(pidx)
-        self.message = await ctx.reply(**kwargs, view=self, mention_author=False, ephemeral=self.ephemeral)
+        self.message = await ctx.reply(**(kwargs | kw), view=self, mention_author=False, ephemeral=self.ephemeral)
 
     @discord.ui.button(emoji=FIRST_PAGE_EMOJI, style=discord.ButtonStyle.grey)
     async def first(self, interaction: discord.Interaction, button: discord.Button):
