@@ -48,9 +48,9 @@ class LogFlags(commands.FlagConverter, case_insensitive=True):
     )
     no_embed: bool = commands.flag(
         name="no-embed",
-        description="Don't embed the logs directly in the channel. Default True for non-slash command.",
+        description="Don't embed the logs directly in the channel. Default False.",
         aliases=["n"],
-        default=None,
+        default=False,
     )
     ephemeral: bool = commands.flag(description="Hide the message shown (default True)", default=True)
 
@@ -256,7 +256,7 @@ class Logging(commands.Cog):
     ):
         """Gets a link to the message logs for a channel.
         ### Supported Flags
-        - `no-embed`: Don't embed the logs directly in the channel
+        - `no-embed`: Don't embed the logs directly in the channel. Default False.
         - `ephemeral`: Hide the shown message (default True)
 
         - `user`: Show logs of a specific user
@@ -324,8 +324,7 @@ class Logging(commands.Cog):
             lines.append("### Filters")
             lines.extend([f"- **{name}**: {text}" for name, text in filter_texts.items()])
 
-        no_embed = flags.no_embed if flags.no_embed is not None else (False if ctx.interaction else True)
-        if not no_embed:
+        if not flags.no_embed:
             filt = {"channel_id": channel.id}
             if params.get("user"):
                 filt["user_id"] = params.get("user")
