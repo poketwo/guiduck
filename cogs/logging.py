@@ -372,7 +372,7 @@ class Logging(commands.Cog):
                         line += (
                             "".join(
                                 f"\n{div}\n"
-                                + fmt_msg(datetime.fromtimestamp(float(k), tz=timezone.utc), v, show_indicators=False)
+                                + fmt_msg(datetime.fromtimestamp(int(k), tz=timezone.utc) + 3600, v, show_indicators=False)  # +3600 because it subtracts 3600 in the message and edit code for some reason :sob:
                                 for k, v in history[1:]
                             )
                         ).replace("\n", "\n> ")
