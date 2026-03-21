@@ -54,21 +54,23 @@ class TimedPin:
 
 
 def can_pin():
-    """Check that the user is the thread owner or has manage_messages permission."""
+    """Check that the user is the thread owner or has the pin messages permission."""
 
     async def predicate(ctx):
         if not isinstance(ctx.channel, discord.Thread):
             raise commands.CheckFailure("This command can only be used in threads.")
 
-        # Users with manage_messages can always pin
-        if ctx.channel.permissions_for(ctx.author).manage_messages:
+        perms = ctx.channel.permissions_for(ctx.author)
+
+        # Users with pin_messages (or manage_messages) can always pin
+        if perms.manage_messages or perms.pin_messages:
             return True
 
         # Thread owner can pin in their own thread
         if ctx.channel.owner_id == ctx.author.id:
             return True
 
-        raise commands.CheckFailure("You must be the thread owner or have the Manage Messages permission to use this.")
+        raise commands.CheckFailure("You must be the thread owner or have the Pin Messages permission to use this.")
 
     return commands.check(predicate)
 
