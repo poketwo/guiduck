@@ -268,18 +268,7 @@ class GiveawayApproveButton(discord.ui.Button):
             member.get("suspended")
             or (member.get("suspended_until") and member.get("suspended_until") > datetime.utcnow())
         ):
-            await self.bot.mongo.db.giveaway.update_one(
-                {"_id": self.giveaway._id}, {"$set": {"approval_status": False}}
-            )
-            await self.giveaway.send_pokemon_to_user(self.giveaway.user)
-
-            embed = await self.giveaway.approval_embed()
-            embed.title = "Giveaway Request Denied"
-            embed.color = discord.Color.red()
-            embed.add_field(name="Reason", value="User is suspended from Pokétwo.", inline=False)
-            await interaction.response.edit_message(embed=embed, view=None)
-            await self.giveaway.user.send(embed=embed)
-            return
+            return await GiveawayDenyButton(self.giveaway).callback(interaction)
 
         await self.bot.mongo.db.giveaway.update_one({"_id": self.giveaway._id}, {"$set": {"approval_status": True}})
 
