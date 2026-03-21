@@ -17,7 +17,7 @@ from helpers.utils import FakeUser
 class Reminder:
     user: discord.Member
     event: str
-    guild_id: int
+    guild_id: Optional[int]
     channel_id: int
     message_id: int
     created_at: datetime
@@ -186,7 +186,7 @@ class Reminders(commands.Cog):
             return
 
         await self.bot.mongo.db.reminder.update_one({"_id": reminder._id}, {"$set": {"resolved": True}})
-        if (guild_id := reminder.guild_id):
+        if guild_id := reminder.guild_id:
             guild = self.bot.get_guild(guild_id)
             channel = guild.get_channel_or_thread(reminder.channel_id)
         else:
