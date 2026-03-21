@@ -12,6 +12,12 @@ from discord.utils import format_dt
 from helpers import time
 from helpers.pagination import AsyncEmbedFieldsPageSource
 
+# Discord's PIN_MESSAGES permission (1 << 51), not yet in this discord.py fork
+PIN_MESSAGES_BIT = 1 << 51
+
+# Discord increased the pin limit from 50 to 250 in August 2025
+MAX_PINS = 250
+
 
 @dataclass
 class TimedPin:
@@ -59,8 +65,12 @@ def can_pin():
     async def predicate(ctx):
         perms = ctx.channel.permissions_for(ctx.author)
 
-        # Users with pin_messages (or manage_messages) can always pin
-        if perms.manage_messages or perms.pin_messages:
+        # Users with manage_messages can always pin
+        if perms.manage_messages:
+            return True
+
+        # Check PIN_MESSAGES (1 << 51) via raw value since our discord.py fork doesn't have it yet
+        if perms.value & PIN_MESSAGES_BIT:
             return True
 
         # Thread owner can pin in their own thread
@@ -80,7 +90,7 @@ class PinIndexOrMessage(commands.Converter):
         stripped = argument.lstrip("#")
         if stripped.isdigit():
             idx = int(stripped)
-            if 1 <= idx <= 50:
+            if 1 <= idx <= MAX_PINS:
                 return idx
 
         return await commands.MessageConverter().convert(ctx, argument)
@@ -240,7 +250,7 @@ class Pins(commands.Cog):
         pages = ViewMenuPages(
             source=AsyncEmbedFieldsPageSource(
                 get_pins(),
-                title=f"\N{PUSHPIN} Pinned Messages ({count}/50)",
+                title=f"\N{PUSHPIN} Pinned Messages ({count}/{MAX_PINS})",
                 format_item=format_item,
                 count=count,
             )
