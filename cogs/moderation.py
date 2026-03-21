@@ -1150,13 +1150,13 @@ class Moderation(commands.Cog):
 
     @commands.hybrid_command()
     @commands.guild_only()
-    @checks.is_trial_moderator()
+    @checks.is_moderator()
     async def lock(self, ctx, channel: Optional[discord.TextChannel] = None, *, reason: Optional[str] = None):
         """Locks a channel by preventing members from sending messages.
 
         If no channel is provided, locks the current channel.
 
-        You must have the Trial Moderator role to use this.
+        You must have the Moderator role to use this.
         """
 
         channel = channel or ctx.channel
@@ -1178,13 +1178,13 @@ class Moderation(commands.Cog):
 
     @commands.hybrid_command()
     @commands.guild_only()
-    @checks.is_trial_moderator()
+    @checks.is_moderator()
     async def unlock(self, ctx, channel: Optional[discord.TextChannel] = None, *, reason: Optional[str] = None):
         """Unlocks a channel by allowing members to send messages again.
 
         If no channel is provided, unlocks the current channel.
 
-        You must have the Trial Moderator role to use this.
+        You must have the Moderator role to use this.
         """
 
         channel = channel or ctx.channel
