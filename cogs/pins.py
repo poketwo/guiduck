@@ -2,7 +2,7 @@ import asyncio
 import textwrap
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 import discord
 from discord.ext import commands
@@ -83,6 +83,20 @@ def can_pin():
     return commands.check(predicate)
 
 
+class PinIndexOrMessage(commands.Converter):
+    """Accepts either a pin index (e.g. #1, #2) or a message link/ID."""
+
+    async def convert(self, ctx, argument: str) -> Union[int, discord.Message]:
+        # Check for pin index (e.g. #1 or just a small number)
+        stripped = argument.lstrip("#")
+        if stripped.isdigit():
+            idx = int(stripped)
+            if 1 <= idx <= 50:
+                return idx
+
+        return await commands.MessageConverter().convert(ctx, argument)
+
+
 class Pins(commands.Cog):
     """For pinning and unpinning messages in threads."""
 
@@ -109,20 +123,36 @@ class Pins(commands.Cog):
     @commands.guild_only()
     @can_pin()
     async def pin(self, ctx, message: Optional[str] = None, *, flags: PinFlags):
-        """Pins a message in the current thread.
+        """Toggles a pin on a message in the current thread.
 
-        You can reply to the message you want to pin, or pass a message link/ID.
+        If the message is not pinned, it will be pinned. If it is already pinned, it will be unpinned.
+
+        You can reply to the message, or pass a message link/ID.
 
         Use --duration to pin temporarily, e.g.:
-        • ?pin <message> --duration 2h
-        • ?pin --duration 30m (when replying)
+        \u2022 ?pin <message> --duration 2h
+        \u2022 ?pin --duration 30m (when replying)
         """
 
         target = await self.resolve_message(ctx, message)
 
         if target.pinned:
-            return await ctx.send("That message is already pinned.")
+            # Unpin the message (toggle off)
+            await target.unpin(reason=f"Unpinned by {ctx.author} (ID: {ctx.author.id})")
 
+            # Resolve any timed pin for this message
+            await self.bot.mongo.db.timed_pin.update_many(
+                {"message_id": target.id, "channel_id": ctx.channel.id, "resolved": False},
+                {"$set": {"resolved": True}},
+            )
+
+            if self._current is not None:
+                self.clear_current()
+            self.bot.loop.create_task(self.update_current())
+
+            return await ctx.send("\N{PUSHPIN} Unpinned!")
+
+        # Pin the message (toggle on)
         await target.pin(reason=f"Pinned by {ctx.author} (ID: {ctx.author.id})")
 
         if flags.duration is not None:
@@ -147,38 +177,13 @@ class Pins(commands.Cog):
         else:
             await ctx.send("\N{PUSHPIN} Pinned!")
 
-    @pin.command(name="remove", aliases=("unpin",))
-    @commands.guild_only()
-    @can_pin()
-    async def pin_remove(self, ctx, *, message: Optional[str] = None):
-        """Unpins a message in the current thread.
-
-        You can reply to the message you want to unpin, or pass a message link/ID.
-        """
-
-        target = await self.resolve_message(ctx, message)
-
-        if not target.pinned:
-            return await ctx.send("That message is not pinned.")
-
-        await target.unpin(reason=f"Unpinned by {ctx.author} (ID: {ctx.author.id})")
-
-        # Resolve any timed pin for this message
-        await self.bot.mongo.db.timed_pin.update_many(
-            {"message_id": target.id, "channel_id": ctx.channel.id, "resolved": False},
-            {"$set": {"resolved": True}},
-        )
-
-        if self._current is not None:
-            self.clear_current()
-        self.bot.loop.create_task(self.update_current())
-
-        await ctx.send("\N{PUSHPIN} Unpinned!")
-
     @pin.command(name="list", aliases=("ls",))
     @commands.guild_only()
     async def pin_list(self, ctx):
-        """Lists all pinned messages in the current channel."""
+        """Lists all pinned messages in the current channel.
+
+        Use ?pin view <#index> to view a specific pin's full content.
+        """
 
         pinned = await ctx.channel.pins()
 
@@ -195,7 +200,7 @@ class Pins(commands.Cog):
             content = msg.content or "*No text content*"
             preview = textwrap.shorten(content, 100)
             jump = f"[Jump]({msg.jump_url})"
-            name = f"{msg.author.display_name} \u2022 {jump}"
+            name = f"#{i + 1}. {msg.author.display_name} \u2022 {jump}"
             value = f"{preview}\n{format_dt(msg.created_at, 'R')}"
             return {"name": name, "value": value, "inline": False}
 
@@ -213,37 +218,49 @@ class Pins(commands.Cog):
         except IndexError:
             await ctx.send("No pinned messages found.")
 
-    @pin.command(name="clear")
+    @pin.command(name="view", aliases=("show", "info"))
     @commands.guild_only()
-    @can_pin()
-    async def pin_clear(self, ctx):
-        """Unpins all messages in the current thread."""
+    async def pin_view(self, ctx, *, target: PinIndexOrMessage):
+        """Shows a specific pinned message's content in an embed.
 
-        pinned = await ctx.channel.pins()
+        You can pass a message link/ID, or use an index from ?pin list (e.g. #1).
+        """
 
-        if not pinned:
-            return await ctx.send("There are no pinned messages to clear.")
+        if isinstance(target, int):
+            # Resolve index to a pinned message
+            pinned = await ctx.channel.pins()
+            if not pinned:
+                return await ctx.send("There are no pinned messages in this channel.")
+            if target < 1 or target > len(pinned):
+                return await ctx.send(
+                    f"Invalid pin index. There are **{len(pinned)}** pinned messages (use #1-#{len(pinned)})."
+                )
+            message = pinned[target - 1]
+        else:
+            message = target
+            if not message.pinned:
+                return await ctx.send("That message is not pinned.")
 
-        result = await ctx.confirm(f"Are you sure you want to unpin all **{len(pinned)}** pinned messages?")
-
-        if result is None or result is False:
-            return await ctx.send("Cancelled.")
-
-        reason = f"Bulk unpin by {ctx.author} (ID: {ctx.author.id})"
-        for msg in pinned:
-            await msg.unpin(reason=reason)
-
-        # Resolve all timed pins in this channel
-        await self.bot.mongo.db.timed_pin.update_many(
-            {"channel_id": ctx.channel.id, "resolved": False},
-            {"$set": {"resolved": True}},
+        embed = discord.Embed(
+            description=message.content or "*No text content*",
+            color=discord.Color.blurple(),
+            timestamp=message.created_at,
         )
+        embed.set_author(name=message.author.display_name, icon_url=message.author.display_avatar.url)
+        embed.add_field(name="Jump", value=f"[Go to message]({message.jump_url})", inline=True)
 
-        if self._current is not None:
-            self.clear_current()
-        self.bot.loop.create_task(self.update_current())
+        if message.attachments:
+            attachment_text = "\n".join(f"[{a.filename}]({a.url})" for a in message.attachments)
+            embed.add_field(name="Attachments", value=attachment_text, inline=False)
+            # Set the first image attachment as the embed image
+            for attachment in message.attachments:
+                if attachment.content_type and attachment.content_type.startswith("image/"):
+                    embed.set_image(url=attachment.url)
+                    break
 
-        await ctx.send(f"\N{PUSHPIN} Unpinned **{len(pinned)}** messages.")
+        embed.set_footer(text=f"Pin #{target}" if isinstance(target, int) else "Pinned message")
+
+        await ctx.send(embed=embed)
 
     # Timed pin dispatch system (modeled after reminders)
 
