@@ -278,6 +278,7 @@ class GiveawayApproveButton(discord.ui.Button):
             embed.color = discord.Color.red()
             embed.add_field(name="Reason", value="User is suspended from Pokétwo.", inline=False)
             await interaction.response.edit_message(embed=embed, view=None)
+            await self.giveaway.user.send(embed=embed)
             return
 
         await self.bot.mongo.db.giveaway.update_one({"_id": self.giveaway._id}, {"$set": {"approval_status": True}})
