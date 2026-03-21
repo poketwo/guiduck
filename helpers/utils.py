@@ -1,7 +1,11 @@
-from typing import Iterable, NamedTuple
+from datetime import datetime
+from textwrap import shorten
+from typing import Iterable, List, NamedTuple, Optional
 
 import discord
 from discord.ext import commands
+
+from . import time
 
 
 class FakeAvatar(NamedTuple):
@@ -67,3 +71,79 @@ def with_attachment_urls(content: str, attachments: Iterable[discord.Attachment]
     for attachment in attachments:
         content += f"\n{attachment.url}"
     return content
+
+
+DISCORD_DT_FORMAT = "%d %B %Y %H:%M %Z"
+
+
+def full_format_dt(dt: datetime, plain_text: Optional[bool] = False) -> str:
+    """Formats datetime object to discord/text timestamp in `FULL (RELATIVE)` format"""
+
+    if plain_text:
+        relative = time.human_timedelta(dt, accuracy=2, brief=True)
+        return f"{dt:{DISCORD_DT_FORMAT}} ({relative})"
+    else:
+        return f"{discord.utils.format_dt(dt)} ({discord.utils.format_dt(dt, 'R')})"
+
+
+def shorten_around(
+    substring: str,
+    string: str,
+    length: int,
+    *,
+    placeholder: Optional[str] = "[...]",
+    words_before: Optional[int] = 3,
+) -> str:
+    """
+    Function to shorten a string around a given substring. Helpful for things like showing search results.
+    """
+
+    words_before += 1
+    words = string.split()
+    for i, word in enumerate(words):
+        if substring in word:
+            start = max(0, i - words_before)
+            break
+    else:
+        return shorten(string, length, placeholder=placeholder)
+
+    new_words = []
+    if start != 0:
+        new_words.append(placeholder)
+
+    new_words.extend(words[start:])
+
+    return shorten(" ".join(new_words), length, placeholder=placeholder)
+
+
+def get_substring_matches(substring: str, strings: List[str]) -> List[str]:
+    """
+    Takes in a substring and a list of strings and returns those strings which have substring in it,
+    sorted by where in the string it appears.
+    """
+
+    matches = []
+    for string in strings:
+        if substring in string:
+            matches.append(string)
+
+    matches.sort(key=lambda c: c.index(substring))
+    return matches
+
+
+def as_line_chunks_by_len(text: str, char_limit: int):
+    """Split a string into chunks by line based on the character limit"""
+
+    chunks = []
+
+    chunk = []
+    for line in text.splitlines():
+        if len("\n".join(chunk + [line])) > char_limit:
+            chunks.append("\n".join(chunk))
+            chunk.clear()
+        chunk.append(line)
+
+    if chunk:
+        chunks.append("\n".join(chunk))
+
+    return chunks

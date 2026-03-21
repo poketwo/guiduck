@@ -7,10 +7,13 @@ from discord.ext import commands, tasks
 
 
 class AutoPost:
-    def __init__(self, channels: List[int], message: str, *, each: int = 1):
+    def __init__(self, channels: List[int], message: str, *, each: int = 1, delete_last: bool = False):
         self.do_post = itertools.cycle([True] + [False] * (each - 1))
         self.channels = itertools.cycle(channels)
         self.message = textwrap.dedent(message).strip()
+
+        self.delete_last = delete_last
+        self.last_message = None
 
 
 POSTS = [
@@ -26,6 +29,7 @@ POSTS = [
         • Don't give into pressure to buy or sell immediately. You can always try again later.
         • Read through the trading tips document linked in the <#754774504571666534> channel.
         """,
+        delete_last=True,
     ),
     AutoPost(
         [741712512113967214],
@@ -49,6 +53,7 @@ POSTS = [
         • Do not run generic bot commands here, there are multiple channels for that. <#720029048381767751> and <#784148997593890836>
         • Auctions and market advertisements are not allowed. Use <#741712512113967214> and <#768161635096461362>.
         """,
+        delete_last=True,
     ),
 ]
 
@@ -77,7 +82,11 @@ class PriceCheck(commands.Cog):
             channel_id = next(post.channels)
             if self.updated[channel_id]:
                 channel = self.bot.get_channel(channel_id)
-                await channel.send(post.message)
+
+                if post.delete_last and post.last_message:
+                    await post.last_message.delete()
+
+                post.last_message = await channel.send(post.message)
                 self.updated[channel_id] = False
 
     @autopost.before_loop

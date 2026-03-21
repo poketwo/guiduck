@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import textwrap
 
 import discord
 import pymongo
@@ -66,10 +67,14 @@ class Tags(commands.Cog):
         async for tag_data in tags:
             yield Tag(**tag_data)
 
-    async def send_tags(self, ctx, tags):
+    async def count_tags(self, query):
+        return await self.bot.mongo.db.tag.count_documents(query)
+
+    async def send_tags(self, ctx, tags, *, count: int = None):
         pages = ViewMenuPages(
             source=AsyncEmbedListPageSource(
                 tags,
+                count=count,
                 show_index=True,
                 format_item=lambda x: x.name,
             )
@@ -97,6 +102,7 @@ class Tags(commands.Cog):
             tag.content,
             allowed_mentions=discord.AllowedMentions.none(),
             reference=ctx.message.reference,
+            ephemeral=True,
         )
         if ctx.guild is not None:
             await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$inc": {"uses": 1}})
@@ -118,10 +124,24 @@ class Tags(commands.Cog):
         if tag.alias:
             embed.add_field(name="Original", value=tag.original)
         else:
+            names = [t.name async for t in self.query_tags({"original": tag.name})]
+            names.sort(key=lambda n: len(n))
+
+            N = 25
+            suffix = ""
+            if len(names) > N:
+                suffix = f" [...{len(names) - N}]"
+                names = names[:N]
+
+            embed.add_field(name="Aliases", value=textwrap.shorten(", ".join(names) + suffix, 512) if names else "*None*")
             embed.add_field(name="Uses", value=tag.uses)
+
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
 
-        await ctx.send(embed=embed)
+        embed.set_footer(text="Created at")
+        embed.timestamp = tag.id.generation_time
+
+        await ctx.send(embed=embed, ephemeral=True)
 
     @tag.command()
     async def raw(self, ctx, *, name):
@@ -135,6 +155,7 @@ class Tags(commands.Cog):
             escaped,
             allowed_mentions=discord.AllowedMentions.none(),
             reference=ctx.message.reference,
+            ephemeral=True,
         )
 
     # Searching tags
@@ -143,13 +164,15 @@ class Tags(commands.Cog):
     async def all(self, ctx):
         """Lists all tags."""
 
-        await self.send_tags(ctx, self.query_tags({}))
+        query = {}
+        await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
 
     @tag.command()
     async def search(self, ctx, *, text):
         """Searches for a tag."""
 
-        await self.send_tags(ctx, self.query_tags({"$text": {"$search": text}}, sort=False))
+        query = {"$text": {"$search": text}}
+        await self.send_tags(ctx, self.query_tags(query, sort=False), count=await self.count_tags(query))
 
     @tag.command()
     async def list(self, ctx, *, member: discord.Member = None):
@@ -157,12 +180,25 @@ class Tags(commands.Cog):
 
         if member is None:
             member = ctx.author
-        await self.send_tags(ctx, self.query_tags({"owner_id": member.id}))
+
+        query = {"owner_id": member.id}
+        await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
+
+    @tag.command()
+    async def aliases(self, ctx, *, name):
+        """Shows all aliases of a tag."""
+
+        tag = await self.get_tag(name)
+        if tag is None:
+            return await ctx.send("Tag not found.")
+
+        query = {"original": tag.name}
+        await self.send_tags(ctx, self.query_tags(query), count=await self.count_tags(query))
 
     # Writing tags
 
     @tag.command()
-    @commands.check_any(checks.is_moderator(), commands.has_role("Create Tags"))
+    @commands.check_any(checks.is_trial_moderator(), commands.has_role("Create Tags"))
     async def create(self, ctx, name, *, content = ""):
         """Creates a new tag owned by you. Attachments will have their URLs appended to the tag."""
 
@@ -181,7 +217,7 @@ class Tags(commands.Cog):
             await ctx.send(f'A tag with the name "{tag.name}" already exists.')
 
     @tag.command()
-    @commands.check_any(checks.is_moderator(), commands.has_role("Create Tags"))
+    @commands.check_any(checks.is_trial_moderator(), commands.has_role("Create Tags"))
     async def alias(self, ctx, name, *, original):
         """Creates an alias for a pre-existing tag."""
 
@@ -211,19 +247,20 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
         if tag.owner_id != ctx.author.id:
-            return await ctx.send("You do not own that tag.")
+            return await ctx.send(f"You do not own the tag `{tag.name}`.")
         if tag.alias:
-            return await ctx.send("You cannot edit an alias.")
+            await ctx.send("Editing original tag of this alias...")
+            return await ctx.invoke(self.edit, tag.original, content=content)
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"content": content}})
-        await ctx.send(f"Successfully edited tag.")
+        await ctx.send(f"Successfully edited tag `{tag.name}`.")
 
     @tag.command(aliases=("fe",))
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def forceedit(self, ctx, name, *, content = ""):
         """Edits a tag by force. Attachments will have their URLs appended to the tag.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         content = with_attachment_urls(content, ctx.message.attachments)
 
@@ -256,11 +293,11 @@ class Tags(commands.Cog):
         await ctx.send(f"Tag and corresponding aliases successfully deleted.")
 
     @tag.command(aliases=("fd",))
-    @checks.is_moderator()
+    @checks.is_trial_moderator()
     async def forcedelete(self, ctx, *, name):
         """Removes a tag by force.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:
@@ -283,12 +320,12 @@ class Tags(commands.Cog):
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": member.id}})
         await ctx.send(f"Successfully transferred tag.")
 
-    @tag.command()
-    @checks.is_moderator()
+    @tag.command(aliases=("ft",))
+    @checks.is_trial_moderator()
     async def forcetransfer(self, ctx, member: discord.Member, *, name):
         """Transfers a tag to another user by force.
 
-        You must have the Moderator role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         tag = await self.get_tag(name)
         if tag is None:

@@ -126,6 +126,8 @@ class Ticket(abc.ABC):
             embed.add_field(name="Agent", value=self.agent.mention)
         if self.subject is not None:
             embed.add_field(name="Subject", value=self.subject, inline=False)
+        if self.description is not None:
+            embed.add_field(name="Description", value=textwrap.shorten(self.description, 200), inline=False)
 
         footer = [f"User ID • {self.user.id}"]
         if self.closed_at is not None:
@@ -143,12 +145,15 @@ class Ticket(abc.ABC):
             description=f"The ticket has been claimed by {self.agent.mention}. You will be assisted shortly.",
         )
 
-    def to_closed_embed(self):
-        return discord.Embed(
+    def to_closed_embed(self, user: discord.Member):
+        embed = discord.Embed(
             title="Ticket Closed",
             color=discord.Color.red(),
             description="The ticket has been closed, and the thread has been archived. Please open another support ticket if you require further assistance.",
         )
+        embed.set_footer(text=f"Closed by {user} ({user.id}).")
+
+        return embed
 
     @classmethod
     async def open(
@@ -248,7 +253,7 @@ class Ticket(abc.ABC):
             else:
                 await original.edit(embed=self.to_status_embed(), view=StatusView(self))
 
-    async def close(self):
+    async def close(self, user: discord.Member):
         if self.closed_at is not None:
             return False
 
@@ -256,7 +261,7 @@ class Ticket(abc.ABC):
 
         await self.edit(closed_at=datetime.now(timezone.utc), status_channel_id=guild_data["ticket_closed_channel_id"])
         with contextlib.suppress(discord.HTTPException):
-            await self.thread.send(embed=self.to_closed_embed())
+            await self.thread.send(embed=self.to_closed_embed(user))
         await self.thread.edit(archived=True, locked=True)
 
         return True
@@ -315,7 +320,7 @@ class CloseTicketButton(discord.ui.Button):
         if interaction.user == self.ticket.user or any(
             x.id in constants.TRIAL_MODERATOR_ROLES for x in interaction.user.roles
         ):
-            await self.ticket.close()
+            await self.ticket.close(interaction.user)
             await interaction.response.defer()
 
 
@@ -463,11 +468,11 @@ class SetupHelp(HelpDeskCategory):
             """
             Welcome to Pokétwo! For some common configuration options, use the commands listed below:
 
-            • `p!prefix <new_prefix>` to change prefix.
-            • `p!serversilence` to silence level up messages server-wide.
-            • `p!location <new_location>` to change location of server (used for day/night calculation).
-            • `p!redirect #channel` to redirect to a certain channel
-            • `p!redirect #channel1 #channel2 #channel3` etc to redirect to multiple channels.
+            • `@Pokétwo prefix <new_prefix>` to change prefix.
+            • `@Pokétwo serversilence` to silence level up messages server-wide.
+            • `@Pokétwo location <new_location>` to change location of server (used for day/night calculation).
+            • `@Pokétwo redirect #channel` to redirect to a certain channel
+            • `@Pokétwo redirect #channel1 #channel2 #channel3` etc to redirect to multiple channels.
 
             Unfortunately, we're not able to handle setup questions in the support server at this time.
             Feel free to check out our Documentation site at <https://docs.poketwo.net/> for common information. However, note that this site is currently an early work in progress.
@@ -511,7 +516,38 @@ class BugReports(HelpDeskCategory):
             """,
         )
 
+    async def on_open(self, ticket: Ticket):
+        if ticket.thread is None:
+            return
+        embed = discord.Embed(
+            title="Bug Reports",
+            color=discord.Color.blurple(),
+            description=textwrap.dedent(
+                """
+                For losses of event boxes, voting boxes, daycare eggs, pokécoins, shards, etc., that you are requesting compensation for, please be sure to attach screenshots that show your before and after balances of the respective item.
+                """
+            ),
+        )
+        await ticket.thread.send(embed=embed)
 
+
+USER_REPORT_INSTRUCTIONS = textwrap.dedent(
+    """
+    Thank you for reporting! We're sorry for any inconveniences you may have experienced. Please provide the following pieces of information for the report you're making to help us understand the situation better:
+
+    1. User ID of the user you're reporting (use `?tag find-id` if you're not sure how),
+    2. Context and explanation regarding the report (e.g. what happened, how you think they've violated our rules, etc) and
+    3. Evidence to back your report. This can be in the form of:
+        - **For non-suspendable offences**:
+          - Full unedited screenshots, screen recordings, message links.
+        - **For suspendable offences** (such as autocatching, crosstrading, etc.):
+          - Uncropped, unedited **screen recordings** only
+            - Must be from the Discord application (mobile or desktop), **not** web browser
+            - The video must include the user's ID being copied and pasted, see `?tag proof` for an example. 
+
+    After you submit these pieces of documentation, a staff member will assist you with the report shortly. Thank you!
+    """
+)
 class Reports(HelpDeskCategory):
     id = "rpt"
     label = "User Reports"
@@ -536,20 +572,7 @@ class Reports(HelpDeskCategory):
         embed = discord.Embed(
             title="User Report Instructions",
             color=discord.Color.blurple(),
-            description=textwrap.dedent(
-                """
-                Thank you for reporting! We're sorry for any inconveniences you may have experienced. Please provide the following pieces of information for the report you're making to help us understand the situation better:
-
-                1. User ID of the user you're reporting (use `?tag find-id` if you're not sure how),
-                2. Context and explanation regarding the report (e.g. what happened, how you think they've violated our rules, etc) and
-                3. Evidence to back your report. This can be in the form of, but not limited to:
-                  - Full, unedited screenshots
-                  - Screen recordings
-                  - Message links
-
-                After you submit these pieces of documentation, a staff member will assist you with the report shortly. Thank you!
-                """
-            ),
+            description=USER_REPORT_INSTRUCTIONS,
         )
         await ticket.thread.send(embed=embed)
 
@@ -580,11 +603,15 @@ class IncenseRefunds(HelpDeskCategory):
             color=discord.Color.blurple(),
             description=textwrap.dedent(
                 """
-                Thank you for submitting an incense refund request. We're sorry for the trouble you've encountered with your incense. In order for us to process your request, please submit the following:
+                Thank you for submitting an incense refund request. We're sorry for the trouble you've encountered with your incense. In order for us to process your request, please submit the following *for each incense to be refunded*:
 
-                1) A screenshot of you purchasing the incense,
-                2) A screenshot of the bot malfunctioning—not sending spawns, not responding to commands, or something else—and
-                3) The number of spawns lost in total, and screenshots to back this up.
+                ***Note: To qualify for a refund, a minimum of 14% of spawns must have been lost per incense (25/180 in standard incense).***
+
+                1. A screenshot of you purchasing the incense and the bot responding to the command,
+                2. A screenshot of the bot malfunctioning—not sending spawns, not responding to commands, or something else,
+                3. The number of spawns lost in total, and screenshots to back this up—and
+                4. A screenshot of you permanently stopping the incense using `@‌Pokétwo#8236 incense stop` and the bot responding to the command,
+                  - If the incense has already ended, run that command now and send a screenshot to show that.
 
                 After you submit these pieces of documentation, someone will come by to refund you shortly. Thank you!
                 """
@@ -671,6 +698,16 @@ class ServerReport(HelpDeskCategory):
     emoji = "\N{NO ENTRY SIGN}"
     hidden = True
     modal_cls = OpenReportModal
+
+    async def on_open(self, ticket: Ticket):
+        if ticket.thread is None:
+            return
+        embed = discord.Embed(
+            title="User Report Instructions",
+            color=discord.Color.blurple(),
+            description=USER_REPORT_INSTRUCTIONS,
+        )
+        await ticket.thread.send(embed=embed)
 
 
 class HelpDeskSelect(discord.ui.Select):
@@ -821,7 +858,7 @@ class HelpDesk(commands.Cog):
             return await ctx.send("Could not find ticket!", ephemeral=True)
 
         if ctx.author == ticket.user or any(x.id in constants.TRIAL_MODERATOR_ROLES for x in ctx.author.roles):
-            result = await ticket.close()
+            result = await ticket.close(ctx.author)
             if ctx.channel != ticket_thread:
                 if result:
                     await ctx.send("Successfully closed ticket.")

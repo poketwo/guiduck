@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import textwrap
 from typing import Optional, Union
+import random
 
 import discord
 from discord.ext import commands, tasks
@@ -17,6 +18,8 @@ from helpers.context import GuiduckContext
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
+BOT_ID = 753657623739629739
+
 
 class ModerationUserFriendlyTime(time.UserFriendlyTime):
     def __init__(self):
@@ -28,6 +31,99 @@ def message_channel(ctx, message):
         return dict(message_id=message.last_message_id, channel_id=message.id)
     message = message or ctx.message
     return dict(message_id=message.id, channel_id=message.channel.id)
+
+
+NO_PUBLIC = ["note"]
+
+FULL_NAMES = [
+    "Sir Lancelot",
+    "Sir Gawain",
+    "Sir Percival",
+    "Sir Bors the Younger",
+    "Sir Lamorak",
+    "Sir Kay",
+    "Sir Gareth",
+    "Sir Bedivere",
+    "Sir Gaheris",
+    "Sir Galahad",
+    "Sir Tristan",
+    "Sir Palamedes",
+    "Sir Abrioris",
+    "Sir Adragain",
+    "Sir Agravain",
+    "King Bagdemagus",
+    "Sir Balin",
+    "Sir Brastius",
+    "Sir Caradoc",
+    "Sir Constantine",
+    "Sir Dagonet, the court jester",
+    "Sir Daniel",
+    "Sir Dinadan",
+    "Sir Dornar",
+    "Sir Ector de Maris",
+    "Sir Galehaut",
+    "Sir Gingalain",
+    "Sir Griflet",
+    "King Leodegrance",
+    "Sir Lionel",
+    "Sir Mador de la Porte",
+    "Sir Maleagant",
+    "Sir Mordred",
+    "King Pellinore",
+    "Sir Pinel",
+    "Sir Sagramore le Desirous",
+    "Sir Tor",
+    "Sir Ulfius",
+    "King Uriens",
+    "Sir Yvain",
+    "Sir Ywain",
+]
+
+FIRST_NAMES = [
+    "Bouncy",
+    "Grumpy",
+    "Wobbly",
+    "Sneaky",
+    "Zippy",
+    "Goofy",
+    "Loopy",
+    "Sassy",
+    "Jumpy",
+    "Snappy",
+    "Nifty",
+    "Cheeky",
+    "Clumsy",
+    "Fluffy",
+    "Witty",
+    "Breezy",
+    "Tipsy",
+    "Chirpy",
+    "Nerdy",
+    "Quirky",
+    "Hyper",
+]
+
+LAST_NAMES = [
+    "Muffin",
+    "Nugget",
+    "Waffle",
+    "Tofu",
+    "Sprinkle",
+    "Biscuit",
+    "Pudding",
+    "Taco",
+    "Bubble",
+    "Crumpet",
+    "Doodle",
+    "Marshmallow",
+    "Pumpkin",
+    "Wiggle",
+    "Popcorn",
+    "Tater",
+    "Jellybean",
+    "Caramel",
+    "Taxi",
+]
 
 
 @dataclass
@@ -119,13 +215,23 @@ class Action(abc.ABC):
             embed.timestamp = self.expires_at
         return embed
 
-    def to_log_embed(self):
+    def to_log_embed(self, *, anonymous: bool = False):
         reason = self.reason or "No reason provided"
         if self.logs_url is not None:
             reason += f" ([Logs]({self.logs_url}))"
 
         embed = discord.Embed(color=self.color)
-        embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.display_avatar.url)
+
+        if anonymous and self.user.id != BOT_ID:
+            if random.random() < 0.5:
+                anon = random.choice(FULL_NAMES)
+            else:
+                anon = random.choice(FIRST_NAMES) + random.choice(LAST_NAMES)
+
+            embed.set_author(name=anon, icon_url=f"https://cdn.discordapp.com/embed/avatars/{random.randint(0, 5)}.png")
+        else:
+            embed.set_author(name=f"{self.user} (ID: {self.user.id})", icon_url=self.user.display_avatar.url)
+
         embed.set_thumbnail(url=self.target.display_avatar.url)
         embed.add_field(
             name=f"{self.emoji} {self.past_tense.title()} {self.target} (ID: {self.target.id})",
@@ -148,7 +254,7 @@ class Action(abc.ABC):
             embed.add_field(name="Logs", value=f"[Link]({self.logs_url})", inline=False)
         if self.duration is not None:
             duration = f"{time.human_timedelta(self.duration)}"
-            expires_at = f"{discord.utils.format_dt(self.expires_at)} ({discord.utils.format_dt(self.expires_at, 'R')}"
+            expires_at = f"{discord.utils.format_dt(self.expires_at)} ({discord.utils.format_dt(self.expires_at, 'R')})"
             embed.add_field(name="Duration", value=duration, inline=False)
             embed.add_field(name="Expires At", value=expires_at, inline=False)
         embed.timestamp = self.created_at
@@ -423,15 +529,17 @@ cls_dict = {
 
 class BanConverter(commands.Converter):
     async def convert(self, ctx, arg):
+        mem = await commands.UserConverter().convert(ctx, arg)
+
         try:
-            return await ctx.guild.fetch_ban(discord.Object(id=int(arg)))
+            return await ctx.guild.fetch_ban(mem)
         except discord.NotFound:
             raise commands.BadArgument("This member is not banned.")
         except ValueError:
             pass
 
-        bans = await ctx.guild.bans()
-        ban = discord.utils.find(lambda u: str(u.user) == arg, bans)
+        bans = [b async for b in ctx.guild.bans()]
+        ban = discord.utils.get(bans, user=mem)
         if ban is None:
             raise commands.BadArgument("This member is not banned.")
         return ban
@@ -488,6 +596,11 @@ class EmergencyView(discord.ui.View):
         return True
 
 
+class HistoryFlagConverter(commands.FlagConverter, case_insensitive=True):
+    target: FetchUserConverter = commands.flag(max_args=1, positional=True)
+    ephemeral: Optional[bool] = False
+
+
 class Moderation(commands.Cog):
     """For moderation."""
 
@@ -531,6 +644,11 @@ class Moderation(commands.Cog):
         if channel is not None:
             await channel.send(embed=action.to_log_embed())
 
+        public_channel = self.bot.get_channel(data["public_logs_channel_id"])
+        if public_channel is not None:
+            if action.type not in NO_PUBLIC:
+                await public_channel.send(embed=action.to_log_embed(anonymous=True))
+
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
         if after.timed_out_until == before.timed_out_until:
@@ -546,6 +664,10 @@ class Moderation(commands.Cog):
             action=discord.AuditLogAction.member_update,
             retry=3,
         )
+
+        if entry is None:
+            return
+
         if entry.user == self.bot.user:
             return
 
@@ -762,7 +884,7 @@ class Moderation(commands.Cog):
 
         if limit > 10000:
             await ctx.send("Too many messages to purge.", ephemeral=True)
-        elif limit > 100:
+        elif limit >= 50:
             view = ConfirmPurgeView()
             await ctx.send(f"Are you sure you want to purge up to {limit} messages?", view=view, ephemeral=True)
         else:
@@ -1025,6 +1147,9 @@ class Moderation(commands.Cog):
         else:
             action_cls = Untimeout
 
+            if not target.is_timed_out():
+                return await ctx.send("This member is not timed out or muted.")
+
         action = action_cls(
             target=target,
             user=ctx.author,
@@ -1105,6 +1230,9 @@ class Moderation(commands.Cog):
         You must have the Trial Moderator role to use this.
         """
 
+        if not discord.utils.get(target.roles, name="Trading Muted"):
+            return await ctx.send("This member is not trading muted.")
+
         action = TradingUnmute(
             target=target,
             user=ctx.author,
@@ -1163,12 +1291,13 @@ class Moderation(commands.Cog):
     @commands.hybrid_group(aliases=("his",), fallback="list")
     @commands.guild_only()
     @checks.is_trial_moderator()
-    async def history(self, ctx, *, target: FetchUserConverter):
+    async def history(self, ctx, *, flags: HistoryFlagConverter):
         """Views a member's punishment history.
 
         You must have the Trial Moderator role to use this.
         """
 
+        target = flags.target
         query = {"target_id": target.id, "guild_id": ctx.guild.id}
         count = await self.bot.mongo.db.action.count_documents(query)
 
@@ -1197,6 +1326,9 @@ class Moderation(commands.Cog):
                 count=count,
             )
         )
+
+        if ctx.interaction and flags.ephemeral:
+            await ctx.interaction.response.defer(ephemeral=True)
 
         try:
             await pages.start(ctx)
@@ -1269,6 +1401,62 @@ class Moderation(commands.Cog):
 
         action = Action.build_from_mongo(self.bot, action)
         await ctx.send(embed=action.to_info_embed())
+
+    @commands.hybrid_command()
+    @commands.guild_only()
+    @checks.is_trial_moderator()
+    async def lock(self, ctx, channel: Optional[discord.TextChannel] = None, *, reason: Optional[str] = None):
+        """Locks a channel by preventing members from sending messages.
+
+        If no channel is provided, locks the current channel.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        channel = channel or ctx.channel
+        overwrites = channel.overwrites_for(ctx.guild.default_role)
+
+        if overwrites.send_messages is False:
+            return await ctx.send(f"{channel.mention} is already locked.", ephemeral=True)
+
+        overwrites.send_messages = False
+        audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
+        if reason:
+            audit_reason += f": {reason}"
+        await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+
+        msg = f"\N{LOCK} Locked {channel.mention}."
+        if reason:
+            msg += f" Reason: {reason}"
+        await ctx.send(msg, ephemeral=True)
+
+    @commands.hybrid_command()
+    @commands.guild_only()
+    @checks.is_trial_moderator()
+    async def unlock(self, ctx, channel: Optional[discord.TextChannel] = None, *, reason: Optional[str] = None):
+        """Unlocks a channel by allowing members to send messages again.
+
+        If no channel is provided, unlocks the current channel.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        channel = channel or ctx.channel
+        overwrites = channel.overwrites_for(ctx.guild.default_role)
+
+        if overwrites.send_messages is not False:
+            return await ctx.send(f"{channel.mention} is not locked.", ephemeral=True)
+
+        overwrites.send_messages = None
+        audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
+        if reason:
+            audit_reason += f": {reason}"
+        await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+
+        msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
+        if reason:
+            msg += f" Reason: {reason}"
+        await ctx.send(msg, ephemeral=True)
 
     async def cog_unload(self):
         self.check_actions.cancel()

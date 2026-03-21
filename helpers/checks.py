@@ -1,5 +1,9 @@
 from datetime import datetime, timedelta, timezone
+from typing import Any, Callable
+
 from discord.ext import commands
+
+from helpers.context import GuiduckContext
 
 from . import constants
 from . import time
@@ -13,8 +17,20 @@ class EmergencyAlertBanned(commands.CheckFailure):
     pass
 
 
+def is_admin():
+    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.ADMIN_ROLES))
+
+
 def is_community_manager():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.COMMUNITY_MANAGER_ROLES))
+
+
+def is_bot_admin():
+    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.BOT_ADMIN_ROLES))
+
+
+def is_server_admin():
+    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.SERVER_ADMIN_ROLES))
 
 
 def is_moderator():
@@ -23,6 +39,10 @@ def is_moderator():
 
 def is_trial_moderator():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.TRIAL_MODERATOR_ROLES))
+
+
+def is_developer():
+    return commands.check_any(commands.is_owner(), commands.has_role(constants.DEVELOPER_ROLE))
 
 
 def in_guilds(*guild_ids):
@@ -40,6 +60,33 @@ def community_server_only():
 
 def support_server_only():
     return in_guilds(constants.SUPPORT_SERVER_ID)
+
+
+class NotInCategory(commands.CheckFailure):
+    pass
+
+
+def in_categories(*category_ids):
+    def predicate(ctx):
+        if ctx.channel.category is None or ctx.channel.category.id not in category_ids:
+            raise NotInCategory("This command is restricted to specific categories.")
+        return True
+
+    return commands.check_any(is_admin(), commands.check(predicate))
+
+
+def staff_categories_only():
+    return in_categories(
+        717881335313858610,
+        1122578424867864616,
+        1219502312859500644,
+        1219501926081630259,
+        1196191915272577134,
+        1300547040480333894,
+        730992224635977748,
+        1103248448934912052,
+        1104727423603449866,
+    )
 
 
 def is_level(level):
@@ -78,3 +125,12 @@ def is_not_emergency_alert_banned():
         return True
 
     return commands.check(predicate)
+
+
+async def passes_check(check: Callable[[GuiduckContext], Any], ctx: GuiduckContext) -> bool:
+    try:
+        await check().predicate(ctx)
+    except commands.CheckFailure:
+        return False
+    else:
+        return True

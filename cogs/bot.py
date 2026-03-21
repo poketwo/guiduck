@@ -52,9 +52,20 @@ class Bot(commands.Cog):
                 )
             else:
                 number = error.cooldown.rate
-                per_text = f"per {name}" if name != 'default' else 'globally'
+                per_text = f"per {name}" if name != "default" else "globally"
                 fmt = f"**{number} time{'s' if number > 1 else ''} {per_text}** every **{retry_after(error.cooldown.per)}**"
-                await ctx.send(f"This command can only be used {fmt}! Try again in **{retry_after(error.retry_after)}**.", ephemeral=True)
+                await ctx.send(
+                    f"This command can only be used {fmt}! Try again in **{retry_after(error.retry_after)}**.",
+                    ephemeral=True,
+                )
+        if isinstance(error, commands.CommandInvokeError) and "private_variable" in str(error.original):
+            await ctx.send(error.original, ephemeral=True)
+        elif isinstance(error, commands.BadFlagArgument):
+            if isinstance(error.original, commands.ConversionError):
+                return await ctx.send(error.original.original, ephemeral=True)
+            await ctx.send(error.original, ephemeral=True)
+        elif isinstance(error, commands.CheckAnyFailure):
+            await ctx.send(error.errors[-1], ephemeral=True)
         elif isinstance(error, commands.CheckFailure):
             await ctx.send(error, ephemeral=True)
         elif isinstance(error, commands.UserInputError):
@@ -89,7 +100,7 @@ class Bot(commands.Cog):
         if ctx.guild is not None and isinstance(user, discord.User):
             user = ctx.guild.get_member(user.id) or user
 
-        embed = discord.Embed()
+        embed = discord.Embed(title=user.display_name)
         embed.set_author(name=str(user))
 
         embed.add_field(name="ID", value=user.id, inline=False)

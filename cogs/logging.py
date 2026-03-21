@@ -1,11 +1,69 @@
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+import math
+from textwrap import dedent
+import time
+from urllib.parse import urlencode
+from typing import Optional
 
 import discord
 from discord.ext import commands, tasks
+from discord.utils import format_dt, time_snowflake
 from pymongo import UpdateOne
+import parsedatetime as pdt
 
 from helpers import checks
+from helpers.context import GuiduckContext
+from helpers.converters import FetchChannelOrThreadConverter
+from helpers.pagination import Paginator
+
+
+class LogFlagConverter(commands.Converter):
+    """
+    Converter for logs command flags that support message IDs for filtration
+    This accepts message link, message ID, "channel ID-message ID" or a date/time string.
+    """
+
+    async def convert(self, ctx: GuiduckContext, arg: str) -> discord.PartialMessage | int | datetime:
+        try:
+            message = await commands.PartialMessageConverter().convert(ctx, arg)
+            return message
+        except commands.MessageNotFound:
+            try:
+                return int(arg)
+            except ValueError:
+                calendar = pdt.Calendar()
+                struct = calendar.parse(arg)[0]
+                now = datetime.now()
+                dt = datetime.fromtimestamp(time.mktime(struct))
+                if 0 < (now - dt).total_seconds() < 1:  # dt is current time when input is not valid
+                    raise ValueError("Invalid input for before/after flag")
+
+                return dt
+
+
+class LogFlags(commands.FlagConverter, case_insensitive=True):
+    channel: FetchChannelOrThreadConverter = commands.flag(
+        description="The channel whose logs to show", default=None, positional=True
+    )
+    no_embed: bool = commands.flag(
+        name="no-embed",
+        description="Don't embed the logs directly in the channel. Default False.",
+        aliases=["n"],
+        default=False,
+    )
+    ephemeral: bool = commands.flag(description="Hide the message shown (default True)", default=True)
+
+    user: discord.Member | discord.User = commands.flag(
+        description="Show logs of a specific user", default=None, aliases=("from",)
+    )
+    before: LogFlagConverter = commands.flag(description="Filter logs before a specific message/time", default=None)
+    after: LogFlagConverter = commands.flag(description="Filter logs after a specific message/time", default=None)
+    limit: int = commands.flag(description="Limit how many logs to show (50 by default)", default=None)
+    deleted: bool = commands.flag(description="Whether to show deleted messages only", default=None)
+
+
+PARAM_OFFSETS = {"before": 1, "after": -1}
 
 
 class Logging(commands.Cog):
@@ -33,11 +91,16 @@ class Logging(commands.Cog):
             "position": role.position,
         }
 
+    async def bulk_write(self, collection_name: str, updates: list):
+        collection = self.bot.mongo.db.get_collection(collection_name)
+        if updates:
+            await collection.bulk_write(updates)
+
     async def full_cache_guild(self, guild):
-        await self.bot.mongo.db.guild.bulk_write([self.make_cache_guild(guild)])
-        await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(channel) for channel in guild.channels])
-        await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(channel) for channel in guild.threads])
-        await self.bot.mongo.db.member.bulk_write([self.make_cache_member(member) for member in guild.members])
+        await self.bulk_write("guild", [self.make_cache_guild(guild)])
+        await self.bulk_write("channel", [self.make_cache_channel(channel) for channel in guild.channels])
+        await self.bulk_write("channel", [self.make_cache_channel(channel) for channel in guild.threads])
+        await self.bulk_write("member", [self.make_cache_member(member) for member in guild.members])
 
     def make_cache_guild(self, guild):
         return UpdateOne(
@@ -105,6 +168,21 @@ class Logging(commands.Cog):
             await self.bot.mongo.db.member.bulk_write([self.make_cache_member(member)])
 
     @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if before.channel == after.channel:
+            return
+
+        if before.channel:
+            await before.channel.send(
+                f"**{member.mention}** has left the voice channel.", allowed_mentions=discord.AllowedMentions.none()
+            )
+
+        if after.channel:
+            await after.channel.send(
+                f"**{member.mention}** has joined the voice channel.", allowed_mentions=discord.AllowedMentions.none()
+            )
+
+    @commands.Cog.listener()
     async def on_guild_join(self, guild):
         for channel in guild.channels:
             await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(channel)])
@@ -170,18 +248,173 @@ class Logging(commands.Cog):
     @commands.hybrid_group(fallback="get")
     @checks.is_trial_moderator()
     @commands.guild_only()
-    async def logs(self, ctx, *, channel: discord.TextChannel | discord.Thread | discord.VoiceChannel = None):
+    async def logs(
+        self,
+        ctx,
+        *,
+        flags: LogFlags,
+    ):
         """Gets a link to the message logs for a channel.
+        ### Supported Flags
+        - `no-embed`: Don't embed the logs directly in the channel. Default False.
+        - `ephemeral`: Hide the shown message (default True)
+
+        - `user`: Show logs of a specific user
+        - `before`: Filter logs before a specific message/time
+        > This flag accepts:
+        > - Message Link
+        > - Message ID (current channel)
+        > - "ChannelID-MessageID" (retrieved by shift-clicking on “Copy ID”)
+        > - Date/time string (e.g. `12/31 16:40`, `friday`, `yesterday`)
+        - `after`: Filter logs after a specific message/time. Same inputs as `before`.
+        - `limit`: Limit how many logs to show (50 by default)
+        - `deleted`: Whether to show deleted messages only
 
         You must have the Trial Moderator role to use this.
         """
 
-        channel = channel or ctx.channel
-        await ctx.send(f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}", ephemeral=True)
+        channel = flags.channel or ctx.channel
+        url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
+
+        params = {}
+        filter_texts = {}
+
+        if flags.user:
+            params["user"] = flags.user.id
+            filter_texts["User"] = flags.user.mention
+
+        if flags.before or flags.after:
+            if flags.before and flags.after:
+                raise commands.BadArgument("Both `before` and `after` flags cannot be used at the same time.")
+
+            for param in ("before", "after"):
+                value = getattr(flags, param)
+                if not value:
+                    continue
+
+                value_line = None
+                if isinstance(value, discord.PartialMessage):
+                    value_line = value.jump_url
+
+                    # Offset it to also include the provided message
+                    offset = PARAM_OFFSETS.get(param, 0)
+                    value = value.id + offset
+
+                elif isinstance(value, datetime):
+                    value_line = format_dt(value, "F")
+                    value = time_snowflake(value)
+
+                params[param] = value
+                if value_line:
+                    filter_texts[param.title()] = value_line
+
+        if flags.limit is not None:
+            params["limit"] = flags.limit
+            filter_texts["Limit"] = flags.limit
+
+        if flags.deleted:
+            params["deleted"] = flags.deleted
+            filter_texts["Deleted Only"] = flags.deleted
+
+        if params:
+            url += f"?{urlencode(params)}"
+
+        lines = [f"### Message Logs of {channel.mention}", url]
+        if filter_texts:
+            lines.append("### Filters")
+            lines.extend([f"- **{name}**: {text}" for name, text in filter_texts.items()])
+
+        if not flags.no_embed:
+            filt = {"channel_id": channel.id}
+            if params.get("user"):
+                filt["user_id"] = params.get("user")
+            if params.get("deleted"):
+                filt["deleted_at"] = {"$ne": None}
+
+            for f, op in zip(("before", "after"), ("$lte", "$gte")):
+                if params.get(f):
+                    filt.setdefault("_id", dict())[op] = params[f]
+
+            PER_PAGE = 10
+            div = "—" * 30
+            paginator = Paginator(None, loop_pages=False, disable_go=True)
+            paginator.add_item(discord.ui.Button(label=f"Jump", url=url))
+
+            async def get_page(page: int):
+                log_lines = []
+
+                offset = page * PER_PAGE
+                async for m in self.bot.mongo.db.message.find(filt).sort("_id", -1).skip(offset).limit(PER_PAGE):
+                    dt = discord.utils.snowflake_time(m["_id"])
+                    author = self.bot.get_user(m["user_id"]) or await self.bot.fetch_user(m["user_id"])
+
+                    history = list(sorted(m["history"].items(), key=lambda t: -int(t[0])))
+                    content = history[0][1]
+
+                    def fmt_msg(_dt, _content, *, show_indicators=True):
+                        ts_t = discord.utils.format_dt(_dt, "t")
+                        ts_d = (
+                            (" " + discord.utils.format_dt(_dt, "d"))
+                            if discord.utils.utcnow().date() != ctx.message.created_at.date()
+                            else ""
+                        )
+                        indicators = (
+                            f"{'`❌`' if m['deleted_at'] else ''}{'`✏️`' if edited else ''}" if show_indicators else ""
+                        )
+
+                        return f"[{ts_t}{ts_d}]{indicators} {author.mention}: {discord.utils.escape_markdown(_content)}"
+
+                    edited = len(m["history"]) > 1
+
+                    line = fmt_msg(dt, content)
+                    if edited:
+                        line += (
+                            "".join(
+                                f"\n{div}\n"
+                                + fmt_msg(datetime.fromtimestamp(int(k) + 3600, tz=timezone.utc), v, show_indicators=False)  # +3600 because it subtracts 3600 in the message and edit code for some reason :sob:
+                                for k, v in history[1:]
+                            )
+                        ).replace("\n", "\n> ")
+
+                    log_lines.append(line)
+
+                if len(log_lines) < PER_PAGE:
+                    paginator.num_pages = page + 1
+
+                desc = f"\n{div}\n".join(log_lines)
+
+                embed = discord.Embed(title=f"#{channel.name}", description=desc)
+                embed.set_author(name=f"{channel.id}")
+                embed.set_footer(
+                    text=dedent(
+                        f"""
+                        ✏️ - edited
+                        ❌ - deleted
+                        Page {page + 1}/{'?' if paginator.num_pages is None else paginator.num_pages}
+                        """
+                    )
+                )
+
+                return embed
+
+            paginator.get_page = get_page
+            await paginator.start(
+                ctx,
+                content="\n".join(lines),
+                ephemeral=flags.ephemeral,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        else:
+            view = discord.ui.View()
+            view.add_item(discord.ui.Button(label=f"Jump", url=url))
+
+            await ctx.send(
+                "\n".join(lines), view=view, ephemeral=flags.ephemeral, allowed_mentions=discord.AllowedMentions.none()
+            )
 
     @logs.command()
     @commands.guild_only()
-    @checks.is_community_manager()
+    @checks.is_server_admin()
     async def restrict(self, ctx, channel: discord.TextChannel | discord.Thread | discord.VoiceChannel = None):
         """Restricts the logs for a channel to Admins.
 
@@ -203,6 +436,38 @@ class Logging(commands.Cog):
         await ctx.send("Syncing all caches for this guild...")
         await self.full_cache_guild(ctx.guild)
         await ctx.send("Completed cache sync.")
+
+    @checks.is_trial_moderator()
+    @commands.guild_only()
+    @commands.command()
+    async def snipe(
+        self,
+        ctx,
+        channel: Optional[discord.TextChannel | discord.Thread | discord.VoiceChannel] = commands.CurrentChannel,
+        nth: int = 1,
+    ):
+        permissions = channel.permissions_for(ctx.author)
+        if not all([getattr(permissions, perm, False) for perm in ("read_messages", "read_message_history")]):
+            return await ctx.reply("You don't have permissions to view that channel.")
+
+        if nth <= 0:
+            return await ctx.reply("The nth deleted message to show cannot be 0 or less.", mention_author=False)
+
+        message = await self.bot.mongo.db.message.find_one(
+            {"channel_id": channel.id, "deleted_at": {"$ne": None}}, sort=[("_id", -1)], skip=nth - 1
+        )
+        if not message:
+            return await ctx.reply("No deleted message found.", mention_author=False)
+
+        user = ctx.guild.get_member(message["user_id"]) or await self.bot.fetch_user(message["user_id"])
+        content = list(message["history"].values())[-1]
+
+        embed = discord.Embed(description=content, color=getattr(user, "color", None))
+        embed.set_author(name=f"{user.display_name} ({user.id})", icon_url=user.display_avatar.url)
+        embed.set_footer(text=f"{message['_id']} • #{channel.name}")
+        embed.timestamp = message["deleted_at"]
+
+        await ctx.reply(embed=embed, mention_author=False)
 
     async def cog_unload(self):
         self.cache_all.cancel()

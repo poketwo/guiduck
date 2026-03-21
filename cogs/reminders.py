@@ -7,6 +7,7 @@ from typing import NamedTuple, Optional
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
+from discord.utils import format_dt
 
 from helpers import time
 from helpers.pagination import AsyncEmbedFieldsPageSource
@@ -103,7 +104,7 @@ class Reminders(commands.Cog):
         self.bot.loop.create_task(self.update_current(reminder))
 
         await ctx.send(
-            f"Alright, I'll remind you in **{time.human_timedelta(reminder.duration)}**: {time_and_content.arg}"
+            f"Alright, I'll remind you **{format_dt(reminder.expires_at, 'R')}**: {time_and_content.arg}"
         )
 
     @reminder.command()

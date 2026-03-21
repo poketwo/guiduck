@@ -85,8 +85,8 @@ class CustomHelpCommand(commands.HelpCommand):
 
             return embed
 
-        paginator = pagination.Paginator(get_page, len(pages) // 6 + 1)
-        await paginator.send(ctx)
+        paginator = pagination.Paginator(get_page, num_pages=len(pages) // 6 + 1)
+        await paginator.start(ctx)
 
     async def send_cog_help(self, cog):
         ctx = self.context

@@ -9,6 +9,10 @@ from helpers import checks, constants
 ROLE_MAPPING_COMMUNITY_TO_SUPPORT = {
     974942298301431809: 930346838589063208,
     718006431231508481: 930346842586218607,
+    1219500643731898450: 1260660223618580572,
+    1219500880534179892: 1260660172561322005,
+    1219501382437048402: 1260660162620821547,
+    1219501453240959006: 1260660160708214907,
     974937010462683166: 964026958117748816,
     724879492622843944: 930346843521556540,
     813433839471820810: 930346845547409439,
@@ -38,6 +42,9 @@ class RoleSync(commands.Cog):
 
     async def sync_all(self):
         guild = self.bot.get_guild(constants.COMMUNITY_SERVER_ID)
+        if not guild:
+            return
+
         for member in guild.members:
             await self.sync_member(member)
 

@@ -111,21 +111,43 @@ class ServerInvites(AutomodModule):
                     return f"Sending invites to another server."
 
 
+CATCHING_CATEGORY_ID = 717872471411261510
+
+
 class Spamming(AutomodModule):
     bucket = "spamming"
     punishments = {
-        1: ("ban", None),
-        0: ("timeout", timedelta(days=1)),
+        5: ("ban", None),
+        4: ("timeout", timedelta(days=3)),
+        3: ("timeout", timedelta(days=1)),
+        2: ("timeout", timedelta(hours=12)),
+        1: ("timeout", timedelta(hours=6)),
+        0: ("timeout", timedelta(hours=1)),
     }
+    message_count = 10
+    message_rate = 12.0  # seconds
 
     def __init__(self):
-        self.cooldown = commands.CooldownMapping.from_cooldown(15, 17.0, commands.BucketType.member)
+        self.cooldown = commands.CooldownMapping.from_cooldown(
+            self.message_count, self.message_rate, commands.BucketType.member
+        )
+        self.catching_cooldown = commands.CooldownMapping.from_cooldown(
+            self.message_count,
+            self.message_rate,
+            lambda msg: (commands.BucketType.channel(msg), commands.BucketType.member(msg)),
+        )
 
     async def check(self, ctx):
-        bucket = self.cooldown.get_bucket(ctx.message)
+        cooldown = (
+            self.catching_cooldown
+            if (ctx.channel.category and ctx.channel.category.id == CATCHING_CATEGORY_ID)
+            else self.cooldown
+        )
+
+        bucket = cooldown.get_bucket(ctx.message)
         if bucket.update_rate_limit():
-            self.cooldown._cache[self.cooldown._bucket_key(ctx.message)].reset()
-            await ctx.channel.purge(limit=15, check=lambda m: m.author == ctx.author)
+            cooldown._cache[cooldown._bucket_key(ctx.message)].reset()
+            await ctx.channel.purge(limit=self.message_count, check=lambda m: m.author == ctx.author)
             return "Spamming"
 
 
@@ -191,14 +213,14 @@ class Automod(commands.Cog):
         await action.execute(ctx)
 
     @commands.hybrid_group()
-    @checks.is_community_manager()
+    @checks.is_server_admin()
     async def automod(self, ctx):
         """Utilities for automoderation."""
 
         await ctx.send_help(ctx.command)
 
     @automod.group(fallback="list")
-    @checks.is_community_manager()
+    @checks.is_server_admin()
     async def words(self, ctx):
         """Displays the banned words list.
 
@@ -215,7 +237,7 @@ class Automod(commands.Cog):
         await pages.start(ctx)
 
     @words.command()
-    @checks.is_community_manager()
+    @checks.is_server_admin()
     async def add(self, ctx, words):
         """Adds words to the banned words list.
 
@@ -228,7 +250,7 @@ class Automod(commands.Cog):
         await ctx.send(f"Added {words_msg} to the banned words list.")
 
     @words.command()
-    @checks.is_community_manager()
+    @checks.is_server_admin()
     async def remove(self, ctx, words):
         """Removes words from the banned words list.
 
