@@ -53,16 +53,6 @@ class TimedPin:
         return self.expires_at - self.created_at
 
 
-class PinFlags(commands.FlagConverter, prefix="--", delimiter=" "):
-    duration: Optional[time.FutureTime] = commands.flag(
-        name="duration",
-        aliases=("d", "for", "in", "time", "t"),
-        description="Duration to keep the message pinned before auto-unpinning",
-        max_args=1,
-        default=None,
-    )
-
-
 def can_pin():
     """Check that the user is the thread owner or has manage_messages permission."""
 
@@ -119,22 +109,66 @@ class Pins(commands.Cog):
 
         raise commands.BadArgument("Please reply to a message or provide a message link/ID.")
 
+    async def parse_message_and_duration(self, ctx, args: Optional[str] = None):
+        """Parse the combined message + duration arguments.
+
+        Supports:
+        - ?pin (reply, no duration)
+        - ?pin <message> (no duration)
+        - ?pin <duration> (reply, with duration)
+        - ?pin <message> <duration>
+        """
+
+        if args is None:
+            return await self.resolve_message(ctx), None
+
+        parts = args.split(None, 1)
+        first = parts[0]
+
+        # Try to resolve the first part as a message
+        msg = None
+        try:
+            msg = await commands.MessageConverter().convert(ctx, first)
+        except commands.MessageNotFound:
+            pass
+
+        if msg is not None:
+            # First part is a message, rest (if any) is duration
+            duration_str = parts[1] if len(parts) > 1 else None
+            if duration_str is not None:
+                try:
+                    duration = time.FutureTime(duration_str, now=ctx.message.created_at)
+                except commands.BadArgument:
+                    raise commands.BadArgument(f"Invalid duration: `{duration_str}`")
+                return msg, duration
+            return msg, None
+
+        # First part is not a message, try the whole thing as a duration (user is replying)
+        try:
+            duration = time.FutureTime(args, now=ctx.message.created_at)
+        except commands.BadArgument:
+            raise commands.BadArgument(
+                f"Could not find a message matching `{first}`. Please reply to a message or provide a valid message link/ID."
+            )
+
+        return await self.resolve_message(ctx), duration
+
     @commands.group(invoke_without_command=True)
     @commands.guild_only()
     @can_pin()
-    async def pin(self, ctx, message: Optional[str] = None, *, flags: PinFlags):
+    async def pin(self, ctx, *, args: Optional[str] = None):
         """Toggles a pin on a message in the current thread.
 
         If the message is not pinned, it will be pinned. If it is already pinned, it will be unpinned.
 
         You can reply to the message, or pass a message link/ID.
 
-        Use --duration to pin temporarily, e.g.:
-        \u2022 ?pin <message> --duration 2h
-        \u2022 ?pin --duration 30m (when replying)
+        Optionally provide a duration to pin temporarily, e.g.:
+        \u2022 ?pin <message> 2h
+        \u2022 ?pin 30m (when replying)
         """
 
-        target = await self.resolve_message(ctx, message)
+        target, duration = await self.parse_message_and_duration(ctx, args)
 
         if target.pinned:
             # Unpin the message (toggle off)
@@ -155,14 +189,14 @@ class Pins(commands.Cog):
         # Pin the message (toggle on)
         await target.pin(reason=f"Pinned by {ctx.author} (ID: {ctx.author.id})")
 
-        if flags.duration is not None:
+        if duration is not None:
             timed_pin = TimedPin(
                 user_id=ctx.author.id,
                 guild_id=ctx.guild.id,
                 channel_id=ctx.channel.id,
                 message_id=target.id,
                 created_at=ctx.message.created_at,
-                expires_at=flags.duration.dt,
+                expires_at=duration.dt,
             )
 
             id = await self.bot.mongo.reserve_id("timed_pin")
@@ -172,7 +206,7 @@ class Pins(commands.Cog):
             self.bot.loop.create_task(self.update_current(timed_pin))
 
             await ctx.send(
-                f"\N{PUSHPIN} Pinned! This message will be automatically unpinned {format_dt(flags.duration.dt, 'R')}."
+                f"\N{PUSHPIN} Pinned! This message will be automatically unpinned {format_dt(duration.dt, 'R')}."
             )
         else:
             await ctx.send("\N{PUSHPIN} Pinned!")
