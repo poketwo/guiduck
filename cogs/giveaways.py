@@ -263,6 +263,23 @@ class GiveawayApproveButton(discord.ui.Button):
         self.giveaway = giveaway
 
     async def callback(self, interaction: discord.Interaction):
+        member = await self.bot.mongo.poketwo_db.member.find_one(self.giveaway.user.id)
+        if member is not None and (
+            member.get("suspended")
+            or (member.get("suspended_until") and member.get("suspended_until") > datetime.utcnow())
+        ):
+            await self.bot.mongo.db.giveaway.update_one(
+                {"_id": self.giveaway._id}, {"$set": {"approval_status": False}}
+            )
+            await self.giveaway.send_pokemon_to_user(self.giveaway.user)
+
+            embed = await self.giveaway.approval_embed()
+            embed.title = "Giveaway Request Denied"
+            embed.color = discord.Color.red()
+            embed.add_field(name="Reason", value="User is suspended from Pokétwo.", inline=False)
+            await interaction.response.edit_message(embed=embed, view=None)
+            return
+
         await self.bot.mongo.db.giveaway.update_one({"_id": self.giveaway._id}, {"$set": {"approval_status": True}})
 
         embed = await self.giveaway.approval_embed()
@@ -365,7 +382,18 @@ class Giveaways(commands.Cog):
         species = self.bot.data.species_by_number(p["species_id"])
         iv_total = p["iv_hp"] + p["iv_atk"] + p["iv_defn"] + p["iv_satk"] + p["iv_sdef"] + p["iv_spd"]
         conditions = [
-            any((species.mythical, species.legendary, species.ultra_beast, "-alola" in species.slug, "-galar" in species.slug, "-hisui" in species.slug, "-paldea" in species.slug)) and iv_total >= 112,
+            any(
+                (
+                    species.mythical,
+                    species.legendary,
+                    species.ultra_beast,
+                    "-alola" in species.slug,
+                    "-galar" in species.slug,
+                    "-hisui" in species.slug,
+                    "-paldea" in species.slug,
+                )
+            )
+            and iv_total >= 112,
             species.event and iv_total >= 112,
             iv_total >= 168 or iv_total <= 18,
             p.get("shiny"),
@@ -401,12 +429,18 @@ class Giveaways(commands.Cog):
         """Start a giveaway."""
 
         member = await self.bot.mongo.poketwo_db.member.find_one(ctx.author.id)
-        if member.get("suspended") or (member.get("suspended_until") and member.get("suspended_until") > datetime.utcnow()):
+        if member.get("suspended") or (
+            member.get("suspended_until") and member.get("suspended_until") > datetime.utcnow()
+        ):
             return await ctx.send("Your account is suspended from Pokétwo and can not do giveaways.")
 
-        user_pending_count = await self.bot.mongo.db.giveaway.count_documents({"user_id": ctx.author.id, "approval_status": None})
+        user_pending_count = await self.bot.mongo.db.giveaway.count_documents(
+            {"user_id": ctx.author.id, "approval_status": None}
+        )
         if user_pending_count >= MAX_PENDING_GIVEAWAYS:
-            return await ctx.reply(f"You already have the max number of giveways pending ({MAX_PENDING_GIVEAWAYS}). Please try again once those have been reviewed!")
+            return await ctx.reply(
+                f"You already have the max number of giveways pending ({MAX_PENDING_GIVEAWAYS}). Please try again once those have been reviewed!"
+            )
 
         pokemon = await self.bot.mongo.poketwo_db.pokemon.find_one(
             {"owned_by": "user", "owner_id": ctx.author.id, "idx": pokemon}
