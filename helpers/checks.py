@@ -55,6 +55,9 @@ def is_level(level):
 def is_not_emergency_alert_banned():
     async def predicate(ctx):
         member = await ctx.bot.mongo.db.member.find_one({"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}})
+        if member is None:
+            return True
+
         now = datetime.now(timezone.utc)
 
         permanently_banned = member.get("emergency_alert_banned")

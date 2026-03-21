@@ -341,6 +341,16 @@ class EmergencyAlertBan(Action):
             {"$set": {"emergency_alert_banned": True}, "$unset": {"emergency_alert_banned_until": 1}},
             upsert=True,
         )
+        # Also resolve any existing temp ban actions so they don't auto-reverse this permanent ban
+        await ctx.bot.mongo.db.action.update_many(
+            {
+                "target_id": self.target.id,
+                "guild_id": ctx.guild.id,
+                "type": "emergency_alert_temporary_ban",
+                "resolved": False,
+            },
+            {"$set": {"resolved": True}},
+        )
         await super().execute(ctx)
 
 
@@ -355,6 +365,16 @@ class EmergencyAlertTempBan(Action):
             {"_id": {"id": self.target.id, "guild_id": ctx.guild.id}},
             {"$set": {"emergency_alert_banned_until": self.expires_at}, "$unset": {"emergency_alert_banned": 1}},
             upsert=True,
+        )
+        # Resolve any existing temp ban actions so the old one doesn't auto-reverse this new one
+        await ctx.bot.mongo.db.action.update_many(
+            {
+                "target_id": self.target.id,
+                "guild_id": ctx.guild.id,
+                "type": "emergency_alert_temporary_ban",
+                "resolved": False,
+            },
+            {"$set": {"resolved": True}},
         )
         await super().execute(ctx)
 
@@ -437,6 +457,12 @@ class EmergencyView(discord.ui.View):
         super().__init__(timeout=None)
         self.ctx = ctx
         self.message: discord.Message
+        self.add_item(
+            discord.ui.Button(
+                label="Logs",
+                url=f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}",
+            )
+        )
 
     @discord.ui.button(label="Resolve", style=discord.ButtonStyle.green)
     async def resolve(self, interaction: discord.Interaction, button: discord.Button):
@@ -591,13 +617,11 @@ class Moderation(commands.Cog):
 
     @commands.hybrid_group(
         aliases=("emergency-staff", "alert", "alert-staff"),
-        help=textwrap.dedent(
-            f"""
+        help=textwrap.dedent(f"""
             Emergency command to alert staff members with the *{EMERGENCY_ROLE_NAME}* role.
 
-            Do no abuse. Meant for use during emergencies that need immediate staff attention.
-            """
-        ),
+            Do not abuse. Meant for use during emergencies that need immediate staff attention.
+            """),
         cooldown_after_parsing=True,
         fallback="send",
         invoke_without_subcommand=True,
@@ -642,12 +666,6 @@ class Moderation(commands.Cog):
         )
         alert_embed.add_field(name="Reason", value=reason, inline=False)
         view = EmergencyView(ctx)
-        view.add_item(
-            discord.ui.Button(
-                label="Logs",
-                url=f"https://admin.poketwo.net/logs/{ctx.guild.id}/{ctx.channel.id}?before={ctx.message.id+1}",
-            )
-        )
         view.message = await ctx.reply(
             role.mention,
             embed=alert_embed,
@@ -1217,7 +1235,7 @@ class Moderation(commands.Cog):
             )
 
         reset = note.lower() == "reset"
-        
+
         result = await self.bot.mongo.db.action.find_one_and_update(
             {"_id": id, "guild_id": ctx.guild.id},
             {"$set": {"note": note}} if not reset else {"$unset": {"note": 1}},
@@ -1227,7 +1245,11 @@ class Moderation(commands.Cog):
 
         action = Action.build_from_mongo(self.bot, result)
         await ctx.send(
-            f"Successfully added a note to entry **{id}**." if not reset else f"Successfully removed note of entry **{id}**.",
+            (
+                f"Successfully added a note to entry **{id}**."
+                if not reset
+                else f"Successfully removed note of entry **{id}**."
+            ),
             embed=action.to_info_embed(),
             ephemeral=True,
         )
