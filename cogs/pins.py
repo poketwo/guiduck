@@ -54,12 +54,9 @@ class TimedPin:
 
 
 def can_pin():
-    """Check that the user is the thread owner or has the pin messages permission."""
+    """Check that the user has pin permission or is the thread owner."""
 
     async def predicate(ctx):
-        if not isinstance(ctx.channel, discord.Thread):
-            raise commands.CheckFailure("This command can only be used in threads.")
-
         perms = ctx.channel.permissions_for(ctx.author)
 
         # Users with pin_messages (or manage_messages) can always pin
@@ -67,10 +64,10 @@ def can_pin():
             return True
 
         # Thread owner can pin in their own thread
-        if ctx.channel.owner_id == ctx.author.id:
+        if isinstance(ctx.channel, discord.Thread) and ctx.channel.owner_id == ctx.author.id:
             return True
 
-        raise commands.CheckFailure("You must be the thread owner or have the Pin Messages permission to use this.")
+        raise commands.CheckFailure("You must have the Pin Messages permission to use this.")
 
     return commands.check(predicate)
 
@@ -90,7 +87,7 @@ class PinIndexOrMessage(commands.Converter):
 
 
 class Pins(commands.Cog):
-    """For pinning and unpinning messages in threads."""
+    """For pinning and unpinning messages."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -159,7 +156,7 @@ class Pins(commands.Cog):
     @commands.guild_only()
     @can_pin()
     async def pin(self, ctx, *, args: Optional[str] = None):
-        """Toggles a pin on a message in the current thread.
+        """Toggles a pin on a message.
 
         If the message is not pinned, it will be pinned. If it is already pinned, it will be unpinned.
 
