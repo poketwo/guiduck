@@ -26,6 +26,7 @@ COGS = [
     "levels",
     "moderation",
     "names",
+    "pins",
     "poketwo_administration",
     "reaction_roles",
     "reminders",
