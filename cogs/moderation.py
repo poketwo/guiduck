@@ -31,17 +31,99 @@ def message_channel(ctx, message):
     message = message or ctx.message
     return dict(message_id=message.id, channel_id=message.channel.id)
 
+
 NO_PUBLIC = ["note"]
 
-FULL_NAMES = ["Sir Lancelot", "Sir Gawain", "Sir Percival", "Sir Bors the Younger", "Sir Lamorak", "Sir Kay", "Sir Gareth", "Sir Bedivere", "Sir Gaheris", "Sir Galahad", "Sir Tristan", "Sir Palamedes", "Sir Abrioris", "Sir Adragain", "Sir Agravain", "King Bagdemagus", "Sir Balin", "Sir Brastius", "Sir Caradoc", "Sir Constantine", "Sir Dagonet, the court jester", "Sir Daniel", "Sir Dinadan", "Sir Dornar", "Sir Ector de Maris", "Sir Galehaut", "Sir Gingalain", "Sir Griflet", "King Leodegrance", "Sir Lionel", "Sir Mador de la Porte", "Sir Maleagant", "Sir Mordred", "King Pellinore", "Sir Pinel", "Sir Sagramore le Desirous", "Sir Tor", "Sir Ulfius", "King Uriens", "Sir Yvain", "Sir Ywain"]
+FULL_NAMES = [
+    "Sir Lancelot",
+    "Sir Gawain",
+    "Sir Percival",
+    "Sir Bors the Younger",
+    "Sir Lamorak",
+    "Sir Kay",
+    "Sir Gareth",
+    "Sir Bedivere",
+    "Sir Gaheris",
+    "Sir Galahad",
+    "Sir Tristan",
+    "Sir Palamedes",
+    "Sir Abrioris",
+    "Sir Adragain",
+    "Sir Agravain",
+    "King Bagdemagus",
+    "Sir Balin",
+    "Sir Brastius",
+    "Sir Caradoc",
+    "Sir Constantine",
+    "Sir Dagonet, the court jester",
+    "Sir Daniel",
+    "Sir Dinadan",
+    "Sir Dornar",
+    "Sir Ector de Maris",
+    "Sir Galehaut",
+    "Sir Gingalain",
+    "Sir Griflet",
+    "King Leodegrance",
+    "Sir Lionel",
+    "Sir Mador de la Porte",
+    "Sir Maleagant",
+    "Sir Mordred",
+    "King Pellinore",
+    "Sir Pinel",
+    "Sir Sagramore le Desirous",
+    "Sir Tor",
+    "Sir Ulfius",
+    "King Uriens",
+    "Sir Yvain",
+    "Sir Ywain",
+]
 
 FIRST_NAMES = [
-    "Bouncy", "Grumpy", "Wobbly", "Sneaky", "Zippy", "Goofy", "Loopy", "Sassy", "Jumpy", "Snappy", "Nifty", "Cheeky", "Clumsy", "Fluffy", "Witty", "Breezy", "Tipsy", "Chirpy", "Nerdy", "Quirky", "Hyper"
+    "Bouncy",
+    "Grumpy",
+    "Wobbly",
+    "Sneaky",
+    "Zippy",
+    "Goofy",
+    "Loopy",
+    "Sassy",
+    "Jumpy",
+    "Snappy",
+    "Nifty",
+    "Cheeky",
+    "Clumsy",
+    "Fluffy",
+    "Witty",
+    "Breezy",
+    "Tipsy",
+    "Chirpy",
+    "Nerdy",
+    "Quirky",
+    "Hyper",
 ]
 
 LAST_NAMES = [
-    "Muffin", "Nugget", "Waffle", "Tofu", "Sprinkle", "Biscuit", "Pudding", "Taco", "Bubble", "Crumpet", "Doodle", "Marshmallow", "Pumpkin", "Wiggle", "Popcorn", "Tater", "Jellybean", "Caramel", "Taxi"
+    "Muffin",
+    "Nugget",
+    "Waffle",
+    "Tofu",
+    "Sprinkle",
+    "Biscuit",
+    "Pudding",
+    "Taco",
+    "Bubble",
+    "Crumpet",
+    "Doodle",
+    "Marshmallow",
+    "Pumpkin",
+    "Wiggle",
+    "Popcorn",
+    "Tater",
+    "Jellybean",
+    "Caramel",
+    "Taxi",
 ]
+
 
 @dataclass
 class Action(abc.ABC):
@@ -667,7 +749,9 @@ class Moderation(commands.Cog):
         if len(note) == 0:
             return await ctx.send_help(ctx.command)
         elif len(note) > constants.EMBED_FIELD_CHAR_LIMIT:
-            return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
+            return await ctx.send(
+                f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters."
+            )
 
         action = Note(
             target=target,
@@ -1026,7 +1110,9 @@ class Moderation(commands.Cog):
         if len(note) == 0:
             return await ctx.send_help(ctx.command)
         elif len(note) > constants.EMBED_FIELD_CHAR_LIMIT:
-            return await ctx.send(f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters.")
+            return await ctx.send(
+                f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters."
+            )
 
         reset = note.lower() == "reset"
 
@@ -1039,7 +1125,9 @@ class Moderation(commands.Cog):
 
         action = Action.build_from_mongo(self.bot, result)
         await ctx.send(
-            f"Successfully added a note to entry **{id}**." if not reset else f"Successfully removed note of entry **{id}**.",
+            f"Successfully added a note to entry **{id}**."
+            if not reset
+            else f"Successfully removed note of entry **{id}**.",
             embed=action.to_info_embed(),
             ephemeral=True,
         )
@@ -1059,6 +1147,62 @@ class Moderation(commands.Cog):
 
         action = Action.build_from_mongo(self.bot, action)
         await ctx.send(embed=action.to_info_embed())
+
+    @commands.hybrid_command()
+    @commands.guild_only()
+    @checks.is_trial_moderator()
+    async def lock(self, ctx, channel: Optional[discord.TextChannel] = None, *, reason: Optional[str] = None):
+        """Locks a channel by preventing members from sending messages.
+
+        If no channel is provided, locks the current channel.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        channel = channel or ctx.channel
+        overwrites = channel.overwrites_for(ctx.guild.default_role)
+
+        if overwrites.send_messages is False:
+            return await ctx.send(f"{channel.mention} is already locked.", ephemeral=True)
+
+        overwrites.send_messages = False
+        audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
+        if reason:
+            audit_reason += f": {reason}"
+        await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+
+        msg = f"\N{LOCK} Locked {channel.mention}."
+        if reason:
+            msg += f" Reason: {reason}"
+        await ctx.send(msg, ephemeral=True)
+
+    @commands.hybrid_command()
+    @commands.guild_only()
+    @checks.is_trial_moderator()
+    async def unlock(self, ctx, channel: Optional[discord.TextChannel] = None, *, reason: Optional[str] = None):
+        """Unlocks a channel by allowing members to send messages again.
+
+        If no channel is provided, unlocks the current channel.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        channel = channel or ctx.channel
+        overwrites = channel.overwrites_for(ctx.guild.default_role)
+
+        if overwrites.send_messages is not False:
+            return await ctx.send(f"{channel.mention} is not locked.", ephemeral=True)
+
+        overwrites.send_messages = None
+        audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
+        if reason:
+            audit_reason += f": {reason}"
+        await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+
+        msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
+        if reason:
+            msg += f" Reason: {reason}"
+        await ctx.send(msg, ephemeral=True)
 
     async def cog_unload(self):
         self.check_actions.cancel()
