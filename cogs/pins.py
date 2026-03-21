@@ -169,6 +169,10 @@ class Pins(commands.Cog):
             {"$set": {"resolved": True}},
         )
 
+        if self._current is not None:
+            self.clear_current()
+        self.bot.loop.create_task(self.update_current())
+
         await ctx.send("\N{PUSHPIN} Unpinned!")
 
     @pin.command(name="list", aliases=("ls",))
@@ -234,6 +238,10 @@ class Pins(commands.Cog):
             {"channel_id": ctx.channel.id, "resolved": False},
             {"$set": {"resolved": True}},
         )
+
+        if self._current is not None:
+            self.clear_current()
+        self.bot.loop.create_task(self.update_current())
 
         await ctx.send(f"\N{PUSHPIN} Unpinned **{len(pinned)}** messages.")
 
