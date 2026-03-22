@@ -16,6 +16,7 @@ ESSENTIAL_COGS = [
 ]
 
 COGS = [
+    "afk",
     "automod",
     "autopost",
     "auto_lock_threads",
