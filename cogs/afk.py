@@ -53,6 +53,11 @@ class Afk(commands.Cog):
             afk, status = await self.get_status(member)
             if afk:
                 await message.channel.send(f"User **{member.name}** is currently `{status}`.")
+                
+                try:
+                    await member.send(f"You have been mentioned in {message.channel} while you were {status}.")
+                except discord.Forbidden:
+                    pass # User unavailable.
     
     @commands.hybrid_command()
     async def afk(self, ctx, *, status: Optional[str] = "AFK"):
