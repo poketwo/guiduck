@@ -60,10 +60,10 @@ class Afk(commands.Cog):
                 except discord.Forbidden:
                     pass # User unavailable.
 
-    @commands.hybrid_command()
+    @commands.hybrid_group(fallback="set")
     @commands.guild_only()
     async def afk(self, ctx, *, status: Optional[str] = "AFK"):
-        """Set your status to AFK"""
+        """If no subcommand is called, set your status to AFK"""
 
         if len(status) > CHAR_LIMIT:
             return await ctx.send(f"Status too long (max {CHAR_LIMIT} characters).")
@@ -75,9 +75,9 @@ class Afk(commands.Cog):
         )
         await ctx.send(f"Set user **{ctx.author.name}** status to `{status}`.")
 
-    @commands.hybrid_command()
+    @afk.command()
     @commands.guild_only()
-    async def unafk(self, ctx):
+    async def clear(self, ctx):
         """Reset your status"""
         user = await self.bot.mongo.db.member.find_one_and_update(
             {"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}},
@@ -86,10 +86,10 @@ class Afk(commands.Cog):
         )
         await ctx.send(f"Status cleared for user **{ctx.author.name}**.")
 
-    @commands.hybrid_command()
+    @afk.command(aliases=("fr",))
     @commands.guild_only()
     @checks.is_server_admin()
-    async def resetstatus(self, ctx, member: discord.Member, note: Optional[str] = None):
+    async def forcereset(self, ctx, member: discord.Member, note: Optional[str] = None):
         """Resets user's status.
 
         You must have the Community Manager role to use this."""
@@ -107,7 +107,7 @@ class Afk(commands.Cog):
             except discord.Forbidden:
                 pass # User unavailable.
 
-    @commands.hybrid_command()
+    @afk.command()
     @commands.guild_only()
     async def status(self, ctx, *, member: Optional[discord.Member] = None):
         """Shows your current status."""
