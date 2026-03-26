@@ -88,7 +88,7 @@ class Afk(commands.Cog):
     @commands.hybrid_command()
     @commands.guild_only()
     @checks.is_server_admin()
-    async def resetstatus(self, ctx, member: discord.Member):
+    async def resetstatus(self, ctx, member: discord.Member, note: Optional[str] = None):
         """Resets user's status.
 
         You must have the Community Manager role to use this."""
@@ -99,6 +99,12 @@ class Afk(commands.Cog):
             upsert=True,
         )
         await ctx.send(f"Status force cleared for user **{member.name}**.")
+        
+        if note is not None:
+            try:
+                await member.send(f"Your status has been reset because {note}")
+            except discord.Forbidden:
+                pass # User unavailable.
 
     @commands.hybrid_command()
     @commands.guild_only()
