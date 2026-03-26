@@ -68,7 +68,7 @@ class Afk(commands.Cog):
         if len(status) > CHAR_LIMIT:
             return await ctx.send(f"Status too long (max {CHAR_LIMIT} characters).")
 
-        user = await self.bot.mongo.db.member.find_one_and_update(
+        await self.bot.mongo.db.member.update_one(
             {"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}},
             {"$set": {"afk": True, "status": status, "since": int(datetime.utcnow().timestamp())}},
             upsert=True,
@@ -79,7 +79,7 @@ class Afk(commands.Cog):
     @commands.guild_only()
     async def clear(self, ctx):
         """Reset your status"""
-        user = await self.bot.mongo.db.member.find_one_and_update(
+        await self.bot.mongo.db.member.update_one(
             {"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}},
             {"$set": {"afk": False, "status": "Online", "since": 0}},
             upsert=True,
@@ -94,7 +94,7 @@ class Afk(commands.Cog):
 
         You must have the Community Manager role to use this."""
 
-        user = await self.bot.mongo.db.member.find_one_and_update(
+        await self.bot.mongo.db.member.update_one(
             {"_id": {"id": member.id, "guild_id": ctx.guild.id}},
             {"$set": {"afk": False, "status": "Online", "since": 0}},
             upsert=True,
