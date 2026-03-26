@@ -8,7 +8,7 @@ from discord.ext.menus.views import ViewMenuPages
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers import checks
 
-MAX = 75 
+CHAR_LIMIT = 75 
 
 class Afk(commands.Cog):
     """For AFK status"""
@@ -66,8 +66,8 @@ class Afk(commands.Cog):
     async def afk(self, ctx, *, status: Optional[str] = "AFK"):
         """Set your status to AFK"""
 
-        if len(status) > MAX:
-            return await ctx.send(f"Status too long (max {MAX} characters).")
+        if len(status) > CHAR_LIMIT:
+            return await ctx.send(f"Status too long (max {CHAR_LIMIT} characters).")
 
         user = await self.bot.mongo.db.member.find_one_and_update(
             {"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}},
