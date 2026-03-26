@@ -8,7 +8,7 @@ from discord.ext.menus.views import ViewMenuPages
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers import checks
 
-CHAR_LIMIT = 75 
+CHAR_LIMIT = 75
 
 class Afk(commands.Cog):
     """For AFK status"""
@@ -34,8 +34,7 @@ class Afk(commands.Cog):
     async def on_message(self, message):
         if message.guild is None or message.author.bot:
             return
-        ctx = await self.bot.get_context(message)
-        if ctx.command is not None:
+        if message.content.startswith(tuple(self.bot.command_prefix)):
             return
 
 #        Currently disable may affect Bot's performance      
