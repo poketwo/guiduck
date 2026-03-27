@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from enum import Enum
 
@@ -41,7 +41,6 @@ class Afk(commands.Cog):
         if message.content.startswith(tuple(self.bot.command_prefix)):
             return
 
-        Currently disable may affect Bot's performance      
         status, _, _= await self.get_status(message.author)
         if status == Status.AFK.value:
             await self.bot.mongo.db.member.update_one(
@@ -77,7 +76,7 @@ class Afk(commands.Cog):
         
         await self.bot.mongo.db.member.update_one(
             {"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}},
-            {"$set": {"status": Status.AFK.value, "reason": reason, "since": int(datetime.utcnow().timestamp())}},
+            {"$set": {"status": Status.AFK.value, "reason": reason, "since": int(datetime.now(timezone.utc).timestamp())}},
             upsert=True,
         )
         await ctx.send(f"Set user **{ctx.author.name}** status to `{reason}`.")
@@ -92,7 +91,7 @@ class Afk(commands.Cog):
         
         await self.bot.mongo.db.member.update_one(
             {"_id": {"id": ctx.author.id, "guild_id": ctx.guild.id}},
-            {"$set": {"status": Status.DND.value, "reason": reason, "since": int(datetime.utcnow().timestamp())}},
+            {"$set": {"status": Status.DND.value, "reason": reason, "since": int(datetime.now(timezone.utc).timestamp())}},
             upsert=True,
         )
         await ctx.send(f"Set user **{ctx.author.name}** status to `{reason}` and **Do Not Disturb**.")
