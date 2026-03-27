@@ -57,11 +57,12 @@ class Afk(commands.Cog):
             status, reason, since = await self.get_status(member)
             if status == Status.AFK.value:
                 await message.channel.send(f"User **{member.name}** is currently `{reason}` since <t:{since}:R>.")
-            
-                try:
-                    await member.send(f"You have been mentioned in {message.channel} while you were {reason}.\n Jump To: {message.jump_url}")
-                except discord.Forbidden:
-                    pass # User unavailable.
+                
+                if message.channel.permissions_for(member).view_channel:
+                    try:
+                        await member.send(f"You have been mentioned in {message.channel} while you were {reason}.\n Jump To: {message.jump_url}")
+                    except discord.Forbidden:
+                        pass # User unavailable.
                     
             elif status == Status.DND.value:
                 await message.channel.send(f"User **{member.name}** is currently `{reason}` and on **Do Not Disturb**.")
