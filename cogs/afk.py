@@ -41,15 +41,15 @@ class Afk(commands.Cog):
         if message.content.startswith(tuple(self.bot.command_prefix)):
             return
 
-#        Currently disable may affect Bot's performance      
-#        status, _, _= await self.get_status(message.author)
-#        if status == Status.AFK.value:
-#            await self.bot.mongo.db.member.update_one(
-#                {"_id": {"id": message.author.id, "guild_id": message.guild.id}},
-#                {"$set": {"status": Status.ONLINE.value, "reason": Status.ONLINE.value, "since": 0}},
-#                upsert=True,
-#            )
-#            await message.channel.send(f"Welcome back **{message.author.name}**, your AFK status has been removed.")
+        Currently disable may affect Bot's performance      
+        status, _, _= await self.get_status(message.author)
+        if status == Status.AFK.value:
+            await self.bot.mongo.db.member.update_one(
+                {"_id": {"id": message.author.id, "guild_id": message.guild.id}},
+                {"$set": {"status": Status.ONLINE.value, "reason": Status.ONLINE.value, "since": 0}},
+                upsert=True,
+            )
+            await message.channel.send(f"Welcome back **{message.author.name}**, your AFK status has been removed.")
 
         if not message.mentions:
             return
@@ -64,7 +64,7 @@ class Afk(commands.Cog):
                 except discord.Forbidden:
                     pass # User unavailable.
                     
-            elif status == Status.DND:
+            elif status == Status.DND.value:
                 await message.channel.send(f"User **{member.name}** is currently `{reason}` and on **Do Not Disturb**.")
 
     @commands.hybrid_group(fallback="set")
@@ -140,9 +140,9 @@ class Afk(commands.Cog):
         embed = discord.Embed(color=discord.Color.blurple())
         embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
         if status != Status.ONLINE.value:
-            embed.add_field(name=status.value, value=f"{reason} since <t:{since}:R>")
+            embed.add_field(name=status, value=f"{reason} since <t:{since}:R>")
         else:
-            embed.add_field(name=status.value, value="Online")
+            embed.add_field(name=status, value="Online")
         
         await ctx.send(embed=embed)
 
