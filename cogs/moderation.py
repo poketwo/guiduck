@@ -1202,22 +1202,39 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        locked_channels = []
+        bot_locked = []
+        manually_restricted = []
+
+        locked_channel_ids = set()
         async for doc in ctx.bot.mongo.db.channel.find({"locked": True, "guild_id": ctx.guild.id}):
             channel = ctx.guild.get_channel(doc["_id"])
             if channel is not None:
+                locked_channel_ids.add(channel.id)
                 line = f"\N{LOCK} {channel.mention}"
                 lock_reason = doc.get("lock_reason")
                 if lock_reason:
                     line += f" — {lock_reason}"
-                locked_channels.append(line)
+                bot_locked.append(line)
 
-        if not locked_channels:
+        for channel in ctx.guild.text_channels:
+            if channel.id in locked_channel_ids:
+                continue
+            overwrites = channel.overwrites_for(ctx.guild.default_role)
+            if overwrites.send_messages is False:
+                manually_restricted.append(f"\N{LOCK} {channel.mention} (manually restricted)")
+
+        if not bot_locked and not manually_restricted:
             return await ctx.send("No channels are currently locked.", ephemeral=True)
+
+        description_parts = []
+        if bot_locked:
+            description_parts.extend(bot_locked)
+        if manually_restricted:
+            description_parts.extend(manually_restricted)
 
         embed = discord.Embed(
             title="Locked Channels",
-            description="\n".join(locked_channels),
+            description="\n".join(description_parts),
             color=discord.Color.orange(),
         )
         await ctx.send(embed=embed, ephemeral=True)
