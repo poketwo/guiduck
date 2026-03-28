@@ -1160,7 +1160,7 @@ class Moderation(commands.Cog):
         action = Action.build_from_mongo(self.bot, action)
         await ctx.send(embed=action.to_info_embed())
 
-    @commands.hybrid_group(fallback="channels")
+    @commands.group(invoke_without_command=True)
     @commands.guild_only()
     @checks.is_moderator()
     async def lock(self, ctx, *, flags: LockFlags):
@@ -1254,7 +1254,7 @@ class Moderation(commands.Cog):
         except IndexError:
             await ctx.send("No channels are currently locked.")
 
-    @commands.hybrid_command()
+    @commands.command()
     @commands.guild_only()
     @checks.is_moderator()
     async def unlock(self, ctx, *, flags: UnlockFlags):
