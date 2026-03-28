@@ -1172,6 +1172,7 @@ class Moderation(commands.Cog):
         channels = channels or [ctx.channel]
 
         results = []
+        to_lock = []
         for channel in channels:
             channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
             if channel_data and channel_data.get("locked", False):
@@ -1190,6 +1191,16 @@ class Moderation(commands.Cog):
                 announce += f" Expires {discord.utils.format_dt(flags.duration.dt, 'R')}."
             await channel.send(announce)
 
+            msg = f"\N{LOCK} Locked {channel.mention}."
+            if flags.reason:
+                msg += f" Reason: {flags.reason}"
+            if flags.duration:
+                msg += f" Expires {discord.utils.format_dt(flags.duration.dt, 'R')}."
+            results.append(msg)
+            to_lock.append(channel)
+
+        for channel in to_lock:
+            overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = False
             audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
             if flags.reason:
@@ -1202,13 +1213,6 @@ class Moderation(commands.Cog):
             if flags.duration:
                 update_fields["lock_expires_at"] = flags.duration.dt
             await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update_fields}, upsert=True)
-
-            msg = f"\N{LOCK} Locked {channel.mention}."
-            if flags.reason:
-                msg += f" Reason: {flags.reason}"
-            if flags.duration:
-                msg += f" Expires {discord.utils.format_dt(flags.duration.dt, 'R')}."
-            results.append(msg)
 
         await ctx.send("\n".join(results), ephemeral=True)
 
@@ -1273,6 +1277,7 @@ class Moderation(commands.Cog):
         channels = channels or [ctx.channel]
 
         results = []
+        to_unlock = []
         for channel in channels:
             channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
             is_locked_in_db = channel_data and channel_data.get("locked", False)
@@ -1285,6 +1290,13 @@ class Moderation(commands.Cog):
                     results.append(f"{channel.mention} is not locked.")
                 continue
 
+            msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
+            if flags.reason:
+                msg += f" Reason: {flags.reason}"
+            results.append(msg)
+            to_unlock.append(channel)
+
+        for channel in to_unlock:
             overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = None
             audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
@@ -1304,11 +1316,6 @@ class Moderation(commands.Cog):
             if flags.reason:
                 announce += f" Reason: {flags.reason}"
             await channel.send(announce)
-
-            msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
-            if flags.reason:
-                msg += f" Reason: {flags.reason}"
-            results.append(msg)
 
         await ctx.send("\n".join(results), ephemeral=True)
 
