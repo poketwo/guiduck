@@ -310,6 +310,9 @@ class Pins(commands.Cog):
         if "pinned" not in payload.data:
             return
 
+        if payload.guild_id is None:
+            return
+
         channel = self.bot.get_channel(payload.channel_id)
         if channel is None:
             try:
