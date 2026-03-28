@@ -1205,7 +1205,11 @@ class Moderation(commands.Cog):
             audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
             if flags.reason:
                 audit_reason += f": {flags.reason}"
-            await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+            try:
+                await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+            except discord.Forbidden:
+                results.append(f"Failed to lock {channel.mention}: missing permissions.")
+                continue
 
             update_fields = {"locked": True, "guild_id": ctx.guild.id}
             if flags.reason:
@@ -1302,7 +1306,11 @@ class Moderation(commands.Cog):
             audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
             if flags.reason:
                 audit_reason += f": {flags.reason}"
-            await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+            try:
+                await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+            except discord.Forbidden:
+                results.append(f"Failed to unlock {channel.mention}: missing permissions.")
+                continue
             await ctx.bot.mongo.db.channel.update_one(
                 {"_id": channel.id},
                 {
