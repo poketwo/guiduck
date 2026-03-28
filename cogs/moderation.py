@@ -1192,8 +1192,7 @@ class Moderation(commands.Cog):
             try:
                 await channel.send(announce)
             except discord.Forbidden:
-                results.append(f"Failed to lock {channel.mention}: missing access.")
-                continue
+                pass
 
             msg = f"\N{LOCK} Locked {channel.mention}."
             if flags.reason:
