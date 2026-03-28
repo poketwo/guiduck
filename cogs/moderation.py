@@ -13,7 +13,7 @@ from discord.ext.menus.views import ViewMenuPages
 from discord.ui import button
 
 from helpers import checks, constants, time
-from helpers.pagination import AsyncEmbedFieldsPageSource
+from helpers.pagination import AsyncEmbedFieldsPageSource, EmbedListPageSource
 from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
 
@@ -1202,42 +1202,38 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        bot_locked = []
-        manually_restricted = []
-
-        locked_channel_ids = set()
+        locked_docs = {}
         async for doc in ctx.bot.mongo.db.channel.find({"locked": True, "guild_id": ctx.guild.id}):
-            channel = ctx.guild.get_channel(doc["_id"])
-            if channel is not None:
-                locked_channel_ids.add(channel.id)
+            locked_docs[doc["_id"]] = doc
+
+        entries = []
+        for channel in ctx.guild.text_channels:
+            if channel.id in locked_docs:
+                doc = locked_docs[channel.id]
                 line = f"\N{LOCK} {channel.mention}"
                 lock_reason = doc.get("lock_reason")
                 if lock_reason:
                     line += f" — {lock_reason}"
-                bot_locked.append(line)
+                entries.append(line)
+            else:
+                overwrites = channel.overwrites_for(ctx.guild.default_role)
+                if overwrites.send_messages is False:
+                    entries.append(f"\N{LOCK} {channel.mention} (manually restricted)")
 
-        for channel in ctx.guild.text_channels:
-            if channel.id in locked_channel_ids:
-                continue
-            overwrites = channel.overwrites_for(ctx.guild.default_role)
-            if overwrites.send_messages is False:
-                manually_restricted.append(f"\N{LOCK} {channel.mention} (manually restricted)")
-
-        if not bot_locked and not manually_restricted:
+        if not entries:
             return await ctx.send("No channels are currently locked.", ephemeral=True)
 
-        description_parts = []
-        if bot_locked:
-            description_parts.extend(bot_locked)
-        if manually_restricted:
-            description_parts.extend(manually_restricted)
-
-        embed = discord.Embed(
-            title="Locked Channels",
-            description="\n".join(description_parts),
-            color=discord.Color.orange(),
+        pages = ViewMenuPages(
+            source=EmbedListPageSource(
+                entries,
+                title=f"\N{LOCK} Locked Channels ({len(entries)})",
+            )
         )
-        await ctx.send(embed=embed, ephemeral=True)
+
+        try:
+            await pages.start(ctx)
+        except IndexError:
+            await ctx.send("No channels are currently locked.")
 
     @commands.hybrid_command()
     @commands.guild_only()
