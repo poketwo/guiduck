@@ -111,7 +111,7 @@ class Afk(commands.Cog):
     @afk.command(aliases=("fr",))
     @commands.guild_only()
     @checks.is_server_admin()
-    async def forcereset(self, ctx, member: discord.Member, note: Optional[str] = None):
+    async def forcereset(self, ctx, member: discord.Member, *, note: Optional[str] = None):
         """Resets user's status.
 
         You must have the Community Manager role to use this."""
