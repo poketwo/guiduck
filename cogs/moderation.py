@@ -3,7 +3,7 @@ from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Union
+from typing import List, Optional, Union
 import random
 
 import discord
@@ -475,13 +475,13 @@ class MemberOrIdConverter(commands.Converter):
 
 
 class LockFlags(commands.FlagConverter, case_insensitive=True):
-    channels: commands.Greedy[discord.TextChannel] = commands.flag(positional=True, default=None)
+    channels: List[discord.TextChannel] = commands.flag(positional=True, default=None)
     reason: Optional[str] = commands.flag(default=None)
     duration: Optional[time.ShortTime] = commands.flag(default=None)
 
 
 class UnlockFlags(commands.FlagConverter, case_insensitive=True):
-    channels: commands.Greedy[discord.TextChannel] = commands.flag(positional=True, default=None)
+    channels: List[discord.TextChannel] = commands.flag(positional=True, default=None)
     reason: Optional[str] = commands.flag(default=None)
 
 
