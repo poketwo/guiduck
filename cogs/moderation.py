@@ -1336,6 +1336,12 @@ class Moderation(commands.Cog):
         if guild is not None:
             channel = guild.get_channel(doc["_id"])
             if channel is not None:
+                try:
+                    await channel.send(
+                        "\N{OPEN LOCK} This channel has been automatically unlocked (lock duration expired)."
+                    )
+                except discord.Forbidden:
+                    pass
                 overwrites = channel.overwrites_for(guild.default_role)
                 overwrites.send_messages = None
                 await channel.set_permissions(guild.default_role, overwrite=overwrites, reason="Lock duration expired")
