@@ -1336,15 +1336,15 @@ class Moderation(commands.Cog):
         if guild is not None:
             channel = guild.get_channel(doc["_id"])
             if channel is not None:
+                overwrites = channel.overwrites_for(guild.default_role)
+                overwrites.send_messages = None
+                await channel.set_permissions(guild.default_role, overwrite=overwrites, reason="Lock duration expired")
                 try:
                     await channel.send(
                         "\N{OPEN LOCK} This channel has been automatically unlocked (lock duration expired)."
                     )
                 except discord.Forbidden:
                     pass
-                overwrites = channel.overwrites_for(guild.default_role)
-                overwrites.send_messages = None
-                await channel.set_permissions(guild.default_role, overwrite=overwrites, reason="Lock duration expired")
         await self.bot.mongo.db.channel.update_one(
             {"_id": doc["_id"]},
             {"$set": {"locked": False}, "$unset": {"lock_reason": 1, "lock_expires_at": 1}},
