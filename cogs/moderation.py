@@ -1160,17 +1160,17 @@ class Moderation(commands.Cog):
         """
 
         channel = channel or ctx.channel
-        overwrites = channel.overwrites_for(ctx.guild.default_role)
 
+        channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
+        if channel_data and channel_data.get("locked", False):
+            return await ctx.send(f"{channel.mention} is already locked.", ephemeral=True)
+
+        overwrites = channel.overwrites_for(ctx.guild.default_role)
         if overwrites.send_messages is False:
             return await ctx.send(
                 f"{channel.mention} cannot be locked because @everyone already doesn't have access to chat there.",
                 ephemeral=True,
             )
-
-        channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
-        if channel_data and channel_data.get("locked", False):
-            return await ctx.send(f"{channel.mention} is already locked.", ephemeral=True)
 
         overwrites.send_messages = False
         audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
@@ -1198,10 +1198,13 @@ class Moderation(commands.Cog):
         channel = channel or ctx.channel
 
         channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
-        if not channel_data or not channel_data.get("locked", False):
+        is_locked_in_db = channel_data and channel_data.get("locked", False)
+        overwrites = channel.overwrites_for(ctx.guild.default_role)
+        is_locked_in_perms = overwrites.send_messages is False
+
+        if not is_locked_in_db and not is_locked_in_perms:
             return await ctx.send(f"{channel.mention} is not locked.", ephemeral=True)
 
-        overwrites = channel.overwrites_for(ctx.guild.default_role)
         overwrites.send_messages = None
         audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
         if reason:
