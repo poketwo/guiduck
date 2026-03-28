@@ -1183,6 +1183,11 @@ class Moderation(commands.Cog):
                 results.append(f"{channel.mention} cannot be locked because it was manually restricted.")
                 continue
 
+            announce = f"\N{LOCK} This channel has been locked."
+            if flags.reason:
+                announce += f" Reason: {flags.reason}"
+            await channel.send(announce)
+
             overwrites.send_messages = False
             audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
             if flags.reason:
@@ -1195,11 +1200,6 @@ class Moderation(commands.Cog):
             if flags.duration:
                 update_fields["lock_expires_at"] = flags.duration.dt
             await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update_fields}, upsert=True)
-
-            announce = f"\N{LOCK} This channel has been locked."
-            if flags.reason:
-                announce += f" Reason: {flags.reason}"
-            await channel.send(announce)
 
             msg = f"\N{LOCK} Locked {channel.mention}."
             if flags.reason:
