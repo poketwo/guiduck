@@ -475,13 +475,11 @@ class MemberOrIdConverter(commands.Converter):
 
 
 class LockFlags(commands.FlagConverter, case_insensitive=True):
-    channels: List[discord.TextChannel] = commands.flag(positional=True, default=None)
     reason: Optional[str] = commands.flag(default=None)
     duration: Optional[time.ShortTime] = commands.flag(default=None)
 
 
 class UnlockFlags(commands.FlagConverter, case_insensitive=True):
-    channels: List[discord.TextChannel] = commands.flag(positional=True, default=None)
     reason: Optional[str] = commands.flag(default=None)
 
 
@@ -1163,7 +1161,7 @@ class Moderation(commands.Cog):
     @commands.group(invoke_without_command=True)
     @commands.guild_only()
     @checks.is_moderator()
-    async def lock(self, ctx, *, flags: LockFlags):
+    async def lock(self, ctx, channels: commands.Greedy[discord.TextChannel], *, flags: LockFlags):
         """Locks one or more channels by preventing members from sending messages.
 
         If no channel is provided, locks the current channel.
@@ -1171,7 +1169,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        channels = flags.channels or [ctx.channel]
+        channels = channels or [ctx.channel]
 
         results = []
         for channel in channels:
@@ -1257,7 +1255,7 @@ class Moderation(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @checks.is_moderator()
-    async def unlock(self, ctx, *, flags: UnlockFlags):
+    async def unlock(self, ctx, channels: commands.Greedy[discord.TextChannel], *, flags: UnlockFlags):
         """Unlocks one or more channels by allowing members to send messages again.
 
         If no channel is provided, unlocks the current channel.
@@ -1265,7 +1263,7 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        channels = flags.channels or [ctx.channel]
+        channels = channels or [ctx.channel]
 
         results = []
         for channel in channels:
