@@ -1148,7 +1148,7 @@ class Moderation(commands.Cog):
         action = Action.build_from_mongo(self.bot, action)
         await ctx.send(embed=action.to_info_embed())
 
-    @commands.hybrid_group(invoke_without_command=True)
+    @commands.hybrid_group(invoke_without_command=True, fallback="channels")
     @commands.guild_only()
     @checks.is_moderator()
     async def lock(self, ctx, channels: commands.Greedy[discord.TextChannel], *, reason: Optional[str] = None):
