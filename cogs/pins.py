@@ -183,6 +183,11 @@ class Pins(commands.Cog):
             # Unpin the message (toggle off)
             await target.unpin(reason=f"Unpinned by {ctx.author} (ID: {ctx.author.id})")
 
+            try:
+                await target.remove_reaction("\N{PUSHPIN}", self.bot.user)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+
             # Resolve any timed pin for this message
             await self.bot.mongo.db.timed_pin.update_many(
                 {"message_id": target.id, "channel_id": ctx.channel.id, "resolved": False},
@@ -197,6 +202,11 @@ class Pins(commands.Cog):
 
         # Pin the message (toggle on)
         await target.pin(reason=f"Pinned by {ctx.author} (ID: {ctx.author.id})")
+
+        try:
+            await target.add_reaction("\N{PUSHPIN}")
+        except (discord.Forbidden, discord.HTTPException):
+            pass
 
         if duration is not None:
             timed_pin = TimedPin(
@@ -357,6 +367,10 @@ class Pins(commands.Cog):
             message = await channel.fetch_message(timed_pin.message_id)
             if message.pinned:
                 await message.unpin(reason="Timed pin expired")
+                try:
+                    await message.remove_reaction("\N{PUSHPIN}", self.bot.user)
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
                 await channel.send(
                     f"\N{PUSHPIN} A temporarily pinned message has been automatically unpinned.",
                     reference=message,
