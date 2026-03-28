@@ -1148,79 +1148,112 @@ class Moderation(commands.Cog):
         action = Action.build_from_mongo(self.bot, action)
         await ctx.send(embed=action.to_info_embed())
 
-    @commands.hybrid_command()
+    @commands.hybrid_group(invoke_without_command=True)
     @commands.guild_only()
     @checks.is_moderator()
-    async def lock(self, ctx, channel: Optional[discord.TextChannel] = None, *, reason: Optional[str] = None):
-        """Locks a channel by preventing members from sending messages.
+    async def lock(self, ctx, channels: commands.Greedy[discord.TextChannel], *, reason: Optional[str] = None):
+        """Locks one or more channels by preventing members from sending messages.
 
         If no channel is provided, locks the current channel.
 
         You must have the Moderator role to use this.
         """
 
-        channel = channel or ctx.channel
+        if not channels:
+            channels = [ctx.channel]
 
-        channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
-        if channel_data and channel_data.get("locked", False):
-            return await ctx.send(f"{channel.mention} is already locked.", ephemeral=True)
+        results = []
+        for channel in channels:
+            channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
+            if channel_data and channel_data.get("locked", False):
+                results.append(f"{channel.mention} is already locked.")
+                continue
 
-        overwrites = channel.overwrites_for(ctx.guild.default_role)
-        if overwrites.send_messages is False:
-            return await ctx.send(
-                f"{channel.mention} cannot be locked because it was manually restricted.",
-                ephemeral=True,
-            )
+            overwrites = channel.overwrites_for(ctx.guild.default_role)
+            if overwrites.send_messages is False:
+                results.append(f"{channel.mention} cannot be locked because it was manually restricted.")
+                continue
 
-        overwrites.send_messages = False
-        audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
-        if reason:
-            audit_reason += f": {reason}"
-        await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
-        await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"locked": True}}, upsert=True)
+            overwrites.send_messages = False
+            audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
+            if reason:
+                audit_reason += f": {reason}"
+            await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+            await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"locked": True}}, upsert=True)
 
-        msg = f"\N{LOCK} Locked {channel.mention}."
-        if reason:
-            msg += f" Reason: {reason}"
-        await ctx.send(msg, ephemeral=True)
+            msg = f"\N{LOCK} Locked {channel.mention}."
+            if reason:
+                msg += f" Reason: {reason}"
+            results.append(msg)
+
+        await ctx.send("\n".join(results), ephemeral=True)
+
+    @lock.command(name="list")
+    @commands.guild_only()
+    @checks.is_moderator()
+    async def lock_list(self, ctx):
+        """Lists all currently locked channels.
+
+        You must have the Moderator role to use this.
+        """
+
+        locked_channels = []
+        async for doc in ctx.bot.mongo.db.channel.find({"locked": True, "guild_id": ctx.guild.id}):
+            channel = ctx.guild.get_channel(doc["_id"])
+            if channel is not None:
+                locked_channels.append(f"\N{LOCK} {channel.mention}")
+
+        if not locked_channels:
+            return await ctx.send("No channels are currently locked.", ephemeral=True)
+
+        embed = discord.Embed(
+            title="Locked Channels",
+            description="\n".join(locked_channels),
+            color=discord.Color.orange(),
+        )
+        await ctx.send(embed=embed, ephemeral=True)
 
     @commands.hybrid_command()
     @commands.guild_only()
     @checks.is_moderator()
-    async def unlock(self, ctx, channel: Optional[discord.TextChannel] = None, *, reason: Optional[str] = None):
-        """Unlocks a channel by allowing members to send messages again.
+    async def unlock(self, ctx, channels: commands.Greedy[discord.TextChannel], *, reason: Optional[str] = None):
+        """Unlocks one or more channels by allowing members to send messages again.
 
         If no channel is provided, unlocks the current channel.
 
         You must have the Moderator role to use this.
         """
 
-        channel = channel or ctx.channel
+        if not channels:
+            channels = [ctx.channel]
 
-        channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
-        is_locked_in_db = channel_data and channel_data.get("locked", False)
+        results = []
+        for channel in channels:
+            channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
+            is_locked_in_db = channel_data and channel_data.get("locked", False)
 
-        if not is_locked_in_db:
+            if not is_locked_in_db:
+                overwrites = channel.overwrites_for(ctx.guild.default_role)
+                if overwrites.send_messages is False:
+                    results.append(f"{channel.mention} cannot be unlocked because it was manually restricted.")
+                else:
+                    results.append(f"{channel.mention} is not locked.")
+                continue
+
             overwrites = channel.overwrites_for(ctx.guild.default_role)
-            if overwrites.send_messages is False:
-                return await ctx.send(
-                    f"{channel.mention} cannot be unlocked because it was manually restricted.",
-                    ephemeral=True,
-                )
-            return await ctx.send(f"{channel.mention} is not locked.", ephemeral=True)
+            overwrites.send_messages = None
+            audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
+            if reason:
+                audit_reason += f": {reason}"
+            await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+            await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"locked": False}}, upsert=True)
 
-        overwrites = channel.overwrites_for(ctx.guild.default_role)
-        overwrites.send_messages = None
-        audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
-        if reason:
-            audit_reason += f": {reason}"
-        await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
-        await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"locked": False}}, upsert=True)
+            msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
+            if reason:
+                msg += f" Reason: {reason}"
+            results.append(msg)
 
-        msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
-        if reason:
-            msg += f" Reason: {reason}"
-        await ctx.send(msg, ephemeral=True)
+        await ctx.send("\n".join(results), ephemeral=True)
 
     async def cog_unload(self):
         self.check_actions.cancel()
