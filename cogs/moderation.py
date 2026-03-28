@@ -1202,6 +1202,8 @@ class Moderation(commands.Cog):
             results.append(msg)
             to_lock.append(channel)
 
+        await ctx.send("\n".join(results), ephemeral=True)
+
         for channel in to_lock:
             overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = False
@@ -1211,7 +1213,6 @@ class Moderation(commands.Cog):
             try:
                 await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
             except discord.Forbidden:
-                results.append(f"Failed to lock {channel.mention}: missing permissions.")
                 continue
 
             update_fields = {"locked": True, "guild_id": ctx.guild.id}
@@ -1220,8 +1221,6 @@ class Moderation(commands.Cog):
             if flags.duration:
                 update_fields["lock_expires_at"] = flags.duration.dt
             await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update_fields}, upsert=True)
-
-        await ctx.send("\n".join(results), ephemeral=True)
 
     @lock.command(name="list")
     @commands.guild_only()
@@ -1303,6 +1302,8 @@ class Moderation(commands.Cog):
             results.append(msg)
             to_unlock.append(channel)
 
+        await ctx.send("\n".join(results), ephemeral=True)
+
         for channel in to_unlock:
             overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = None
@@ -1312,7 +1313,6 @@ class Moderation(commands.Cog):
             try:
                 await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
             except discord.Forbidden:
-                results.append(f"Failed to unlock {channel.mention}: missing permissions.")
                 continue
             await ctx.bot.mongo.db.channel.update_one(
                 {"_id": channel.id},
@@ -1330,8 +1330,6 @@ class Moderation(commands.Cog):
                 await channel.send(announce)
             except discord.Forbidden:
                 pass
-
-        await ctx.send("\n".join(results), ephemeral=True)
 
     async def reverse_expired_lock(self, doc):
         guild = self.bot.get_guild(doc.get("guild_id"))
