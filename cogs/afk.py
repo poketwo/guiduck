@@ -70,6 +70,8 @@ class Afk(commands.Cog):
             await message.channel.send(f"Welcome back **{message.author.name}**, your AFK status has been removed.")
 
         for member in message.mentions:
+            if member.id == message.author.id:
+                continue
             info = await self.get_status(member)
             if info.status == Status.AFK:
                 await message.channel.send(
