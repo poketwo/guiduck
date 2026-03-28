@@ -1302,8 +1302,6 @@ class Moderation(commands.Cog):
             results.append(msg)
             to_unlock.append(channel)
 
-        await ctx.send("\n".join(results), ephemeral=True)
-
         for channel in to_unlock:
             overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = None
@@ -1330,6 +1328,8 @@ class Moderation(commands.Cog):
                 await channel.send(announce)
             except discord.Forbidden:
                 pass
+
+        await ctx.send("\n".join(results), ephemeral=True)
 
     async def reverse_expired_lock(self, doc):
         guild = self.bot.get_guild(doc.get("guild_id"))
