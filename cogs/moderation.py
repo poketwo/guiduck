@@ -1235,7 +1235,7 @@ class Moderation(commands.Cog):
         except IndexError:
             await ctx.send("No channels are currently locked.")
 
-    @commands.hybrid_command()
+    @commands.hybrid_group(invoke_without_command=True, fallback="channels")
     @commands.guild_only()
     @checks.is_moderator()
     async def unlock(self, ctx, channels: commands.Greedy[discord.TextChannel], *, reason: Optional[str] = None):
