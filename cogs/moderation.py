@@ -1179,7 +1179,9 @@ class Moderation(commands.Cog):
             if reason:
                 audit_reason += f": {reason}"
             await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
-            await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"locked": True}}, upsert=True)
+            await ctx.bot.mongo.db.channel.update_one(
+                {"_id": channel.id}, {"$set": {"locked": True, "guild_id": ctx.guild.id}}, upsert=True
+            )
 
             msg = f"\N{LOCK} Locked {channel.mention}."
             if reason:
@@ -1246,7 +1248,9 @@ class Moderation(commands.Cog):
             if reason:
                 audit_reason += f": {reason}"
             await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
-            await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"locked": False}}, upsert=True)
+            await ctx.bot.mongo.db.channel.update_one(
+                {"_id": channel.id}, {"$set": {"locked": False, "guild_id": ctx.guild.id}}, upsert=True
+            )
 
             msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
             if reason:
