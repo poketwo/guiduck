@@ -1179,9 +1179,12 @@ class Moderation(commands.Cog):
             if reason:
                 audit_reason += f": {reason}"
             await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
-            await ctx.bot.mongo.db.channel.update_one(
-                {"_id": channel.id}, {"$set": {"locked": True, "guild_id": ctx.guild.id}}, upsert=True
-            )
+            update_fields = {"locked": True, "guild_id": ctx.guild.id}
+            if reason:
+                update_fields["lock_reason"] = reason
+            else:
+                update_fields["lock_reason"] = None
+            await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update_fields}, upsert=True)
 
             msg = f"\N{LOCK} Locked {channel.mention}."
             if reason:
@@ -1203,7 +1206,11 @@ class Moderation(commands.Cog):
         async for doc in ctx.bot.mongo.db.channel.find({"locked": True, "guild_id": ctx.guild.id}):
             channel = ctx.guild.get_channel(doc["_id"])
             if channel is not None:
-                locked_channels.append(f"\N{LOCK} {channel.mention}")
+                line = f"\N{LOCK} {channel.mention}"
+                lock_reason = doc.get("lock_reason")
+                if lock_reason:
+                    line += f" — {lock_reason}"
+                locked_channels.append(line)
 
         if not locked_channels:
             return await ctx.send("No channels are currently locked.", ephemeral=True)
@@ -1249,7 +1256,9 @@ class Moderation(commands.Cog):
                 audit_reason += f": {reason}"
             await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
             await ctx.bot.mongo.db.channel.update_one(
-                {"_id": channel.id}, {"$set": {"locked": False, "guild_id": ctx.guild.id}}, upsert=True
+                {"_id": channel.id},
+                {"$set": {"locked": False, "guild_id": ctx.guild.id, "lock_reason": None}},
+                upsert=True,
             )
 
             msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
