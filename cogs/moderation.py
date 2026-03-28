@@ -1196,6 +1196,11 @@ class Moderation(commands.Cog):
                 update_fields["lock_expires_at"] = flags.duration.dt
             await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update_fields}, upsert=True)
 
+            announce = f"\N{LOCK} This channel has been locked."
+            if flags.reason:
+                announce += f" Reason: {flags.reason}"
+            await channel.send(announce)
+
             msg = f"\N{LOCK} Locked {channel.mention}."
             if flags.reason:
                 msg += f" Reason: {flags.reason}"
@@ -1292,6 +1297,11 @@ class Moderation(commands.Cog):
                 },
                 upsert=True,
             )
+
+            announce = f"\N{OPEN LOCK} This channel has been unlocked."
+            if flags.reason:
+                announce += f" Reason: {flags.reason}"
+            await channel.send(announce)
 
             msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
             if flags.reason:
