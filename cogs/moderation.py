@@ -1189,7 +1189,11 @@ class Moderation(commands.Cog):
                 announce += f" Reason: {flags.reason}"
             if flags.duration:
                 announce += f" Expires {discord.utils.format_dt(flags.duration.dt, 'R')}."
-            await channel.send(announce)
+            try:
+                await channel.send(announce)
+            except discord.Forbidden:
+                results.append(f"Failed to lock {channel.mention}: missing access.")
+                continue
 
             msg = f"\N{LOCK} Locked {channel.mention}."
             if flags.reason:
@@ -1323,7 +1327,10 @@ class Moderation(commands.Cog):
             announce = f"\N{OPEN LOCK} This channel has been unlocked."
             if flags.reason:
                 announce += f" Reason: {flags.reason}"
-            await channel.send(announce)
+            try:
+                await channel.send(announce)
+            except discord.Forbidden:
+                pass
 
         await ctx.send("\n".join(results), ephemeral=True)
 
