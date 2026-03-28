@@ -1148,10 +1148,10 @@ class Moderation(commands.Cog):
         action = Action.build_from_mongo(self.bot, action)
         await ctx.send(embed=action.to_info_embed())
 
-    @commands.hybrid_group(invoke_without_command=True, fallback="channels")
+    @commands.hybrid_group(fallback="channels")
     @commands.guild_only()
     @checks.is_moderator()
-    async def lock(self, ctx, channels: commands.Greedy[discord.TextChannel], *, reason: Optional[str] = None):
+    async def lock(self, ctx, *, channels: commands.Greedy[discord.TextChannel]):
         """Locks one or more channels by preventing members from sending messages.
 
         If no channel is provided, locks the current channel.
@@ -1176,20 +1176,12 @@ class Moderation(commands.Cog):
 
             overwrites.send_messages = False
             audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
-            if reason:
-                audit_reason += f": {reason}"
             await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
-            update_fields = {"locked": True, "guild_id": ctx.guild.id}
-            if reason:
-                update_fields["lock_reason"] = reason
-            else:
-                update_fields["lock_reason"] = None
-            await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update_fields}, upsert=True)
+            await ctx.bot.mongo.db.channel.update_one(
+                {"_id": channel.id}, {"$set": {"locked": True, "guild_id": ctx.guild.id}}, upsert=True
+            )
 
-            msg = f"\N{LOCK} Locked {channel.mention}."
-            if reason:
-                msg += f" Reason: {reason}"
-            results.append(msg)
+            results.append(f"\N{LOCK} Locked {channel.mention}.")
 
         await ctx.send("\n".join(results), ephemeral=True)
 
@@ -1202,19 +1194,14 @@ class Moderation(commands.Cog):
         You must have the Moderator role to use this.
         """
 
-        locked_docs = {}
+        locked_ids = set()
         async for doc in ctx.bot.mongo.db.channel.find({"locked": True, "guild_id": ctx.guild.id}):
-            locked_docs[doc["_id"]] = doc
+            locked_ids.add(doc["_id"])
 
         entries = []
         for channel in ctx.guild.text_channels:
-            if channel.id in locked_docs:
-                doc = locked_docs[channel.id]
-                line = f"\N{LOCK} {channel.mention}"
-                lock_reason = doc.get("lock_reason")
-                if lock_reason:
-                    line += f" — {lock_reason}"
-                entries.append(line)
+            if channel.id in locked_ids:
+                entries.append(f"\N{LOCK} {channel.mention}")
             else:
                 overwrites = channel.overwrites_for(ctx.guild.default_role)
                 if overwrites.send_messages is False:
@@ -1235,10 +1222,10 @@ class Moderation(commands.Cog):
         except IndexError:
             await ctx.send("No channels are currently locked.")
 
-    @commands.hybrid_group(invoke_without_command=True, fallback="channels")
+    @commands.hybrid_group(fallback="channels")
     @commands.guild_only()
     @checks.is_moderator()
-    async def unlock(self, ctx, channels: commands.Greedy[discord.TextChannel], *, reason: Optional[str] = None):
+    async def unlock(self, ctx, *, channels: commands.Greedy[discord.TextChannel]):
         """Unlocks one or more channels by allowing members to send messages again.
 
         If no channel is provided, unlocks the current channel.
@@ -1265,19 +1252,14 @@ class Moderation(commands.Cog):
             overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = None
             audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
-            if reason:
-                audit_reason += f": {reason}"
             await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
             await ctx.bot.mongo.db.channel.update_one(
                 {"_id": channel.id},
-                {"$set": {"locked": False, "guild_id": ctx.guild.id, "lock_reason": None}},
+                {"$set": {"locked": False, "guild_id": ctx.guild.id}},
                 upsert=True,
             )
 
-            msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
-            if reason:
-                msg += f" Reason: {reason}"
-            results.append(msg)
+            results.append(f"\N{OPEN LOCK} Unlocked {channel.mention}.")
 
         await ctx.send("\n".join(results), ephemeral=True)
 
