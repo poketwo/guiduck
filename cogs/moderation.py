@@ -1186,6 +1186,8 @@ class Moderation(commands.Cog):
             announce = f"\N{LOCK} This channel has been locked."
             if flags.reason:
                 announce += f" Reason: {flags.reason}"
+            if flags.duration:
+                announce += f" Expires {discord.utils.format_dt(flags.duration.dt, 'R')}."
             await channel.send(announce)
 
             overwrites.send_messages = False
