@@ -1302,24 +1302,25 @@ class Moderation(commands.Cog):
 
         await ctx.send("\n".join(results), ephemeral=True)
 
+    async def reverse_expired_lock(self, doc):
+        guild = self.bot.get_guild(doc.get("guild_id"))
+        if guild is not None:
+            channel = guild.get_channel(doc["_id"])
+            if channel is not None:
+                overwrites = channel.overwrites_for(guild.default_role)
+                overwrites.send_messages = None
+                await channel.set_permissions(guild.default_role, overwrite=overwrites, reason="Lock duration expired")
+        await self.bot.mongo.db.channel.update_one(
+            {"_id": doc["_id"]},
+            {"$set": {"locked": False}, "$unset": {"lock_reason": 1, "lock_expires_at": 1}},
+        )
+
     @tasks.loop(seconds=30)
     async def check_expired_locks(self):
         await self.bot.wait_until_ready()
         query = {"locked": True, "lock_expires_at": {"$lt": datetime.now(timezone.utc)}}
         async for doc in self.bot.mongo.db.channel.find(query):
-            guild = self.bot.get_guild(doc.get("guild_id"))
-            if guild is not None:
-                channel = guild.get_channel(doc["_id"])
-                if channel is not None:
-                    overwrites = channel.overwrites_for(guild.default_role)
-                    overwrites.send_messages = None
-                    await channel.set_permissions(
-                        guild.default_role, overwrite=overwrites, reason="Lock duration expired"
-                    )
-            await self.bot.mongo.db.channel.update_one(
-                {"_id": doc["_id"]},
-                {"$set": {"locked": False}, "$unset": {"lock_reason": 1, "lock_expires_at": 1}},
-            )
+            self.bot.loop.create_task(self.reverse_expired_lock(doc))
 
     async def cog_unload(self):
         self.check_actions.cancel()
