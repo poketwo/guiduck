@@ -1163,6 +1163,13 @@ class Moderation(commands.Cog):
         overwrites = channel.overwrites_for(ctx.guild.default_role)
 
         if overwrites.send_messages is False:
+            return await ctx.send(
+                f"{channel.mention} cannot be locked because @everyone already doesn't have access to chat there.",
+                ephemeral=True,
+            )
+
+        channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
+        if channel_data and channel_data.get("locked", False):
             return await ctx.send(f"{channel.mention} is already locked.", ephemeral=True)
 
         overwrites.send_messages = False
@@ -1170,6 +1177,7 @@ class Moderation(commands.Cog):
         if reason:
             audit_reason += f": {reason}"
         await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+        await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"locked": True}}, upsert=True)
 
         msg = f"\N{LOCK} Locked {channel.mention}."
         if reason:
@@ -1188,16 +1196,18 @@ class Moderation(commands.Cog):
         """
 
         channel = channel or ctx.channel
-        overwrites = channel.overwrites_for(ctx.guild.default_role)
 
-        if overwrites.send_messages is not False:
+        channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
+        if not channel_data or not channel_data.get("locked", False):
             return await ctx.send(f"{channel.mention} is not locked.", ephemeral=True)
 
+        overwrites = channel.overwrites_for(ctx.guild.default_role)
         overwrites.send_messages = None
         audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
         if reason:
             audit_reason += f": {reason}"
         await channel.set_permissions(ctx.guild.default_role, overwrite=overwrites, reason=audit_reason)
+        await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"locked": False}}, upsert=True)
 
         msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
         if reason:
