@@ -41,7 +41,7 @@ class Afk(commands.Cog):
         if message.content.startswith(tuple(self.bot.command_prefix)):
             return
 
-        status, _, _= await self.get_status(message.author)
+        status, _, _ = await self.get_status(message.author)
         if status == Status.AFK.value:
             await self.bot.mongo.db.member.update_one(
                 {"_id": {"id": message.author.id, "guild_id": message.guild.id}},
@@ -111,7 +111,7 @@ class Afk(commands.Cog):
     @afk.command(aliases=("fr",))
     @commands.guild_only()
     @checks.is_server_admin()
-    async def forcereset(self, ctx, member: discord.Member, note: Optional[str] = None):
+    async def forcereset(self, ctx, member: discord.Member, *, note: Optional[str] = None):
         """Resets user's status.
 
         You must have the Community Manager role to use this."""
