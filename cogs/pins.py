@@ -252,7 +252,7 @@ class Pins(commands.Cog):
         def format_item(i, msg):
             content = msg.content or "*No text content*"
             preview = textwrap.shorten(content, 100)
-            jump = f"[Jump]({msg.jump_url})"
+            jump = f"{msg.jump_url}"
             name = f"#{i + 1}. {msg.author.display_name} \u2022 {jump}"
             value = f"{preview}\n{format_dt(msg.created_at, 'R')}"
             return {"name": name, "value": value, "inline": False}
