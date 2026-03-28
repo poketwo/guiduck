@@ -26,12 +26,12 @@ class Afk(commands.Cog):
         )
 
         if not member_data:
-            return Status.ONLINE.value, Status.ONLINE.value, 0
+            return Status.ONLINE, Status.ONLINE.value, 0
 
-        status = member_data.get("status", Status.ONLINE.value)
+        status = Status(member_data.get("status", Status.ONLINE.value))
         reason = member_data.get("reason", Status.ONLINE.value)
         since = member_data.get("since", 0)
-        
+
         return status, reason, since
 
     @commands.Cog.listener()
@@ -43,7 +43,7 @@ class Afk(commands.Cog):
             return
 
         status, _, _ = await self.get_status(message.author)
-        if status == Status.AFK.value:
+        if status == Status.AFK:
             await self.bot.mongo.db.member.update_one(
                 {"_id": {"id": message.author.id, "guild_id": message.guild.id}},
                 {"$set": {"status": Status.ONLINE.value, "reason": Status.ONLINE.value, "since": 0}},
@@ -56,7 +56,7 @@ class Afk(commands.Cog):
 
         for member in set(message.mentions):
             status, reason, since = await self.get_status(member)
-            if status == Status.AFK.value:
+            if status == Status.AFK:
                 await message.channel.send(f"User **{member.name}** is currently `{reason}` since <t:{since}:R>.")
                 
                 if message.channel.permissions_for(member).view_channel:
@@ -65,7 +65,7 @@ class Afk(commands.Cog):
                     except discord.Forbidden:
                         pass # User unavailable.
                     
-            elif status == Status.DND.value:
+            elif status == Status.DND:
                 await message.channel.send(f"User **{member.name}** is currently `{reason}` and on **Do Not Disturb**.")
 
     @commands.hybrid_group(fallback="set")
@@ -140,10 +140,10 @@ class Afk(commands.Cog):
 
         embed = discord.Embed(color=discord.Color.blurple())
         embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
-        if status != Status.ONLINE.value:
-            embed.add_field(name=status, value=f"{reason} since <t:{since}:R>")
+        if status != Status.ONLINE:
+            embed.add_field(name=status.value, value=f"{reason} since <t:{since}:R>")
         else:
-            embed.add_field(name=status, value="Online")
+            embed.add_field(name=status.value, value="Online")
         
         await ctx.send(embed=embed)
 
