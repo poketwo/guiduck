@@ -72,7 +72,7 @@ class Afk(commands.Cog):
         if not message.mentions:
             return
 
-        for member in set(message.mentions):
+        for member in message.mentions:
             info = await self.get_status(member)
             if info.status == Status.AFK:
                 await message.channel.send(
