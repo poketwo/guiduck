@@ -305,6 +305,34 @@ class Pins(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    @commands.Cog.listener()
+    async def on_raw_message_edit(self, payload):
+        if "pinned" not in payload.data:
+            return
+
+        channel = self.bot.get_channel(payload.channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(payload.channel_id)
+            except (discord.NotFound, discord.Forbidden):
+                return
+
+        try:
+            message = await channel.fetch_message(payload.message_id)
+        except (discord.NotFound, discord.Forbidden):
+            return
+
+        if payload.data["pinned"]:
+            try:
+                await message.add_reaction("\N{PUSHPIN}")
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+        else:
+            try:
+                await message.remove_reaction("\N{PUSHPIN}", self.bot.user)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+
     # Timed pin dispatch system (modeled after reminders)
 
     async def get_next_timed_pin(self):
