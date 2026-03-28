@@ -38,7 +38,8 @@ class Afk(commands.Cog):
     async def on_message(self, message):
         if message.guild is None or message.author.bot:
             return
-        if message.content.startswith(tuple(self.bot.command_prefix)):
+        ctx = await self.bot.get_context(message)
+        if ctx.command is not None:
             return
 
         status, _, _ = await self.get_status(message.author)
