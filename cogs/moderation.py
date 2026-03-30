@@ -1180,11 +1180,11 @@ class Moderation(commands.Cog):
                 continue
 
             overwrites = channel.overwrites_for(ctx.guild.default_role)
-            if overwrites.send_messages is False:
+            if overwrites.send_messages is False or overwrites.send_messages_in_threads is False:
                 results.append(f"{channel.mention} cannot be locked because it was manually restricted.")
                 continue
 
-            announce = f"\N{LOCK} This channel has been locked."
+            announce = f"\N{LOCK} This channel and its threads have been locked."
             if flags.duration:
                 announce += f"\n**Expires**: {discord.utils.format_dt(flags.duration.dt, 'R')}"
             if flags.reason:
@@ -1201,6 +1201,8 @@ class Moderation(commands.Cog):
         for channel in to_lock:
             overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = False
+            overwrites.send_messages_in_threads = False
+
             audit_reason = f"Locked by {ctx.author} (ID: {ctx.author.id})"
             if flags.reason:
                 audit_reason += f": {flags.reason}"
@@ -1255,7 +1257,7 @@ class Moderation(commands.Cog):
                 entries.append(line)
             else:
                 overwrites = channel.overwrites_for(ctx.guild.default_role)
-                if overwrites.send_messages is False:
+                if overwrites.send_messages is False or overwrites.send_messages_in_threads is False:
                     entries.append(f"\N{LOCK} {channel.mention} (manually restricted)")
 
         if not entries:
@@ -1287,13 +1289,14 @@ class Moderation(commands.Cog):
         channels = channels or [ctx.channel]
 
         results = []
+        to_unlock = []
         for channel in channels:
             channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
             is_locked_in_db = channel_data and channel_data.get("locked", False)
 
             if not is_locked_in_db:
                 overwrites = channel.overwrites_for(ctx.guild.default_role)
-                if overwrites.send_messages is False:
+                if overwrites.send_messages is False or overwrites.send_messages_in_threads is False:
                     results.append(f"{channel.mention} cannot be unlocked because it was manually restricted.")
                 else:
                     results.append(f"{channel.mention} is not locked.")
@@ -1310,6 +1313,8 @@ class Moderation(commands.Cog):
         for channel in to_unlock:
             overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = None
+            overwrites.send_messages_in_threads = None
+
             audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
             if flags.reason:
                 audit_reason += f": {flags.reason}"
