@@ -1185,15 +1185,17 @@ class Moderation(commands.Cog):
                 continue
 
             announce = f"\N{LOCK} This channel has been locked."
-            if flags.reason:
-                announce += f" Reason: {flags.reason}"
             if flags.duration:
-                announce += f" Expires {discord.utils.format_dt(flags.duration.dt, 'R')}."
+                announce += f"\n**Expires**: {discord.utils.format_dt(flags.duration.dt, 'R')}"
+            if flags.reason:
+                announce += f"\n**Reason**:\n>>> {flags.reason}"
             try:
                 await channel.send(announce)
             except discord.Forbidden:
                 pass
 
+            msg = f"\N{LOCK} Locked {channel.mention}." + "\n".join(announce.splitlines()[1:])
+            results.append(msg)
             to_lock.append(channel)
 
         for channel in to_lock:
@@ -1215,11 +1217,11 @@ class Moderation(commands.Cog):
                 update_fields["lock_expires_at"] = flags.duration.dt
             await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update_fields}, upsert=True)
 
-            msg = f"\N{LOCK} Locked {channel.mention}."
-            if flags.reason:
-                msg += f" Reason: {flags.reason}"
+            msg = f"\N{LOCK} Locked {channel.mention} and its threads."
             if flags.duration:
                 msg += f" Expires {discord.utils.format_dt(flags.duration.dt, 'R')}."
+            if flags.reason:
+                msg += f"\n**Reason**:\n>>> {flags.reason}"
             results.append(msg)
 
         await ctx.send("\n".join(results), ephemeral=True)
@@ -1297,6 +1299,15 @@ class Moderation(commands.Cog):
                     results.append(f"{channel.mention} is not locked.")
                 continue
 
+            msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
+            if flags.reason:
+                msg += f"\n**Reason**:\n>>> {flags.reason}"
+            results.append(msg)
+            to_unlock.append(channel)
+
+        await ctx.send("\n".join(results), ephemeral=True)
+
+        for channel in to_unlock:
             overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = None
             audit_reason = f"Unlocked by {ctx.author} (ID: {ctx.author.id})"
@@ -1319,7 +1330,7 @@ class Moderation(commands.Cog):
 
             announce = f"\N{OPEN LOCK} This channel has been unlocked."
             if flags.reason:
-                announce += f" Reason: {flags.reason}"
+                announce += f"\n**Reason**:\n>>> {flags.reason}"
             try:
                 await channel.send(announce)
             except discord.Forbidden:
