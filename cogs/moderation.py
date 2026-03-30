@@ -1194,7 +1194,10 @@ class Moderation(commands.Cog):
             except discord.Forbidden:
                 pass
 
-            msg = f"\N{LOCK} Locked {channel.mention}." + "\n".join(announce.splitlines()[1:])
+            extra = announce.splitlines()[1:]
+            msg = f"\N{LOCK} Locked {channel.mention}."
+            if extra:
+                msg += "\n" + "\n".join(extra)
             results.append(msg)
             to_lock.append(channel)
 
@@ -1355,6 +1358,7 @@ class Moderation(commands.Cog):
             if channel is not None:
                 overwrites = channel.overwrites_for(guild.default_role)
                 overwrites.send_messages = None
+                overwrites.send_messages_in_threads = None
                 try:
                     await channel.set_permissions(
                         guild.default_role, overwrite=overwrites, reason="Lock duration expired"
