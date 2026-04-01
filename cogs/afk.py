@@ -72,6 +72,11 @@ class Afk(commands.Cog):
         for member in message.mentions:
             if member.id == message.author.id:
                 continue
+
+            perm = message.channel.permissions_for(member)
+            if perm.read_messages is not True:
+                continue
+
             info = await self.get_status(member)
             if info.status == Status.AFK:
                 await message.channel.send(
