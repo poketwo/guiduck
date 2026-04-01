@@ -67,7 +67,7 @@ class Afk(commands.Cog):
         info = await self.get_status(message.author)
         if info.status == Status.AFK:
             await self.clear_status(message.author.id, message.guild.id)
-            await message.channel.send(f"Welcome back **{message.author.name}**, your AFK status has been removed.")
+            await message.channel.send(f"Welcome back **{message.author.name}**, your AFK status has been removed you have been gone since <t:{info.since}:f>.")
 
         for member in message.mentions:
             if member.id == message.author.id:
@@ -86,7 +86,6 @@ class Afk(commands.Cog):
                         )
                     except discord.Forbidden:
                         pass
-                await asyncio.sleep(5)
             elif info.status == Status.DND:
                 await message.channel.send(
                     f"User **{member.name}** is currently `{info.reason}` since <t:{info.since}:R> and on **Do Not Disturb**.",
