@@ -89,7 +89,7 @@ class Afk(commands.Cog):
                 await asyncio.sleep(5)
             elif info.status == Status.DND:
                 await message.channel.send(
-                    f"User **{member.name}** is currently `{info.reason}` and on **Do Not Disturb**.",
+                    f"User **{member.name}** is currently `{info.reason}` since <t:{info.since}:R> and on **Do Not Disturb**.",
                     delete_after=5
                 )
 
