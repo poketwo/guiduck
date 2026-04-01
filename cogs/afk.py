@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, timezone
 from enum import Enum
 from typing import NamedTuple, Optional
@@ -116,7 +115,7 @@ class Afk(commands.Cog):
         await self.set_status(ctx.author.id, ctx.guild.id, Status.DND, reason)
         await ctx.send(f"Set user **{ctx.author.name}** status to `{reason}` and **Do Not Disturb**.")
 
-    @afk.command(aliases=())
+    @afk.command(aliases=("remove",))
     @commands.guild_only()
     async def clear(self, ctx: commands.Context):
         """Reset your status"""
