@@ -67,7 +67,7 @@ class Afk(commands.Cog):
         info = await self.get_status(message.author)
         if info.status == Status.AFK:
             await self.clear_status(message.author.id, message.guild.id)
-            await message.channel.send(f"Welcome back **{message.author.name}**, your AFK status has been removed.")
+            await message.channel.send(f"Welcome back **{message.author.name}**, your AFK status has been removed. You had been gone since <t:{info.since}:f>.")
 
         for member in message.mentions:
             if member.id == message.author.id:
@@ -80,7 +80,8 @@ class Afk(commands.Cog):
             info = await self.get_status(member)
             if info.status == Status.AFK:
                 await message.channel.send(
-                    f"User **{member.name}** is currently `{info.reason}` since <t:{info.since}:R>."
+                    f"User **{member.name}** is currently `{info.reason}` since <t:{info.since}:R>.",
+                    delete_after=5
                 )
                 if message.channel.permissions_for(member).view_channel:
                     try:
@@ -92,7 +93,8 @@ class Afk(commands.Cog):
                         pass
             elif info.status == Status.DND:
                 await message.channel.send(
-                    f"User **{member.name}** is currently `{info.reason}` and on **Do Not Disturb**."
+                    f"User **{member.name}** is currently `{info.reason}` since <t:{info.since}:R> and on **Do Not Disturb**.",
+                    delete_after=5
                 )
 
     @commands.hybrid_group(fallback="set")
@@ -117,7 +119,7 @@ class Afk(commands.Cog):
         await self.set_status(ctx.author.id, ctx.guild.id, Status.DND, reason)
         await ctx.send(f"Set user **{ctx.author.name}** status to `{reason}` and **Do Not Disturb**.")
 
-    @afk.command()
+    @afk.command(aliases=("remove",))
     @commands.guild_only()
     async def clear(self, ctx: commands.Context):
         """Reset your status"""
