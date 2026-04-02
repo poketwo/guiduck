@@ -67,7 +67,7 @@ class Afk(commands.Cog):
         info = await self.get_status(message.author)
         if info.status == Status.AFK:
             await self.clear_status(message.author.id, message.guild.id)
-            await message.channel.send(f"Welcome back **{message.author.name}**, your AFK status has been removed you have been gone since <t:{info.since}:f>.")
+            await message.channel.send(f"Welcome back **{message.author.name}**, your AFK status has been removed. You had been gone since <t:{info.since}:f>.")
 
         for member in message.mentions:
             if member.id == message.author.id:
