@@ -16,6 +16,7 @@ ESSENTIAL_COGS = [
 ]
 
 COGS = [
+    "afk",
     "automod",
     "autopost",
     "auto_lock_threads",
@@ -26,6 +27,7 @@ COGS = [
     "levels",
     "moderation",
     "names",
+    "pins",
     "poketwo_administration",
     "reaction_roles",
     "reminders",

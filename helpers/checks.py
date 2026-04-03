@@ -109,7 +109,6 @@ def is_not_emergency_alert_banned():
 
         permanently_banned = member.get("emergency_alert_banned")
         if permanently_banned:
-            ctx.command.reset_cooldown(ctx)
             raise EmergencyAlertBanned(
                 "You've been permanently banned from issuing emergency staff alerts due to violation(s) of its rules. If you think that this was a mistake, please contact a staff member."
             )
@@ -117,7 +116,6 @@ def is_not_emergency_alert_banned():
         temp_banned_until = member.get("emergency_alert_banned_until")
         temp_banned = temp_banned_until is not None
         if temp_banned and temp_banned_until > now:
-            ctx.command.reset_cooldown(ctx)
             duration_seconds = (temp_banned_until - now).total_seconds()
             raise EmergencyAlertBanned(
                 f"You've been banned from issuing emergency staff alerts for **{time.human_timedelta(timedelta(seconds=duration_seconds))}** due to violation(s) of its rules."
