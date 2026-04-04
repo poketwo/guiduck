@@ -493,6 +493,8 @@ class DeleteDuration(commands.Converter):
     async def convert(cls, ctx, argument):
         if argument.lower() in ("y", "yes", "true"):
             return cls(MAX_DELETE_MESSAGE_SECONDS)
+        if argument.lower() in ("n", "no", "false"):
+            return cls(0)
         result = await time.Time.convert(ctx, argument)
         delta = result.dt - ctx.message.created_at
         seconds = min(max(int(delta.total_seconds()), 0), MAX_DELETE_MESSAGE_SECONDS)
