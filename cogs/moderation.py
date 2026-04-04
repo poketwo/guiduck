@@ -493,13 +493,10 @@ class DeleteDuration(commands.Converter):
     async def convert(cls, ctx, argument):
         if argument.lower() in ("y", "yes", "true"):
             return cls(MAX_DELETE_MESSAGE_SECONDS)
-        try:
-            short_time = time.ShortTime(argument, now=ctx.message.created_at)
-            delta = short_time.dt - ctx.message.created_at
-            seconds = min(max(int(delta.total_seconds()), 0), MAX_DELETE_MESSAGE_SECONDS)
-            return cls(seconds)
-        except commands.BadArgument:
-            raise commands.BadArgument("Invalid delete duration. Use `y` for 7 days or a duration like `3d`, `1h`.")
+        result = await time.Time.convert(ctx, argument)
+        delta = result.dt - ctx.message.created_at
+        seconds = min(max(int(delta.total_seconds()), 0), MAX_DELETE_MESSAGE_SECONDS)
+        return cls(seconds)
 
 
 class BanFlags(commands.FlagConverter, case_insensitive=True):
