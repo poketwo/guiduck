@@ -18,6 +18,7 @@ from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
 
 BOT_ID = 753657623739629739
+MAX_DELETE_MESSAGE_SECONDS = 604800  # 7 days
 
 
 class ModerationUserFriendlyTime(time.UserFriendlyTime):
@@ -285,6 +286,7 @@ class Ban(Action):
     past_tense = "banned"
     emoji = "\N{HAMMER}"
     color = discord.Color.red()
+    delete_message_seconds = 0
 
     def to_user_embed(self):
         embed = super().to_user_embed()
@@ -293,7 +295,7 @@ class Ban(Action):
 
     async def execute(self, ctx):
         reason = self.reason or f"Action done by {self.user} (ID: {self.user.id})"
-        await ctx.guild.ban(self.target, reason=reason)
+        await ctx.guild.ban(self.target, reason=reason, delete_message_seconds=self.delete_message_seconds)
         await super().execute(ctx)
 
 
@@ -481,6 +483,27 @@ class LockFlags(commands.FlagConverter, case_insensitive=True):
 
 class UnlockFlags(commands.FlagConverter, case_insensitive=True):
     reason: Optional[str] = commands.flag(default=None)
+
+
+class DeleteDuration(commands.Converter):
+    def __init__(self, seconds):
+        self.seconds = seconds
+
+    @classmethod
+    async def convert(cls, ctx, argument):
+        if argument.lower() in ("y", "yes", "true"):
+            return cls(MAX_DELETE_MESSAGE_SECONDS)
+        if argument.lower() in ("n", "no", "false"):
+            return cls(0)
+        result = await time.Time.convert(ctx, argument)
+        delta = result.dt - ctx.message.created_at
+        seconds = min(max(int(delta.total_seconds()), 0), MAX_DELETE_MESSAGE_SECONDS)
+        return cls(seconds)
+
+
+class BanFlags(commands.FlagConverter, case_insensitive=True):
+    time_and_reason: str = commands.flag(positional=True)
+    delete: Optional[DeleteDuration] = commands.flag(default=None)
 
 
 class HistoryFlagConverter(commands.FlagConverter, case_insensitive=True):
@@ -796,10 +819,10 @@ class Moderation(commands.Cog):
         await action.execute(ctx)
         await ctx.send(f"Kicked **{target}** (Case #{action._id}).", ephemeral=True)
 
-    @commands.hybrid_command(usage="<target> [expires_at] [reason]")
+    @commands.hybrid_command(usage="<target> [expires_at] [reason] [delete: <duration>]")
     @commands.guild_only()
     @checks.is_trial_moderator()
-    async def ban(self, ctx, target: MemberOrIdConverter, *, time_and_reason):
+    async def ban(self, ctx, target: MemberOrIdConverter, *, flags: BanFlags):
         """Bans a member from the server.
 
         You must have the Trial Moderator role to use this.
@@ -808,7 +831,9 @@ class Moderation(commands.Cog):
         if any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(target, "roles", [])):
             return await ctx.send("You can't punish that person!", ephemeral=True)
 
-        expires_at, reason = await self.parse_time_and_reason(ctx, time_and_reason)
+        expires_at, reason = await self.parse_time_and_reason(ctx, flags.time_and_reason)
+
+        delete_secs = flags.delete.seconds if flags.delete else 0
 
         action = Ban(
             target=target,
@@ -818,13 +843,22 @@ class Moderation(commands.Cog):
             created_at=ctx.message.created_at,
             expires_at=expires_at,
         )
+        action.delete_message_seconds = delete_secs
         await action.notify()
         await action.execute(ctx)
+
+        if delete_secs > 0:
+            delete_status = (
+                f" Deleted {time.human_timedelta(timedelta(seconds=delete_secs), suffix=False)} of messages."
+            )
+        else:
+            delete_status = " Messages were not deleted."
+
         if action.duration is None:
-            await ctx.send(f"Banned **{target}** (Case #{action._id}).", ephemeral=True)
+            await ctx.send(f"Banned **{target}** (Case #{action._id}).{delete_status}", ephemeral=True)
         else:
             await ctx.send(
-                f"Banned **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).",
+                f"Banned **{target}** for **{time.human_timedelta(action.duration)}** (Case #{action._id}).{delete_status}",
                 ephemeral=True,
             )
 
