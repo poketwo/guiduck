@@ -19,6 +19,7 @@ from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
 BOT_ID = 753657623739629739
 MAX_DELETE_MESSAGE_SECONDS = 604800  # 7 days
+DEFAULT_DELETE_MESSAGE_SECONDS = 3600  # 1 hour
 
 
 class ModerationUserFriendlyTime(time.UserFriendlyTime):
@@ -503,7 +504,7 @@ class DeleteDuration(commands.Converter):
 
 class BanFlags(commands.FlagConverter, case_insensitive=True):
     time_and_reason: str = commands.flag(positional=True)
-    delete: Optional[DeleteDuration] = commands.flag(default=None)
+    delete: Optional[DeleteDuration] = commands.flag(aliases=["d"], default=DeleteDuration(DEFAULT_DELETE_MESSAGE_SECONDS))
 
 
 class HistoryFlagConverter(commands.FlagConverter, case_insensitive=True):
@@ -833,7 +834,7 @@ class Moderation(commands.Cog):
 
         expires_at, reason = await self.parse_time_and_reason(ctx, flags.time_and_reason)
 
-        delete_secs = flags.delete.seconds if flags.delete else 0
+        delete_secs = flags.delete.seconds
 
         action = Ban(
             target=target,
