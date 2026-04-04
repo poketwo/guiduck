@@ -18,6 +18,7 @@ from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
 
 BOT_ID = 753657623739629739
+MAX_DELETE_MESSAGE_SECONDS = 604800  # 7 days
 
 
 class ModerationUserFriendlyTime(time.UserFriendlyTime):
@@ -491,11 +492,11 @@ class DeleteDuration(commands.Converter):
     @classmethod
     async def convert(cls, ctx, argument):
         if argument.lower() in ("y", "yes", "true"):
-            return cls(604800)  # 7 days
+            return cls(MAX_DELETE_MESSAGE_SECONDS)
         try:
             short_time = time.ShortTime(argument, now=ctx.message.created_at)
             delta = short_time.dt - ctx.message.created_at
-            seconds = min(max(int(delta.total_seconds()), 0), 604800)
+            seconds = min(max(int(delta.total_seconds()), 0), MAX_DELETE_MESSAGE_SECONDS)
             return cls(seconds)
         except commands.BadArgument:
             raise commands.BadArgument("Invalid delete duration. Use `y` for 7 days or a duration like `3d`, `1h`.")
