@@ -280,13 +280,12 @@ class Kick(Action):
         await super().execute(ctx)
 
 
-@dataclass
 class Ban(Action):
     type = "ban"
     past_tense = "banned"
     emoji = "\N{HAMMER}"
     color = discord.Color.red()
-    delete_message_seconds: int = 0
+    delete_message_seconds = 0
 
     def to_user_embed(self):
         embed = super().to_user_embed()
@@ -843,8 +842,8 @@ class Moderation(commands.Cog):
             guild_id=ctx.guild.id,
             created_at=ctx.message.created_at,
             expires_at=expires_at,
-            delete_message_seconds=delete_secs,
         )
+        action.delete_message_seconds = delete_secs
         await action.notify()
         await action.execute(ctx)
 
