@@ -522,20 +522,15 @@ class Moderation(commands.Cog):
         self.check_actions.start()
         self.check_expired_locks.start()
 
-    @commands.Cog.listener()
-    async def on_message(self, message):
+    async def handle_honeypot(self, user, guild, channel, message_id=None, created_at=None):
 
-        if message.author.bot:
-            return
-
-        if message.channel.id != HONEYPOT_CHANNEL_ID:
-            return
-
-        if checks.is_protected(message.author, self.bot):
+        if checks.is_protected(user, self.bot):
             with suppress(discord.Forbidden, discord.HTTPException):
-                await message.author.send(f"You're in staff, why are you messaging in <#{HONEYPOT_CHANNEL_ID}>?")
+                await user.send(
+                    f"You're in staff, why are you messaging in <#{HONEYPOT_CHANNEL_ID}>?"
+                )
             return
-        
+
         reason = (
             "Your account seems to be compromised. You have been removed from the Pokétwo Community server.\n"
             "We recommend enabling Two-Factor Authentication to protect your account and our community.\n"
@@ -545,20 +540,57 @@ class Moderation(commands.Cog):
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=1)
 
         action = Ban(
-            target=message.author,
+            target=user,
             user=self.bot.user,
             reason=reason,
-            guild_id=message.guild.id,
-            channel_id=message.channel.id,
-            message_id=message.id,
-            created_at=message.created_at,
+            guild_id=guild.id,
+            channel_id=channel.id,
+            message_id=message_id,
+            created_at=created_at,
             expires_at=expires_at
         )
-        
+
         action.delete_message_seconds = 3600
-        
+
         await action.notify()
-        await action.execute(FakeContext(self.bot, message.guild))
+        await action.execute(FakeContext(self.bot, guild))
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+
+        if message.author.bot:
+            return
+
+        if message.channel.id != HONEYPOT_CHANNEL_ID:
+            return
+
+        await self.handle_honeypot(
+            user=message.author,
+            guild=message.guild,
+            channel=message.channel,
+            message_id=message.id,
+            created_at=message.created_at
+        )
+
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+
+        if interaction.type != discord.InteractionType.application_command:
+            return
+
+        if not interaction.guild:
+            return
+
+        if interaction.channel_id != HONEYPOT_CHANNEL_ID:
+            return
+
+        await self.handle_honeypot(
+            user=interaction.user,
+            guild=interaction.guild,
+            channel=interaction.channel,
+            message_id=getattr(interaction, "id", None),
+            created_at=datetime.now(timezone.utc)
+        )
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
