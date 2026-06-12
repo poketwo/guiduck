@@ -35,6 +35,8 @@ class Ticket(abc.ABC):
 
     status_channel_id: Optional[int] = None
     status_message_id: Optional[int] = None
+    mirror_status_channel_id: Optional[int] = None
+    mirror_status_message_id: Optional[int] = None
 
     @property
     def guild(self):
@@ -49,6 +51,12 @@ class Ticket(abc.ABC):
         if self.status_channel_id is None:
             return None
         return self.guild.get_channel(self.status_channel_id)
+
+    @property
+    def mirror_status_channel(self):
+        if self.mirror_status_channel_id is None:
+            return None
+        return self.bot.get_channel(self.mirror_status_channel_id)
 
     @classmethod
     def build_from_mongo(cls, bot, x):
@@ -69,6 +77,8 @@ class Ticket(abc.ABC):
             "extra_info": x.get("extra_info"),
             "status_channel_id": x.get("status_channel_id"),
             "status_message_id": x.get("status_message_id"),
+            "mirror_status_channel_id": x.get("mirror_status_channel_id"),
+            "mirror_status_message_id": x.get("mirror_status_message_id"),
         }
         if "agent_id" in x:
             kwargs["agent"] = guild.get_member(x["agent_id"]) or FakeUser(x["agent_id"])
@@ -97,6 +107,8 @@ class Ticket(abc.ABC):
             base["status_channel_id"] = self.status_channel_id
         if self.status_message_id is not None:
             base["status_message_id"] = self.status_message_id
+        base["mirror_status_channel_id"] = self.mirror_status_channel_id
+        base["mirror_status_message_id"] = self.mirror_status_message_id
         return base
 
     def to_first_embed(self):
@@ -241,6 +253,61 @@ class Ticket(abc.ABC):
         except discord.NotFound:
             return None
 
+    async def fetch_mirror_status_message(self):
+        if self.mirror_status_channel_id is None or self.mirror_status_message_id is None:
+            return None
+        channel = self.mirror_status_channel
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(self.mirror_status_channel_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return None
+        try:
+            return await channel.fetch_message(self.mirror_status_message_id)
+        except discord.NotFound:
+            return None
+
+    async def fetch_mirror_status_channel(self):
+        channel = self.bot.get_channel(constants.COMMUNITY_TICKET_MIRROR_CHANNEL_ID)
+        if channel is not None:
+            return channel
+        try:
+            return await self.bot.fetch_channel(constants.COMMUNITY_TICKET_MIRROR_CHANNEL_ID)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return None
+
+    async def delete_mirror_status_message(self):
+        mirror = await self.fetch_mirror_status_message()
+        if mirror is not None:
+            with contextlib.suppress(discord.HTTPException):
+                await mirror.delete()
+        self.mirror_status_channel_id = None
+        self.mirror_status_message_id = None
+
+    async def update_mirror_status_message(self, status_message):
+        if status_message is None or status_message.channel.id != constants.SUPPORT_TICKET_NEW_CHANNEL_ID:
+            await self.delete_mirror_status_message()
+            return
+
+        mirror_channel = await self.fetch_mirror_status_channel()
+        if mirror_channel is None:
+            return
+
+        mirror = await self.fetch_mirror_status_message()
+        if mirror is not None and mirror.channel.id != mirror_channel.id:
+            with contextlib.suppress(discord.HTTPException):
+                await mirror.delete()
+            mirror = None
+
+        if mirror is None:
+            mirror = await mirror_channel.send(embed=self.to_status_embed(), view=MirrorStatusView(status_message))
+            self.mirror_status_channel_id = mirror.channel.id
+            self.mirror_status_message_id = mirror.id
+        else:
+            await mirror.edit(embed=self.to_status_embed(), view=MirrorStatusView(status_message))
+            self.mirror_status_channel_id = mirror.channel.id
+            self.mirror_status_message_id = mirror.id
+
     async def update_status_message(self, original=None):
         if original is not None and original.channel.id != self.status_channel_id:
             await original.delete()
@@ -248,10 +315,12 @@ class Ticket(abc.ABC):
 
         if self.status_channel is not None:
             if original is None:
-                status_message = await self.status_channel.send(embed=self.to_status_embed(), view=StatusView(self))
-                self.status_message_id = status_message.id
+                original = await self.status_channel.send(embed=self.to_status_embed(), view=StatusView(self))
+                self.status_message_id = original.id
             else:
                 await original.edit(embed=self.to_status_embed(), view=StatusView(self))
+
+        await self.update_mirror_status_message(original)
 
     async def close(self, user: discord.Member):
         if self.closed_at is not None:
@@ -333,6 +402,14 @@ class JumpToTicketButton(discord.ui.Button):
         self.ticket = ticket
 
 
+class GoToStatusMessageButton(discord.ui.Button):
+    def __init__(self, message: discord.Message):
+        super().__init__(
+            label="Go to Embed",
+            url=message.jump_url,
+        )
+
+
 class OpenTicketButton(discord.ui.Button):
     def __init__(self, category: HelpDeskCategory):
         super().__init__(label="Open Ticket", style=discord.ButtonStyle.primary)
@@ -411,6 +488,13 @@ class StatusView(discord.ui.View):
         self.add_item(ClaimTicketButton(ticket, style=discord.ButtonStyle.primary))
         self.add_item(CloseTicketButton(ticket, style=discord.ButtonStyle.danger))
         self.add_item(JumpToTicketButton(ticket))
+
+
+class MirrorStatusView(discord.ui.View):
+    def __init__(self, message: discord.Message):
+        super().__init__()
+        self.stop()
+        self.add_item(GoToStatusMessageButton(message))
 
 
 class OpenTicketView(discord.ui.View):
@@ -548,6 +632,8 @@ USER_REPORT_INSTRUCTIONS = textwrap.dedent(
     After you submit these pieces of documentation, a staff member will assist you with the report shortly. Thank you!
     """
 )
+
+
 class Reports(HelpDeskCategory):
     id = "rpt"
     label = "User Reports"
@@ -806,6 +892,22 @@ class HelpDesk(commands.Cog):
         if ticket is not None:
             return Ticket.build_from_mongo(self.bot, ticket)
 
+    async def fetch_ticket_by_status_message(self, message_id):
+        ticket = await self.bot.mongo.db.ticket.find_one({"status_message_id": message_id})
+        if ticket is not None:
+            return Ticket.build_from_mongo(self.bot, ticket)
+
+    async def save_ticket_mirror_state(self, ticket):
+        await self.bot.mongo.db.ticket.update_one(
+            {"_id": ticket._id},
+            {
+                "$set": {
+                    "mirror_status_channel_id": ticket.mirror_status_channel_id,
+                    "mirror_status_message_id": ticket.mirror_status_message_id,
+                }
+            },
+        )
+
     @commands.Cog.listener()
     async def on_thread_update(self, before: discord.Thread, after: discord.Thread):
         if after.archived and not before.archived:
@@ -814,6 +916,37 @@ class HelpDesk(commands.Cog):
                 return
             if ticket.closed_at is None:
                 await after.edit(archived=False)
+
+    @commands.Cog.listener()
+    async def on_raw_message_edit(self, payload):
+        if (
+            payload.guild_id != constants.SUPPORT_SERVER_ID
+            or payload.channel_id != constants.SUPPORT_TICKET_NEW_CHANNEL_ID
+        ):
+            return
+
+        ticket = await self.fetch_ticket_by_status_message(payload.message_id)
+        if ticket is None:
+            return
+
+        status_message = await ticket.fetch_status_message()
+        await ticket.update_mirror_status_message(status_message)
+        await self.save_ticket_mirror_state(ticket)
+
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, payload):
+        if (
+            payload.guild_id != constants.SUPPORT_SERVER_ID
+            or payload.channel_id != constants.SUPPORT_TICKET_NEW_CHANNEL_ID
+        ):
+            return
+
+        ticket = await self.fetch_ticket_by_status_message(payload.message_id)
+        if ticket is None:
+            return
+
+        await ticket.delete_mirror_status_message()
+        await self.save_ticket_mirror_state(ticket)
 
     @commands.command()
     @commands.is_owner()
