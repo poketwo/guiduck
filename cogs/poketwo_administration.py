@@ -210,6 +210,25 @@ class PoketwoAdministration(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def can_pay_anyone(self, ctx):
+        return await checks.passes_check(checks.is_server_admin, ctx) or await checks.passes_check(
+            checks.is_bot_admin, ctx
+        )
+
+    def is_lower_staff(self, ctx, user):
+        member = user if isinstance(user, discord.Member) else ctx.guild.get_member(user.id)
+        return member is not None and checks.is_lower_than_senior_moderator(member)
+
+    async def ensure_can_pay_user(self, ctx, user):
+        if await self.can_pay_anyone(ctx):
+            return True
+
+        if self.is_lower_staff(ctx, user):
+            return True
+
+        await ctx.send("Senior Moderators can only pay Moderators and Trial Moderators.", ephemeral=True)
+        return False
+
     async def save_refund(self, refund: Refund):
         if not refund._executed:
             raise ValueError("Can only save executed refunds")
@@ -407,11 +426,11 @@ class PoketwoAdministration(commands.Cog):
         return embed
 
     @commands.hybrid_group(aliases=["administration"], invoke_without_command=True)
-    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin())
+    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin(), checks.is_senior_moderator())
     async def admin(self, ctx):
         """Administration commands
 
-        You must have the Server Admin or Bot Admin role to use this."""
+        You must have the Server Admin, Bot Admin, or Senior Moderator role to use this."""
 
         await ctx.send_help(ctx.command)
 
@@ -433,9 +452,12 @@ class PoketwoAdministration(commands.Cog):
         )
 
     @admin.command(aliases=("giveshard", "as", "gs"))
-    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin())
+    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin(), checks.is_senior_moderator())
     async def addshards(self, ctx, user: FetchUserConverter, amt: int, *, notes: Optional[str] = None):
         """Add to a user's shard balance."""
+
+        if not await self.ensure_can_pay_user(ctx, user):
+            return
 
         await self.bot.mongo.poketwo_db.member.update_one({"_id": user.id}, {"$inc": {"premium_balance": amt}})
         await self.bot.poketwo_redis.hdel(f"db:member", user.id)
@@ -453,7 +475,7 @@ class PoketwoAdministration(commands.Cog):
         usage="[role: ROLE=Moderator] [users: USER1 USER2 ...] [month: MONTH=Previous] [year: YEAR=Current] [all-users: yes/no=no] [show-ids: yes/no=no]"
     )
     @checks.staff_categories_only()
-    @checks.is_server_admin()
+    @commands.check_any(checks.is_server_admin(), checks.is_senior_moderator())
     @with_typing()
     async def activity(
         self,
@@ -495,6 +517,14 @@ class PoketwoAdministration(commands.Cog):
         # Members determination
 
         role = args.role
+        restricted_payout = not await self.can_pay_anyone(ctx)
+        if restricted_payout and args.show_all:
+            return await ctx.send("Senior Moderators can only pay Moderators and Trial Moderators.", ephemeral=True)
+        if restricted_payout and role and role.id not in constants.SENIOR_MODERATOR_PAYABLE_ROLES:
+            return await ctx.send("Senior Moderators can only pay Moderator and Trial Moderator roles.", ephemeral=True)
+        if restricted_payout and args.users and not all(self.is_lower_staff(ctx, user) for user in args.users):
+            return await ctx.send("Senior Moderators can only pay Moderators and Trial Moderators.", ephemeral=True)
+
         if not (role or args.users or args.show_all):
             role = next((r for r_id in constants.MODERATOR_ROLES[-2:] if (r := ctx.guild.get_role(r_id))), None)
 
@@ -503,6 +533,9 @@ class PoketwoAdministration(commands.Cog):
             members = role.members
         elif args.users:
             members = args.users
+
+        if restricted_payout:
+            members = [member for member in members if self.is_lower_staff(ctx, member)]
 
         if args.show_all:
             if args.users:

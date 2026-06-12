@@ -26,6 +26,10 @@ def is_server_admin():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.SERVER_ADMIN_ROLES))
 
 
+def is_senior_moderator():
+    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.SENIOR_MODERATOR_ROLES))
+
+
 def is_moderator():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.MODERATOR_ROLES))
 
@@ -37,6 +41,14 @@ def is_trial_moderator():
 def is_developer():
     return commands.check_any(commands.is_owner(), commands.has_role(constants.DEVELOPER_ROLE))
 
+
+def is_lower_than_senior_moderator(member):
+    role_ids = {role.id for role in member.roles}
+    return bool(role_ids & set(constants.SENIOR_MODERATOR_PAYABLE_ROLES)) and not bool(
+        role_ids & set(constants.SENIOR_MODERATOR_ROLES)
+    )
+
+
 def is_protected(member, bot):
     if member.id == 716390085896962058:
         return True
@@ -47,6 +59,7 @@ def is_protected(member, bot):
     protected_roles.add(constants.DEVELOPER_ROLE)
 
     return bool(role_ids & protected_roles)
+
 
 def in_guilds(*guild_ids):
     def predicate(ctx):
