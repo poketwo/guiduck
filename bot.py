@@ -20,6 +20,7 @@ COGS = [
     "automod",
     "autopost",
     "auto_lock_threads",
+    "boosts",
     "collectors",
     "forms",
     "giveaways",
