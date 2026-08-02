@@ -240,10 +240,16 @@ class Levels(commands.Cog):
         new_xp = max(user["xp"], MIN_XP)
         new_level = self.level_at(new_xp)
 
-        if (new_xp, new_level) != (user["xp"], old_level):
+        # Adjust relative to the stored values so concurrent message XP isn't overwritten
+        shortfall = new_xp - user["xp"]
+        if shortfall:
             await self.bot.mongo.db.member.update_one(
-                {"_id": {"id": member.id, "guild_id": ctx.guild.id}},
-                {"$set": {"xp": new_xp, "level": new_level}},
+                {"_id": {"id": member.id, "guild_id": ctx.guild.id}}, {"$inc": {"xp": shortfall}}
+            )
+        if new_level != old_level:
+            await self.bot.mongo.db.member.update_one(
+                {"_id": {"id": member.id, "guild_id": ctx.guild.id}, "level": user.get("level")},
+                {"$set": {"level": new_level}},
             )
         add_roles, remove_roles = await self.apply_level_roles(member, old_level, new_level)
 
