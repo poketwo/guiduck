@@ -202,6 +202,7 @@ class Tags(commands.Cog):
     async def create(self, ctx, name, *, content = ""):
         """Creates a new tag owned by you. Attachments will have their URLs appended to the tag."""
 
+        name = name.strip()
         content = with_attachment_urls(content, ctx.message.attachments)
 
         if len(content) == 0:
@@ -221,6 +222,7 @@ class Tags(commands.Cog):
     async def alias(self, ctx, name, *, original):
         """Creates an alias for a pre-existing tag."""
 
+        name = name.strip()
         original = await self.get_tag(original, original=True)
         if original is None:
             return await ctx.send("A tag with that name does not exist.")
