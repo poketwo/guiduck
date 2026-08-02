@@ -16,6 +16,8 @@ SILENT = False
 
 MIN_XP = 0
 
+LEVEL_SYNC_ATTEMPTS = 3
+
 ROLES = defaultdict(
     list,
     {
@@ -80,6 +82,33 @@ class Levels(commands.Cog):
         if remove_roles:
             await member.remove_roles(*remove_roles)
         return add_roles, remove_roles
+
+    async def resync_level(self, member: discord.Member) -> tuple[int, int]:
+        """Recomputes and stores the member's level from their stored XP.
+
+        Returns the levels before and after the update; they are equal if no change was stored.
+        """
+
+        member_id = {"id": member.id, "guild_id": member.guild.id}
+        old_level = 0
+        for _ in range(LEVEL_SYNC_ATTEMPTS):
+            user = await self.bot.mongo.db.member.find_one({"_id": member_id})
+            if user is None:
+                return 0, 0
+
+            old_level = user.get("level", 0)
+            new_level = self.level_at(user.get("xp", 0))
+            if old_level == new_level:
+                return old_level, old_level
+
+            # Guard on the level we read so a concurrent level-up isn't clobbered
+            result = await self.bot.mongo.db.member.update_one(
+                {"_id": member_id, "level": user.get("level")}, {"$set": {"level": new_level}}
+            )
+            if result.modified_count:
+                return old_level, new_level
+
+        return old_level, old_level
 
     def format_roles(self, roles: list[discord.Role]) -> str:
         return ", ".join(f"**{role.mention}**" for role in roles)
@@ -236,21 +265,17 @@ class Levels(commands.Cog):
             upsert=True,
             return_document=ReturnDocument.AFTER,
         )
-        old_xp, old_level = user["xp"] - xp, user.get("level", 0)
+        old_xp = user["xp"] - xp
         new_xp = max(user["xp"], MIN_XP)
-        new_level = self.level_at(new_xp)
 
-        # Adjust relative to the stored values so concurrent message XP isn't overwritten
+        # Adjust relative to the stored value so concurrent message XP isn't overwritten
         shortfall = new_xp - user["xp"]
         if shortfall:
             await self.bot.mongo.db.member.update_one(
                 {"_id": {"id": member.id, "guild_id": ctx.guild.id}}, {"$inc": {"xp": shortfall}}
             )
-        if new_level != old_level:
-            await self.bot.mongo.db.member.update_one(
-                {"_id": {"id": member.id, "guild_id": ctx.guild.id}, "level": user.get("level")},
-                {"$set": {"level": new_level}},
-            )
+
+        old_level, new_level = await self.resync_level(member)
         add_roles, remove_roles = await self.apply_level_roles(member, old_level, new_level)
 
         verb = "Gave" if xp > 0 else "Took"
