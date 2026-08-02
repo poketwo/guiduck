@@ -40,8 +40,46 @@ class Levels(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def min_xp_at(self, level):
+    def min_xp_at(self, level: int) -> int:
         return (2 * level * level + 27 * level + 91) * level * 5 // 6
+
+    def level_at(self, xp: int) -> int:
+        """Returns the highest level reachable with the given amount of XP."""
+
+        level = 0
+        while self.min_xp_at(level + 1) <= xp:
+            level += 1
+        return level
+
+    async def get_level_logs_channel_id(self, guild: discord.Guild) -> int | None:
+        """Returns the ID of the guild's configured level logs channel, if any."""
+
+        data = await self.bot.mongo.db.guild.find_one({"_id": guild.id})
+        if data is None:
+            return None
+        return data.get("level_logs_channel_id")
+
+    def roles_between_levels(self, guild: discord.Guild, low: int, high: int) -> list[discord.Role]:
+        """Returns the level roles awarded for levels in the (low, high] range."""
+
+        role_ids = itertools.chain(*[roles for level, roles in ROLES.items() if low < level <= high])
+        return [role for role in map(guild.get_role, role_ids) if role is not None]
+
+    async def apply_level_roles(
+        self, member: discord.Member, old_level: int, new_level: int
+    ) -> tuple[list[discord.Role], list[discord.Role]]:
+        """Grants and removes level roles to reflect a level change, returning the roles changed."""
+
+        add_roles = self.roles_between_levels(member.guild, old_level, new_level)
+        remove_roles = self.roles_between_levels(member.guild, new_level, old_level)
+        if add_roles:
+            await member.add_roles(*add_roles)
+        if remove_roles:
+            await member.remove_roles(*remove_roles)
+        return add_roles, remove_roles
+
+    def format_roles(self, roles: list[discord.Role]) -> str:
+        return ", ".join(f"**{role.mention}**" for role in roles)
 
     async def sync_level_roles(self, member):
         user = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
@@ -74,11 +112,10 @@ class Levels(commands.Cog):
         if discord.utils.get(message.mentions, id=716390085896962058):
             return
 
-        data = await self.bot.mongo.db.guild.find_one({"_id": message.guild.id})
-        try:
-            level_logs_channel = self.bot.get_channel(data["level_logs_channel_id"])
-        except KeyError:
+        level_logs_channel_id = await self.get_level_logs_channel_id(message.guild)
+        if level_logs_channel_id is None:
             return
+        level_logs_channel = self.bot.get_channel(level_logs_channel_id)
 
         # Set 60s timeout between messages
         if await self.bot.redis.get(f"xp:{message.guild.id}:{message.author.id}") is not None:
@@ -140,11 +177,10 @@ class Levels(commands.Cog):
 
         You must have the Community Manager role to use this."""
 
-        data = await self.bot.mongo.db.guild.find_one({"_id": ctx.guild.id})
-        try:
-            level_logs_channel = self.bot.get_channel(data["level_logs_channel_id"])
-        except KeyError:
+        level_logs_channel_id = await self.get_level_logs_channel_id(ctx.guild)
+        if level_logs_channel_id is None:
             return await ctx.send("No level logs channel set in this server!")
+        level_logs_channel = self.bot.get_channel(level_logs_channel_id)
 
         await ctx.message.add_reaction("▶️")
 
@@ -159,27 +195,13 @@ class Levels(commands.Cog):
         if current_level == level:
             return await ctx.send("No changes made.")
 
-        add_roles = [
-            ctx.guild.get_role(x)
-            for x in itertools.chain(
-                *[lvl_roles for lvl, lvl_roles in ROLES.items() if lvl <= level and lvl > current_level]
-            )
-        ]
-        await member.add_roles(*add_roles)
-
-        remove_roles = [
-            ctx.guild.get_role(x)
-            for x in itertools.chain(
-                *[lvl_roles for lvl, lvl_roles in ROLES.items() if lvl > level and lvl <= current_level]
-            )
-        ]
-        await member.remove_roles(*remove_roles)
+        add_roles, remove_roles = await self.apply_level_roles(member, current_level, level)
 
         msg = f"Set **{member}**'s level to **{level}**."
         if add_roles:
-            msg += f" They have received the roles {', '.join(map(lambda r: f'**{r}**', [role.mention for role in add_roles]))}."
+            msg += f" They have received the roles {self.format_roles(add_roles)}."
         if remove_roles:
-            msg += f" The roles {', '.join(map(lambda r: f'**{r}**', [role.mention for role in remove_roles]))} have been removed."
+            msg += f" The roles {self.format_roles(remove_roles)} have been removed."
 
         await ctx.channel.send(msg)
         if level_logs_channel is not None:
