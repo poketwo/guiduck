@@ -7,11 +7,14 @@ from typing import Optional
 import discord
 from discord.ext import commands
 from discord.ext.menus.views import ViewMenuPages
+from pymongo import ReturnDocument
 
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers import checks
 
 SILENT = False
+
+MIN_XP = 0
 
 ROLES = defaultdict(
     list,
@@ -206,6 +209,59 @@ class Levels(commands.Cog):
         await ctx.channel.send(msg)
         if level_logs_channel is not None:
             await level_logs_channel.send(f"**{member.mention}**'s level has been set to **{level}** by {ctx.author}.")
+
+        await ctx.message.add_reaction("✅")
+
+    @commands.hybrid_command(aliases=("addxp",))
+    @commands.guild_only()
+    @checks.is_server_admin()
+    async def givexp(self, ctx, member: discord.Member, xp: int):
+        """Gives a user an amount of XP, updating their level accordingly.
+
+        A negative amount takes XP away instead. You must have the Server Administrator role to use this."""
+
+        if xp == 0:
+            return await ctx.send("No changes made.")
+
+        level_logs_channel_id = await self.get_level_logs_channel_id(ctx.guild)
+        if level_logs_channel_id is None:
+            return await ctx.send("No level logs channel set in this server!")
+        level_logs_channel = self.bot.get_channel(level_logs_channel_id)
+
+        await ctx.message.add_reaction("▶️")
+
+        user = await self.bot.mongo.db.member.find_one_and_update(
+            {"_id": {"id": member.id, "guild_id": ctx.guild.id}},
+            {"$inc": {"xp": xp}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        old_xp, old_level = user["xp"] - xp, user.get("level", 0)
+        new_xp = max(user["xp"], MIN_XP)
+        new_level = self.level_at(new_xp)
+
+        if (new_xp, new_level) != (user["xp"], old_level):
+            await self.bot.mongo.db.member.update_one(
+                {"_id": {"id": member.id, "guild_id": ctx.guild.id}},
+                {"$set": {"xp": new_xp, "level": new_level}},
+            )
+        add_roles, remove_roles = await self.apply_level_roles(member, old_level, new_level)
+
+        verb = "Gave" if xp > 0 else "Took"
+        msg = f"{verb} **{abs(xp)}** XP {'to' if xp > 0 else 'from'} **{member}** ({old_xp} → {new_xp} XP)."
+        if new_level != old_level:
+            msg += f" They are now level **{new_level}** (was **{old_level}**)."
+        if add_roles:
+            msg += f" They have received the roles {self.format_roles(add_roles)}."
+        if remove_roles:
+            msg += f" The roles {self.format_roles(remove_roles)} have been removed."
+
+        await ctx.channel.send(msg)
+        if level_logs_channel is not None:
+            await level_logs_channel.send(
+                f"**{member.mention}**'s XP has been changed from **{old_xp}** to **{new_xp}**"
+                f" (level **{old_level}** → **{new_level}**) by {ctx.author}."
+            )
 
         await ctx.message.add_reaction("✅")
 
