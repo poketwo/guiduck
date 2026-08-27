@@ -732,30 +732,12 @@ class Punishments(HelpDeskCategory):
     emoji = "\N{HAMMER}"
 
     async def on_select(self, interaction: discord.Interaction):
-        await self.respond_then_open_ticket(
+        await self.respond(
             interaction,
             """
-            We do not accept appeals through this server. If you would like to appeal a punishment, please do so via our appeals site at https://forms.poketwo.net/.
-
-            If you would still like to open a ticket, please press the button below.
-
-            Note that abusing the ticket feature will result in a ban from the support server.
+            Appeals now support file uploads, so we no longer accept ban or suspension appeal tickets through this server. To appeal a punishment, please use our appeals site at https://forms.poketwo.net/.
             """,
         )
-
-    async def on_open(self, ticket: Ticket):
-        if ticket.thread is None:
-            return
-        embed = discord.Embed(
-            title="Bans & Suspension Appeal",
-            color=discord.Color.blurple(),
-            description=textwrap.dedent(
-                """
-                We do not accept appeals through this server. If you would like to appeal a punishment, please do so via our appeals site at https://forms.poketwo.net/.
-                """
-            ),
-        )
-        await ticket.thread.send(embed=embed)
 
 
 class Miscellaneous(HelpDeskCategory):
