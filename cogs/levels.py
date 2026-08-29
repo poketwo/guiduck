@@ -180,7 +180,10 @@ class Levels(commands.Cog):
             if not SILENT:
                 await message.channel.send(msg)
             if level_logs_channel is not None:
-                await level_logs_channel.send(f"{message.author.mention} reached level **{new_level}**.")
+                await level_logs_channel.send(
+                    f"{message.author.mention} reached level **{new_level}**.",
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
 
     @commands.hybrid_command(aliases=("rank", "level"))
     async def xp(self, ctx, *, member: Optional[discord.Member] = commands.Author):
@@ -237,7 +240,10 @@ class Levels(commands.Cog):
 
         await ctx.channel.send(msg)
         if level_logs_channel is not None:
-            await level_logs_channel.send(f"**{member.mention}**'s level has been set to **{level}** by {ctx.author}.")
+            await level_logs_channel.send(
+                f"**{member.mention}**'s level has been set to **{level}** by {ctx.author}.",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
 
         await ctx.message.add_reaction("✅")
 
@@ -291,7 +297,8 @@ class Levels(commands.Cog):
         if level_logs_channel is not None:
             await level_logs_channel.send(
                 f"**{member.mention}**'s XP has been changed from **{old_xp}** to **{new_xp}**"
-                f" (level **{old_level}** → **{new_level}**) by {ctx.author}."
+                f" (level **{old_level}** → **{new_level}**) by {ctx.author}.",
+                allowed_mentions=discord.AllowedMentions.none(),
             )
 
         await ctx.message.add_reaction("✅")

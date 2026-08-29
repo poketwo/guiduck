@@ -103,7 +103,8 @@ class Reminders(commands.Cog):
         self.bot.loop.create_task(self.update_current(reminder))
 
         await ctx.send(
-            f"Alright, I'll remind you **{format_dt(reminder.expires_at, 'R')}**: {time_and_content.arg}"
+            f"Alright, I'll remind you **{format_dt(reminder.expires_at, 'R')}**: "
+            f"{time_and_content.arg} (ID: **{reminder._id}**)"
         )
 
     @reminder.command()
