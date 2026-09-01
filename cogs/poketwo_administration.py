@@ -566,7 +566,7 @@ class PoketwoAdministration(commands.Cog):
         bonus_per_point = priv_vars.get("bonus_per_point", 1000)
         bonus = bonus_threshold is not None
         if bonus:
-            cols = [*cols, *priv_vars.get("bonus_columns", ["Bonus", "Final"])]
+            cols = [*cols, *priv_vars.get("bonus_columns", ["Bonus", "Total"])]
 
         net = lambda b, t: b * bnet + t * tnet
         MAX_NAME_LENGTH = 13
