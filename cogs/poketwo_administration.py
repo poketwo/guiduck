@@ -566,13 +566,7 @@ class PoketwoAdministration(commands.Cog):
         bonus_per_point = priv_vars.get("bonus_per_point", 1000)
         bonus = bonus_threshold is not None
         if bonus:
-            cols = [
-                *cols,
-                *priv_vars.get(
-                    "bonus_columns",
-                    ["Over Limit", "Over Avg", "Curved", "Bonus", "Final"],
-                ),
-            ]
+            cols = [*cols, *priv_vars.get("bonus_columns", ["Bonus", "Final"])]
 
         net = lambda b, t: b * bnet + t * tnet
         MAX_NAME_LENGTH = 13
@@ -615,7 +609,7 @@ class PoketwoAdministration(commands.Cog):
                 over_average = max(excess - average_excess, 0)
                 curved = max(math.log(over_average, bonus_log_base), 0) if over_average > 0 else 0
                 bonus_amount = int(amount + curved * bonus_per_point) - amount if payable else 0
-                row += [excess, round(over_average, 2), round(curved, 3), bonus_amount, amount + bonus_amount]
+                row += [bonus_amount, amount + bonus_amount]
 
             data.append(row)
 
@@ -638,13 +632,16 @@ class PoketwoAdministration(commands.Cog):
                 > **Min Cut-off**: {min_total}
                 > **Formula**: `(bot-logs * {bnet} + tickets * {tnet}) * 100`
                 > **Max Amount**: {max_amount}"""
-                + (dedent(f"""
+                + (
+                    dedent(
+                        f"""
                         > **Bonus Threshold**: {bonus_threshold}
                         > **Average Excess**: {average_excess:,.2f}
-                        > **Over Limit**: `max(weighted - {bonus_threshold}, 0)`
-                        > **Over Avg**: `max(over_limit - {average_excess:,.2f}, 0)`
-                        > **Curved**: `max(log(over_avg, {bonus_log_base}), 0)`
-                        > **Bonus**: `curved * {bonus_per_point}`""") if bonus else "")
+                        > **Bonus Formula**: `log(max(excess - average_excess, 0), {bonus_log_base}) * {bonus_per_point}`"""
+                    )
+                    if bonus
+                    else ""
+                )
             ),
             *[
                 f"""{"`"*3}py\n{chunk}\n{"`"*3}"""
