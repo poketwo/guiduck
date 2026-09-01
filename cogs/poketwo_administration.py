@@ -1,4 +1,5 @@
 import collections
+import math
 import random
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -560,9 +561,17 @@ class PoketwoAdministration(commands.Cog):
         tnet = priv_vars["tickets_net"]
         max_amount = priv_vars["max_amount"]
         min_total = priv_vars["min_total"]
+        bonus_threshold = priv_vars.get("bonus_threshold")
+        bonus_log_base = priv_vars.get("bonus_log_base", 5)
+        bonus_per_point = priv_vars.get("bonus_per_point", 1000)
+        bonus = bonus_threshold is not None
+        if bonus:
+            cols = [*cols, *priv_vars.get("bonus_columns", ["Bonus", "Final"])]
 
         net = lambda b, t: b * bnet + t * tnet
-        data = []
+        MAX_NAME_LENGTH = 13
+
+        activity = []
         for member in set(members):
             tickets = await self.bot.mongo.db.ticket.count_documents({"agent_id": member.id, "closed_at": _filter})
             bot_logs = await self.bot.mongo.db.action.count_documents(
@@ -573,12 +582,7 @@ class PoketwoAdministration(commands.Cog):
                     else {}
                 )
             )
-            total = net(bot_logs, tickets)
 
-            raw = round(total * 100)
-            amount = min(max_amount, raw if total >= min_total else 0)
-
-            MAX_NAME_LENGTH = 13
             name = (
                 (member.name[:MAX_NAME_LENGTH] + ("..." if len(member.name) > MAX_NAME_LENGTH else ""))
                 if not args.show_ids
@@ -588,16 +592,26 @@ class PoketwoAdministration(commands.Cog):
             if ex_member and not (tickets or bot_logs):
                 continue
 
-            data.append(
-                [
-                    name + ("*" if ex_member else ""),
-                    bot_logs,
-                    tickets,
-                    total,
-                    raw,
-                    amount,
-                ]
-            )
+            activity.append((name + ("*" if ex_member else ""), bot_logs, tickets, net(bot_logs, tickets)))
+
+        # Activity past the threshold, which is what the bonus is scaled on, averaged over everyone shown
+        excesses = [max(total - bonus_threshold, 0) if bonus else 0 for *_, total in activity]
+        average_excess = sum(excesses) / len(excesses) if excesses else 0
+
+        data = []
+        for (name, bot_logs, tickets, total), excess in zip(activity, excesses):
+            raw = round(total * 100)
+            payable = total >= min_total
+            amount = min(max_amount, raw) if payable else 0
+
+            row = [name, bot_logs, tickets, total, raw, amount]
+            if bonus:
+                over_average = max(excess - average_excess, 0)
+                curved = max(math.log(over_average, bonus_log_base), 0) if over_average > 0 else 0
+                bonus_amount = int(amount + curved * bonus_per_point) - amount if payable else 0
+                row += [bonus_amount, amount + bonus_amount]
+
+            data.append(row)
 
         data.sort(key=lambda t: t[4], reverse=True)
 
@@ -618,6 +632,16 @@ class PoketwoAdministration(commands.Cog):
                 > **Min Cut-off**: {min_total}
                 > **Formula**: `(bot-logs * {bnet} + tickets * {tnet}) * 100`
                 > **Max Amount**: {max_amount}"""
+                + (
+                    dedent(
+                        f"""
+                        > **Bonus Threshold**: {bonus_threshold}
+                        > **Average Excess**: {average_excess:,.2f}
+                        > **Bonus Formula**: `log(max(excess - average_excess, 0), {bonus_log_base}) * {bonus_per_point}`"""
+                    )
+                    if bonus
+                    else ""
+                )
             ),
             *[
                 f"""{"`"*3}py\n{chunk}\n{"`"*3}"""
