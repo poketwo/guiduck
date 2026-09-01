@@ -505,7 +505,9 @@ class DeleteDuration(commands.Converter):
 
 class BanFlags(commands.FlagConverter, case_insensitive=True):
     time_and_reason: str = commands.flag(positional=True)
-    delete: Optional[DeleteDuration] = commands.flag(aliases=["d"], default=DeleteDuration(DEFAULT_DELETE_MESSAGE_SECONDS))
+    delete: Optional[DeleteDuration] = commands.flag(
+        aliases=["d"], default=DeleteDuration(DEFAULT_DELETE_MESSAGE_SECONDS)
+    )
 
 
 class HistoryFlagConverter(commands.FlagConverter, case_insensitive=True):
@@ -526,9 +528,7 @@ class Moderation(commands.Cog):
 
         if checks.is_protected(user, self.bot):
             with suppress(discord.Forbidden, discord.HTTPException):
-                await user.send(
-                    f"You're in staff, why are you messaging in <#{HONEYPOT_CHANNEL_ID}>?"
-                )
+                await user.send(f"You're in staff, why are you messaging in <#{HONEYPOT_CHANNEL_ID}>?")
             return
 
         reason = (
@@ -547,7 +547,7 @@ class Moderation(commands.Cog):
             channel_id=channel.id,
             message_id=message_id,
             created_at=created_at,
-            expires_at=expires_at
+            expires_at=expires_at,
         )
 
         action.delete_message_seconds = 3600
@@ -569,7 +569,7 @@ class Moderation(commands.Cog):
             guild=message.guild,
             channel=message.channel,
             message_id=message.id,
-            created_at=message.created_at
+            created_at=message.created_at,
         )
 
     @commands.Cog.listener()
@@ -589,7 +589,7 @@ class Moderation(commands.Cog):
             guild=interaction.guild,
             channel=interaction.channel,
             message_id=getattr(interaction, "id", None),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
     @commands.Cog.listener()
@@ -1110,39 +1110,42 @@ class Moderation(commands.Cog):
         await ctx.send(f"Unmuted **{target}** in trading channels (Case #{action._id}).", ephemeral=True)
 
     async def reverse_raw_action(self, raw_action):
-        action = Action.build_from_mongo(self.bot, raw_action)
+        try:
+            action = Action.build_from_mongo(self.bot, raw_action)
 
-        guild = self.bot.get_guild(action.guild_id)
-        target = action.target
+            guild = self.bot.get_guild(action.guild_id)
+            target = action.target
 
-        if action.type == "ban":
-            action_type = Unban
-            try:
-                ban = await guild.fetch_ban(discord.Object(id=raw_action["target_id"]))
-            except (ValueError, discord.NotFound):
+            if action.type == "ban":
+                action_type = Unban
+                try:
+                    ban = await guild.fetch_ban(discord.Object(id=raw_action["target_id"]))
+                except (ValueError, discord.NotFound):
+                    return
+                target = ban.user
+            elif action.type == "mute":
+                action_type = Unmute
+            elif action.type == "timeout":
+                action_type = SymbolicUntimeout
+            elif action.type == "trading_mute":
+                action_type = TradingUnmute
+            else:
                 return
-            target = ban.user
-        elif action.type == "mute":
-            action_type = Unmute
-        elif action.type == "timeout":
-            action_type = SymbolicUntimeout
-        elif action.type == "trading_mute":
-            action_type = TradingUnmute
-        else:
-            return
 
-        new_action = action_type(
-            target=target,
-            user=self.bot.user,
-            reason="Punishment duration expired",
-            guild_id=action.guild_id,
-            created_at=datetime.now(timezone.utc),
-        )
+            new_action = action_type(
+                target=target,
+                user=self.bot.user,
+                reason="Punishment duration expired",
+                guild_id=action.guild_id,
+                created_at=datetime.now(timezone.utc),
+            )
 
-        await new_action.execute(FakeContext(self.bot, guild))
-        await new_action.notify()
-
-        await self.bot.mongo.db.action.update_one({"_id": raw_action["_id"]}, {"$set": {"resolved": True}})
+            await new_action.execute(FakeContext(self.bot, guild))
+            await new_action.notify()
+        except Exception:
+            self.bot.log.exception("Failed to reverse action %s", raw_action["_id"])
+        finally:
+            await self.bot.mongo.db.action.update_one({"_id": raw_action["_id"]}, {"$set": {"resolved": True}})
 
     @tasks.loop(seconds=30)
     async def check_actions(self):
@@ -1150,7 +1153,7 @@ class Moderation(commands.Cog):
         query = {"resolved": False, "expires_at": {"$lt": datetime.now(timezone.utc)}}
 
         async for action in self.bot.mongo.db.action.find(query):
-            self.bot.loop.create_task(self.reverse_raw_action(action))
+            await self.reverse_raw_action(action)
 
     @commands.hybrid_group(aliases=("his",), fallback="list")
     @commands.guild_only()
@@ -1487,7 +1490,7 @@ class Moderation(commands.Cog):
         await self.bot.wait_until_ready()
         query = {"locked": True, "lock_expires_at": {"$lt": datetime.now(timezone.utc)}}
         async for doc in self.bot.mongo.db.channel.find(query):
-            self.bot.loop.create_task(self.reverse_expired_lock(doc))
+            await self.reverse_expired_lock(doc)
 
     async def cog_unload(self):
         self.check_actions.cancel()
