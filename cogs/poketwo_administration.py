@@ -556,7 +556,8 @@ class PoketwoAdministration(commands.Cog):
 
         priv_vars = await self.bot.mongo.fetch_private_variable("activity")
 
-        cols = priv_vars["columns"]
+        cols = [*priv_vars["columns"]]
+        cols.pop(4)
         bnet = priv_vars["bot_logs_net"]
         tnet = priv_vars["tickets_net"]
         max_amount = priv_vars["max_amount"]
@@ -594,6 +595,8 @@ class PoketwoAdministration(commands.Cog):
 
             activity.append((name + ("*" if ex_member else ""), bot_logs, tickets, net(bot_logs, tickets)))
 
+        activity.sort(key=lambda row: row[3], reverse=True)
+
         # Activity past the threshold, which is what the bonus is scaled on, averaged over everyone shown
         excesses = [max(total - bonus_threshold, 0) if bonus else 0 for *_, total in activity]
         average_excess = sum(excesses) / len(excesses) if excesses else 0
@@ -604,7 +607,7 @@ class PoketwoAdministration(commands.Cog):
             payable = total >= min_total
             amount = min(max_amount, raw) if payable else 0
 
-            row = [name, bot_logs, tickets, total, raw, amount]
+            row = [name, bot_logs, tickets, total, amount]
             if bonus:
                 over_average = max(excess - average_excess, 0)
                 curved = max(math.log(over_average, bonus_log_base), 0) if over_average > 0 else 0
@@ -612,8 +615,6 @@ class PoketwoAdministration(commands.Cog):
                 row += [bonus_amount, amount + bonus_amount]
 
             data.append(row)
-
-        data.sort(key=lambda t: t[4], reverse=True)
 
         if len(members) > 1:
             data.append(["" for _ in cols])
