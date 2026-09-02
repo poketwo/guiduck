@@ -22,6 +22,7 @@ REFUND_CHANNEL_ID = 973239955784614008
 
 MANAGEMENT_LOGS_CHANNEL_ID = 1301202435380871230
 ADMIN_PAY_CHANNEL_IDS = (1514309909389246494, 1514310056152272926)
+ADMIN_PAY_STAFF_ROLE_ID = 1483963509275623444
 
 IV_FLAGS = "iv_hp", "iv_atk", "iv_defn", "iv_satk", "iv_sdef", "iv_spd"
 random_level = lambda ctx: max(1, min(int(random.normalvariate(20, 10)), 100))
@@ -450,7 +451,12 @@ class PoketwoAdministration(commands.Cog):
         return embed
 
     @commands.hybrid_group(aliases=["administration"], invoke_without_command=True)
-    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin(), checks.is_senior_moderator())
+    @commands.check_any(
+        checks.is_server_admin(),
+        checks.is_bot_admin(),
+        checks.is_senior_moderator(),
+        commands.has_role(ADMIN_PAY_STAFF_ROLE_ID),
+    )
     async def admin(self, ctx):
         """Administration commands
 
@@ -477,7 +483,12 @@ class PoketwoAdministration(commands.Cog):
 
     @admin.command(aliases=("giveshard", "as", "gs"))
     @checks.staff_categories_only(*ADMIN_PAY_CHANNEL_IDS)
-    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin(), checks.is_senior_moderator())
+    @commands.check_any(
+        checks.is_server_admin(),
+        checks.is_bot_admin(),
+        checks.is_senior_moderator(),
+        commands.has_role(ADMIN_PAY_STAFF_ROLE_ID),
+    )
     async def addshards(self, ctx, user: FetchUserConverter, amt: int, *, notes: Optional[str] = None):
         """Add to a user's shard balance."""
 
@@ -500,7 +511,9 @@ class PoketwoAdministration(commands.Cog):
         usage="[role: ROLE=Moderator] [users: USER1 USER2 ...] [month: MONTH=Previous] [year: YEAR=Current] [all-users: yes/no=no] [show-ids: yes/no=no]"
     )
     @checks.staff_categories_only(*ADMIN_PAY_CHANNEL_IDS)
-    @commands.check_any(checks.is_server_admin(), checks.is_senior_moderator())
+    @commands.check_any(
+        checks.is_server_admin(), checks.is_senior_moderator(), commands.has_role(ADMIN_PAY_STAFF_ROLE_ID)
+    )
     @with_typing()
     async def activity(
         self,
