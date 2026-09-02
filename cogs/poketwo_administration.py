@@ -217,15 +217,37 @@ class PoketwoAdministration(commands.Cog):
             checks.is_bot_admin, ctx
         )
 
-    def is_lower_staff(self, ctx, user):
-        member = user if isinstance(user, discord.Member) else ctx.guild.get_member(user.id)
-        return member is not None and checks.is_lower_than_senior_moderator(member)
+    async def resolve_member(self, ctx, user):
+        if isinstance(user, discord.Member):
+            return user
+
+        member = ctx.guild.get_member(user.id)
+        if member is not None:
+            return member
+
+        try:
+            return await ctx.guild.fetch_member(user.id)
+        except discord.NotFound:
+            return None
+
+    async def role_members(self, ctx, role):
+        if ctx.guild.chunked:
+            return role.members
+
+        member_ids = await self.bot.mongo.db.member.distinct("_id.id", {"_id.guild_id": ctx.guild.id, "roles": role.id})
+        members = []
+        for member_id in member_ids:
+            member = await self.resolve_member(ctx, discord.Object(member_id))
+            if member is not None:
+                members.append(member)
+        return members
 
     async def ensure_can_pay_user(self, ctx, user):
         if await self.can_pay_anyone(ctx):
             return True
 
-        if self.is_lower_staff(ctx, user):
+        member = await self.resolve_member(ctx, user)
+        if member is not None and checks.is_lower_than_senior_moderator(member):
             return True
 
         await ctx.send("Senior Moderators can only pay Moderators and Trial Moderators.", ephemeral=True)
@@ -520,12 +542,19 @@ class PoketwoAdministration(commands.Cog):
         # Members determination
 
         role = args.role
+        users = [member for user in args.users or [] if (member := await self.resolve_member(ctx, user)) is not None]
         restricted_payout = not await self.can_pay_anyone(ctx)
         if restricted_payout and args.show_all:
             return await ctx.send("Senior Moderators can only pay Moderators and Trial Moderators.", ephemeral=True)
         if restricted_payout and role and role.id not in constants.SENIOR_MODERATOR_PAYABLE_ROLES:
             return await ctx.send("Senior Moderators can only pay Moderator and Trial Moderator roles.", ephemeral=True)
-        if restricted_payout and args.users and not all(self.is_lower_staff(ctx, user) for user in args.users):
+        if (
+            restricted_payout
+            and args.users
+            and (
+                len(users) != len(args.users) or not all(checks.is_lower_than_senior_moderator(user) for user in users)
+            )
+        ):
             return await ctx.send("Senior Moderators can only pay Moderators and Trial Moderators.", ephemeral=True)
 
         if not (role or args.users or args.show_all):
@@ -533,12 +562,12 @@ class PoketwoAdministration(commands.Cog):
 
         members = []
         if role:
-            members = role.members
-        elif args.users:
-            members = args.users
+            members = await self.role_members(ctx, role)
+        elif users:
+            members = users
 
         if restricted_payout:
-            members = [member for member in members if self.is_lower_staff(ctx, member)]
+            members = [member for member in members if checks.is_lower_than_senior_moderator(member)]
 
         if args.show_all:
             if args.users:
