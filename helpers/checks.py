@@ -82,16 +82,18 @@ class NotInCategory(commands.CheckFailure):
     pass
 
 
-def in_categories(*category_ids):
+def in_categories(*category_ids, channel_ids=()):
     def predicate(ctx):
-        if ctx.channel.category is None or ctx.channel.category.id not in category_ids:
+        if ctx.channel.id not in channel_ids and (
+            ctx.channel.category is None or ctx.channel.category.id not in category_ids
+        ):
             raise NotInCategory("This command is restricted to specific categories.")
         return True
 
     return commands.check_any(is_admin(), commands.check(predicate))
 
 
-def staff_categories_only():
+def staff_categories_only(*channel_ids):
     return in_categories(
         717881335313858610,
         1122578424867864616,
@@ -102,6 +104,7 @@ def staff_categories_only():
         730992224635977748,
         1103248448934912052,
         1104727423603449866,
+        channel_ids=channel_ids,
     )
 
 
