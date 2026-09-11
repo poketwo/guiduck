@@ -1,4 +1,5 @@
 import abc
+import asyncio
 from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
 
 BOT_ID = 753657623739629739
 HONEYPOT_CHANNEL_ID = 1493349791017472062
+HONEYPOT_RETRY_DELAY = 30
 MAX_DELETE_MESSAGE_SECONDS = 604800  # 7 days
 DEFAULT_DELETE_MESSAGE_SECONDS = 3600  # 1 hour
 
@@ -522,6 +524,26 @@ class Moderation(commands.Cog):
         self.check_actions.start()
         self.check_expired_locks.start()
 
+    async def retry_honeypot(self, action, guild):
+        while not await self.bot.mongo.db.action.find_one({"_id": action._id, "resolved": True}):
+            await asyncio.sleep(1)
+
+        await asyncio.sleep(HONEYPOT_RETRY_DELAY)
+
+        created_at = datetime.now(timezone.utc)
+        retry_action = Ban(
+            target=action.target,
+            user=self.bot.user,
+            reason=action.reason,
+            guild_id=guild.id,
+            channel_id=action.channel_id,
+            message_id=action.message_id,
+            created_at=created_at,
+            expires_at=created_at + timedelta(seconds=1),
+        )
+        retry_action.delete_message_seconds = action.delete_message_seconds
+        await retry_action.execute(FakeContext(self.bot, guild))
+
     async def handle_honeypot(self, user, guild, channel, message_id=None, created_at=None):
 
         if checks.is_protected(user, self.bot):
@@ -554,6 +576,7 @@ class Moderation(commands.Cog):
 
         await action.notify()
         await action.execute(FakeContext(self.bot, guild))
+        self.bot.loop.create_task(self.retry_honeypot(action, guild))
 
     @commands.Cog.listener()
     async def on_message(self, message):
