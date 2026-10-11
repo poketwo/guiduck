@@ -11,6 +11,7 @@ from pymongo import ReturnDocument
 
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers import checks
+from helpers.utils import log_staff_action
 
 SILENT = False
 
@@ -244,6 +245,15 @@ class Levels(commands.Cog):
                 f"**{member.mention}**'s level has been set to **{level}** by {ctx.author}.",
                 allowed_mentions=discord.AllowedMentions.none(),
             )
+        await log_staff_action(
+            ctx,
+            "Level set",
+            fields=[
+                ("User", f"{member.mention} ({member.id})"),
+                ("Level", f"{current_level} → {level}"),
+                ("XP", f"{user.get('xp', 0)} → {xp}"),
+            ],
+        )
 
         await ctx.message.add_reaction("✅")
 
@@ -300,6 +310,15 @@ class Levels(commands.Cog):
                 f" (level **{old_level}** → **{new_level}**) by {ctx.author}.",
                 allowed_mentions=discord.AllowedMentions.none(),
             )
+        await log_staff_action(
+            ctx,
+            "XP given" if xp > 0 else "XP taken",
+            fields=[
+                ("User", f"{member.mention} ({member.id})"),
+                ("XP", f"{old_xp} → {new_xp} ({xp:+})"),
+                ("Level", f"{old_level} → {new_level}"),
+            ],
+        )
 
         await ctx.message.add_reaction("✅")
 

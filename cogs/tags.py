@@ -9,7 +9,7 @@ from discord.ext.menus.views import ViewMenuPages
 
 from helpers import checks
 from helpers.pagination import AsyncEmbedListPageSource
-from helpers.utils import FakeUser, with_attachment_urls
+from helpers.utils import FakeUser, log_staff_action, with_attachment_urls
 
 
 CHAR_LIMIT = 1994
@@ -279,6 +279,12 @@ class Tags(commands.Cog):
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"content": content}})
         await ctx.send(f"Successfully force edited tag.")
+        await log_staff_action(
+            ctx,
+            f"Tag force edited: {tag.name}",
+            fields=[("Owner", f"<@{tag.owner_id}> ({tag.owner_id})")],
+            files=[("before.txt", tag.content), ("after.txt", content)],
+        )
 
     @tag.command()
     async def delete(self, ctx, *, name):
@@ -305,9 +311,22 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
 
+        aliases = [] if tag.alias else [t.name async for t in self.query_tags({"original": tag.name}, sort=False)]
+
         await self.bot.mongo.db.tag.delete_one({"_id": tag.id})
         await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully force deleted.")
+
+        fields = [("Owner", f"<@{tag.owner_id}> ({tag.owner_id})"), ("Uses", tag.uses)]
+        if tag.alias:
+            fields.append(("Original", tag.original))
+            files = []
+        else:
+            files = [("content.txt", tag.content)]
+            if aliases:
+                files.append(("aliases.txt", "\n".join(aliases)))
+        fields.append(("Aliases deleted", len(aliases)))
+        await log_staff_action(ctx, f"Tag force deleted: {tag.name}", fields=fields, files=files)
 
     @tag.command()
     async def transfer(self, ctx, member: discord.Member, *, name):
@@ -335,6 +354,14 @@ class Tags(commands.Cog):
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": member.id}})
         await ctx.send(f"Successfully force transferred tag.")
+        await log_staff_action(
+            ctx,
+            f"Tag force transferred: {tag.name}",
+            fields=[
+                ("Previous owner", f"<@{tag.owner_id}> ({tag.owner_id})"),
+                ("New owner", f"{member.mention} ({member.id})"),
+            ],
+        )
 
     @tag.command()
     @checks.community_server_only()

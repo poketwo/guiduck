@@ -1,11 +1,31 @@
 from datetime import datetime
+import io
 from textwrap import shorten
 from typing import Iterable, List, NamedTuple, Optional
 
 import discord
 from discord.ext import commands
 
-from . import time
+from . import constants, time
+
+
+async def log_staff_action(ctx, title, *, fields=(), files=()):
+    channel = ctx.bot.get_channel(constants.STAFF_LOGS_CHANNEL_ID)
+    if channel is None:
+        return
+
+    embed = discord.Embed(color=discord.Color.blurple(), title=title)
+    embed.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
+    embed.add_field(name="Moderator", value=f"{ctx.author.mention} ({ctx.author.id})", inline=False)
+    for name, value in fields:
+        embed.add_field(name=name, value=value, inline=False)
+    embed.timestamp = discord.utils.utcnow()
+
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="Jump", url=ctx.message.jump_url))
+
+    files = [discord.File(io.BytesIO(content.encode()), filename=filename) for filename, content in files]
+    await channel.send(embed=embed, files=files, view=view, allowed_mentions=discord.AllowedMentions.none())
 
 
 class FakeAvatar(NamedTuple):

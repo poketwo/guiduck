@@ -7,6 +7,7 @@ from discord.ext.menus.views import ViewMenuPages
 
 from helpers import checks, time
 from helpers.pagination import AsyncEmbedCodeBlockTablePageSource
+from helpers.utils import log_staff_action
 
 GIVEREP_TRIGGERS = [
     "+rep",
@@ -126,8 +127,16 @@ class Reputation(commands.Cog):
 
         You must have the Community Manager role to use this."""
 
+        data = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
+        old_value = (data or {}).get("reputation", 0)
+
         await self.update_rep(member, set=value)
         await ctx.send(f"Set **{member}**'s rep to **{value}**")
+        await log_staff_action(
+            ctx,
+            "Reputation set",
+            fields=[("User", f"{member.mention} ({member.id})"), ("Reputation", f"{old_value} → {value}")],
+        )
 
     @commands.hybrid_command()
     @commands.guild_only()
