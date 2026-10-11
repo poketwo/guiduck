@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-import io
 import textwrap
 
 import discord
@@ -10,11 +9,10 @@ from discord.ext.menus.views import ViewMenuPages
 
 from helpers import checks
 from helpers.pagination import AsyncEmbedListPageSource
-from helpers.utils import FakeUser, with_attachment_urls
+from helpers.utils import FakeUser, log_staff_action, with_attachment_urls
 
 
 CHAR_LIMIT = 1994
-TAG_LOGS_CHANNEL_ID = 1558836982795346072
 
 
 @dataclass
@@ -86,24 +84,6 @@ class Tags(commands.Cog):
             await pages.start(ctx)
         except IndexError:
             await ctx.send("No tags found.")
-
-    async def log_force_action(self, ctx, action, tag, *, fields=(), files=()):
-        channel = self.bot.get_channel(TAG_LOGS_CHANNEL_ID)
-        if channel is None:
-            return
-
-        embed = discord.Embed(color=discord.Color.blurple(), title=f"Tag {action}: {tag.name}")
-        embed.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
-        embed.add_field(name="Moderator", value=f"{ctx.author.mention} ({ctx.author.id})", inline=False)
-        for name, value in fields:
-            embed.add_field(name=name, value=value, inline=False)
-        embed.timestamp = discord.utils.utcnow()
-
-        view = discord.ui.View()
-        view.add_item(discord.ui.Button(label="Jump", url=ctx.message.jump_url))
-
-        files = [discord.File(io.BytesIO(content.encode()), filename=filename) for filename, content in files]
-        await channel.send(embed=embed, files=files, view=view, allowed_mentions=discord.AllowedMentions.none())
 
     # Reading tags
 
@@ -299,10 +279,9 @@ class Tags(commands.Cog):
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"content": content}})
         await ctx.send(f"Successfully force edited tag.")
-        await self.log_force_action(
+        await log_staff_action(
             ctx,
-            "force edited",
-            tag,
+            f"Tag force edited: {tag.name}",
             fields=[("Owner", f"<@{tag.owner_id}> ({tag.owner_id})")],
             files=[("before.txt", tag.content), ("after.txt", content)],
         )
@@ -347,7 +326,7 @@ class Tags(commands.Cog):
             if aliases:
                 files.append(("aliases.txt", "\n".join(aliases)))
         fields.append(("Aliases deleted", len(aliases)))
-        await self.log_force_action(ctx, "force deleted", tag, fields=fields, files=files)
+        await log_staff_action(ctx, f"Tag force deleted: {tag.name}", fields=fields, files=files)
 
     @tag.command()
     async def transfer(self, ctx, member: discord.Member, *, name):
@@ -375,10 +354,9 @@ class Tags(commands.Cog):
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": member.id}})
         await ctx.send(f"Successfully force transferred tag.")
-        await self.log_force_action(
+        await log_staff_action(
             ctx,
-            "force transferred",
-            tag,
+            f"Tag force transferred: {tag.name}",
             fields=[
                 ("Previous owner", f"<@{tag.owner_id}> ({tag.owner_id})"),
                 ("New owner", f"{member.mention} ({member.id})"),
