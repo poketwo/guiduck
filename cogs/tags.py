@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import io
 import textwrap
 
 import discord
@@ -13,6 +14,7 @@ from helpers.utils import FakeUser, with_attachment_urls
 
 
 CHAR_LIMIT = 1994
+TAG_LOGS_CHANNEL_ID = 1558836982795346072
 
 
 @dataclass
@@ -84,6 +86,24 @@ class Tags(commands.Cog):
             await pages.start(ctx)
         except IndexError:
             await ctx.send("No tags found.")
+
+    async def log_force_action(self, ctx, action, tag, *, fields=(), files=()):
+        channel = self.bot.get_channel(TAG_LOGS_CHANNEL_ID)
+        if channel is None:
+            return
+
+        embed = discord.Embed(color=discord.Color.blurple(), title=f"Tag {action}: {tag.name}")
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
+        embed.add_field(name="Moderator", value=f"{ctx.author.mention} ({ctx.author.id})", inline=False)
+        for name, value in fields:
+            embed.add_field(name=name, value=value, inline=False)
+        embed.timestamp = discord.utils.utcnow()
+
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label="Jump", url=ctx.message.jump_url))
+
+        files = [discord.File(io.BytesIO(content.encode()), filename=filename) for filename, content in files]
+        await channel.send(embed=embed, files=files, view=view, allowed_mentions=discord.AllowedMentions.none())
 
     # Reading tags
 
@@ -279,6 +299,13 @@ class Tags(commands.Cog):
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"content": content}})
         await ctx.send(f"Successfully force edited tag.")
+        await self.log_force_action(
+            ctx,
+            "force edited",
+            tag,
+            fields=[("Owner", f"<@{tag.owner_id}> ({tag.owner_id})")],
+            files=[("before.txt", tag.content), ("after.txt", content)],
+        )
 
     @tag.command()
     async def delete(self, ctx, *, name):
@@ -305,9 +332,22 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
 
+        aliases = [] if tag.alias else [t.name async for t in self.query_tags({"original": tag.name}, sort=False)]
+
         await self.bot.mongo.db.tag.delete_one({"_id": tag.id})
         await self.bot.mongo.db.tag.delete_many({"original": tag.name})
         await ctx.send(f"Tag and corresponding aliases successfully force deleted.")
+
+        fields = [("Owner", f"<@{tag.owner_id}> ({tag.owner_id})"), ("Uses", tag.uses)]
+        if tag.alias:
+            fields.append(("Original", tag.original))
+            files = []
+        else:
+            files = [("content.txt", tag.content)]
+            if aliases:
+                files.append(("aliases.txt", "\n".join(aliases)))
+        fields.append(("Aliases deleted", len(aliases)))
+        await self.log_force_action(ctx, "force deleted", tag, fields=fields, files=files)
 
     @tag.command()
     async def transfer(self, ctx, member: discord.Member, *, name):
@@ -335,6 +375,15 @@ class Tags(commands.Cog):
 
         await self.bot.mongo.db.tag.update_one({"_id": tag.id}, {"$set": {"owner_id": member.id}})
         await ctx.send(f"Successfully force transferred tag.")
+        await self.log_force_action(
+            ctx,
+            "force transferred",
+            tag,
+            fields=[
+                ("Previous owner", f"<@{tag.owner_id}> ({tag.owner_id})"),
+                ("New owner", f"{member.mention} ({member.id})"),
+            ],
+        )
 
     @tag.command()
     @checks.community_server_only()
