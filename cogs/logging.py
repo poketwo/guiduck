@@ -439,7 +439,7 @@ class Logging(commands.Cog):
 
     @checks.is_trial_moderator()
     @commands.guild_only()
-    @commands.command()
+    @commands.hybrid_command()
     async def snipe(
         self,
         ctx,

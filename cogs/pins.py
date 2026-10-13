@@ -162,7 +162,7 @@ class Pins(commands.Cog):
 
         return await self.resolve_message(ctx), duration
 
-    @commands.group(invoke_without_command=True)
+    @commands.hybrid_group(fallback="toggle", invoke_without_command=True)
     @commands.guild_only()
     @can_pin()
     async def pin(self, ctx, *, args: Optional[str] = None):

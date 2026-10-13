@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 import aiohttp
 import discord
 from discord.ext import commands, events
@@ -43,13 +46,20 @@ class Bot(commands.Bot, events.EventsMixin):
     def __init__(self, **kwargs):
         super().__init__(
             **kwargs,
-            command_prefix=config.PREFIX,
-            intents=discord.Intents.all(),
+            command_prefix=commands.when_mentioned_or(*config.PREFIX),
+            intents=self.make_intents(),
             allowed_mentions=discord.AllowedMentions(everyone=False, roles=False),
             case_insensitive=True,
         )
 
         self.config = config
+
+    @staticmethod
+    def make_intents():
+        intents = discord.Intents.default()
+        intents.members = True
+        intents.message_content = True
+        return intents
 
     async def is_owner(self, user):
         if isinstance(user, discord.Member):
@@ -68,6 +78,17 @@ class Bot(commands.Bot, events.EventsMixin):
             await self.load_extension(f"cogs.{i}")
         for i in COGS:
             await self.load_extension(f"cogs.{i}")
+        await self.sync_commands()
+
+    async def sync_commands(self):
+        await self.get_cog("Redis").wait_until_ready()
+        payload = json.dumps([cmd.to_dict(self.tree) for cmd in self.tree.get_commands()], sort_keys=True)
+        digest = hashlib.sha256(payload.encode()).hexdigest()
+        if await self.redis.get("commands_hash", encoding="utf-8") == digest:
+            return
+        synced = await self.tree.sync()
+        await self.redis.set("commands_hash", digest)
+        self.log.info(f"Synced {len(synced)} application commands.")
 
     @property
     def mongo(self):
