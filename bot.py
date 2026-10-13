@@ -58,7 +58,7 @@ class Bot(commands.Bot, events.EventsMixin):
     def make_intents():
         intents = discord.Intents.default()
         intents.members = True
-        intents.message_content = True
+        intents.message_content = config.MESSAGE_CONTENT_INTENT
         return intents
 
     async def is_owner(self, user):

@@ -28,6 +28,7 @@ PREFIX = os.environ["PREFIX"].split()
 DATABASE_NAME = os.environ["DATABASE_NAME"]
 POKETWO_DATABASE_NAME = os.environ["POKETWO_DATABASE_NAME"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+MESSAGE_CONTENT_INTENT = os.getenv("MESSAGE_CONTENT_INTENT", "").lower() in ("1", "true", "yes")
 
 REDIS_URI = os.environ["REDIS_URI"]
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
