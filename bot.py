@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 import aiohttp
 import discord
 from discord.ext import commands, events
@@ -68,6 +71,17 @@ class Bot(commands.Bot, events.EventsMixin):
             await self.load_extension(f"cogs.{i}")
         for i in COGS:
             await self.load_extension(f"cogs.{i}")
+        await self.sync_commands()
+
+    async def sync_commands(self):
+        await self.get_cog("Redis").wait_until_ready()
+        payload = json.dumps([cmd.to_dict(self.tree) for cmd in self.tree.get_commands()], sort_keys=True)
+        digest = hashlib.sha256(payload.encode()).hexdigest()
+        if await self.redis.get("commands_hash", encoding="utf-8") == digest:
+            return
+        synced = await self.tree.sync()
+        await self.redis.set("commands_hash", digest)
+        self.log.info(f"Synced {len(synced)} application commands.")
 
     @property
     def mongo(self):
