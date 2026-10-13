@@ -112,7 +112,7 @@ class Collectors(commands.Cog):
         except IndexError:
             await ctx.send("No users found.")
 
-    @commands.command()
+    @commands.hybrid_command()
     @checks.community_server_only()
     async def collectors(self, ctx, *, species: SpeciesConverter):
         """An alias for the collect search command."""
