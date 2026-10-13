@@ -82,12 +82,17 @@ class Bot(commands.Bot, events.EventsMixin):
 
     async def sync_commands(self):
         await self.get_cog("Redis").wait_until_ready()
+        key = f"commands_hash:{self.application_id}"
         payload = json.dumps([cmd.to_dict(self.tree) for cmd in self.tree.get_commands()], sort_keys=True)
         digest = hashlib.sha256(payload.encode()).hexdigest()
-        if await self.redis.get("commands_hash", encoding="utf-8") == digest:
+        if await self.redis.get(key, encoding="utf-8") == digest:
             return
-        synced = await self.tree.sync()
-        await self.redis.set("commands_hash", digest)
+        try:
+            synced = await self.tree.sync()
+        except discord.HTTPException as e:
+            self.log.error(f"Failed to sync application commands: {e}")
+            return
+        await self.redis.set(key, digest)
         self.log.info(f"Synced {len(synced)} application commands.")
 
     @property
