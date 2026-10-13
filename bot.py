@@ -46,7 +46,7 @@ class Bot(commands.Bot, events.EventsMixin):
     def __init__(self, **kwargs):
         super().__init__(
             **kwargs,
-            command_prefix=config.PREFIX,
+            command_prefix=commands.when_mentioned_or(*config.PREFIX),
             intents=self.make_intents(),
             allowed_mentions=discord.AllowedMentions(everyone=False, roles=False),
             case_insensitive=True,
