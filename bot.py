@@ -47,12 +47,19 @@ class Bot(commands.Bot, events.EventsMixin):
         super().__init__(
             **kwargs,
             command_prefix=config.PREFIX,
-            intents=discord.Intents.all(),
+            intents=self.make_intents(),
             allowed_mentions=discord.AllowedMentions(everyone=False, roles=False),
             case_insensitive=True,
         )
 
         self.config = config
+
+    @staticmethod
+    def make_intents():
+        intents = discord.Intents.default()
+        intents.members = True
+        intents.message_content = True
+        return intents
 
     async def is_owner(self, user):
         if isinstance(user, discord.Member):
