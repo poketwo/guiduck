@@ -161,6 +161,8 @@ class Levels(commands.Cog):
             {"$inc": {"messages": 1, "xp": xp}},
             upsert=True,
         )
+        if user is None:
+            user = {}
 
         if user.get("xp", 0) + xp > self.min_xp_at(user.get("level", 0) + 1):
             new_level = user.get("level", 0) + 1

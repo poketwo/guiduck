@@ -181,7 +181,7 @@ class ReactionRoles(commands.Cog):
         if emoji in menu["options"]:
             guild = self.bot.get_guild(payload.guild_id)
             role = guild.get_role(menu["options"][emoji])
-            member = guild.get_member(payload.user_id)
+            member = payload.member or await guild.fetch_member(payload.user_id)
             await member.add_roles(role)
             await member.send(f"Gave you the **{role}** role!")
 
@@ -198,7 +198,7 @@ class ReactionRoles(commands.Cog):
         if emoji in menu["options"]:
             guild = self.bot.get_guild(payload.guild_id)
             role = guild.get_role(menu["options"][emoji])
-            member = guild.get_member(payload.user_id)
+            member = guild.get_member(payload.user_id) or await guild.fetch_member(payload.user_id)
             await member.remove_roles(role)
             await member.send(f"Took away the **{role}** role!")
 
