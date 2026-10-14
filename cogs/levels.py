@@ -158,7 +158,14 @@ class Levels(commands.Cog):
         xp = random.randint(15, 25)
         user = await self.bot.mongo.db.member.find_one_and_update(
             {"_id": {"id": message.author.id, "guild_id": message.guild.id}},
-            {"$inc": {"messages": 1, "xp": xp}},
+            {
+                "$inc": {"messages": 1, "xp": xp},
+                "$set": {
+                    "name": message.author.name,
+                    "discriminator": message.author.discriminator,
+                    "nick": message.author.nick,
+                },
+            },
             upsert=True,
         )
         if user is None:
@@ -332,7 +339,7 @@ class Levels(commands.Cog):
         count = await self.bot.mongo.db.member.count_documents({})
 
         def format_item(i, x):
-            name = f"{i + 1}. {x['name']}#{x['discriminator']}"
+            name = f"{i + 1}. {x.get('name', x['_id']['id'])}#{x.get('discriminator', '0')}"
             if x.get("nick") is not None:
                 name = f"{name} ({x['nick']})"
             return {
