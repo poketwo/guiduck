@@ -14,6 +14,17 @@ from helpers import checks, constants
 from helpers.pagination import EmbedListPageSource
 
 INVITE_REGEX = r"(?:https?://)?discord(?:app)?\.(?:com/invite|gg)/([a-zA-Z0-9]+)/?"
+
+
+def _split_tolerant(text):
+    return r"\s*".join(re.escape(c) for c in text)
+
+
+# Same as INVITE_REGEX but allows whitespace/newlines between characters, so "https://disc\nord\n.gg/x" is caught too.
+AUTOMOD_INVITE_REGEX = (
+    rf"(?i){_split_tolerant('discord')}(?:{_split_tolerant('app')})?\s*\.\s*"
+    rf"(?:{_split_tolerant('com/invite')}|{_split_tolerant('gg')})\s*/\s*[a-z0-9]+"
+)
 URL_REGEX = r"(?:https?:)?(?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n]+)"
 
 
@@ -132,8 +143,10 @@ class ServerInvites(AutomodModule):
         codes = [invite.code for invite in await guild.invites()]
         if guild.vanity_url_code is not None:
             codes.append(guild.vanity_url_code)
-        # Suffix match, so a foreign code that merely starts with one of ours isn't allowed through.
-        return discord.AutoModTrigger(regex_patterns=[INVITE_REGEX], allow_list=[f"*/{code}" for code in codes])
+        # Allow-list entries are exact, so split links to this server are blocked too, as are foreign codes that
+        # merely start with one of ours. Discord caps the allow list at 100 entries.
+        allow_list = [f"*{host}/{code}" for code in codes for host in ("discord.gg", "discord.com/invite")]
+        return discord.AutoModTrigger(regex_patterns=[AUTOMOD_INVITE_REGEX], allow_list=allow_list[:100])
 
 
 CATCHING_CATEGORY_ID = 717872471411261510
