@@ -13,6 +13,8 @@ from helpers.pagination import EmbedListPageSource
 
 INVITE_REGEX = r"(?:https?://)?discord(?:app)?\.(?:com/invite|gg)/([a-zA-Z0-9]+)/?"
 
+BANNED_WORDS_EXEMPT_CHANNEL_ID = 984579960037576855
+
 
 class AutomodModule:
     bucket: str
@@ -158,6 +160,40 @@ class Automod(commands.Cog):
 
         await self.automod_punish(execution.guild, member, module, reason=module.automod_reason(execution))
 
+    async def get_rule(self, guild, name):
+        return discord.utils.get(await guild.fetch_automod_rules(), name=name)
+
+    async def set_rule(self, ctx, name, trigger, exempt_channels=()):
+        kwargs = dict(
+            trigger=trigger,
+            actions=[discord.AutoModRuleAction(type=discord.AutoModRuleActionType.block_message)],
+            exempt_roles=[role for role in ctx.guild.roles if role.permissions.manage_messages],
+            exempt_channels=list(exempt_channels),
+            enabled=True,
+            reason=f"Action done by {ctx.author} (ID: {ctx.author.id})",
+        )
+        if (rule := await self.get_rule(ctx.guild, name)) is None:
+            await ctx.guild.create_automod_rule(
+                name=name, event_type=discord.AutoModRuleEventType.message_send, **kwargs
+            )
+        else:
+            await rule.edit(**kwargs)
+
+    async def banned_words(self, guild):
+        rule = await self.get_rule(guild, BannedWords.rule_name)
+        return [] if rule is None else [w.strip("*") for w in rule.trigger.keyword_filter]
+
+    async def set_banned_words(self, ctx, words):
+        if not words:
+            if (rule := await self.get_rule(ctx.guild, BannedWords.rule_name)) is not None:
+                await rule.delete()
+            return
+        # Bare keywords match whole words; domains have to match inside URLs.
+        trigger = discord.AutoModTrigger(keyword_filter=[f"*{w}*" if "." in w else w for w in words])
+        await self.set_rule(
+            ctx, BannedWords.rule_name, trigger, exempt_channels=[discord.Object(BANNED_WORDS_EXEMPT_CHANNEL_ID)]
+        )
+
     async def automod_punish(self, guild, member, module, *, reason, message=None):
         if message is not None:
             with suppress(discord.Forbidden, discord.HTTPException):
@@ -199,6 +235,47 @@ class Automod(commands.Cog):
         """Utilities for automoderation."""
 
         await ctx.send_help(ctx.command)
+
+    @automod.group(fallback="list")
+    @checks.is_server_admin()
+    async def words(self, ctx):
+        """Displays the banned words list.
+
+        You must have the Community Manager role to use this.
+        """
+
+        pages = ViewMenuPages(
+            source=EmbedListPageSource(await self.banned_words(ctx.guild), title="Banned Words", show_index=True)
+        )
+        await pages.start(ctx)
+
+    @words.command()
+    @checks.is_server_admin()
+    async def add(self, ctx, words):
+        """Adds words to the banned words list.
+
+        You must have the Community Manager role to use this.
+        """
+
+        words = words.casefold().split()
+        current = await self.banned_words(ctx.guild)
+        await self.set_banned_words(ctx, list(dict.fromkeys(current + words)))
+        words_msg = ", ".join(f"**{x}**" for x in words)
+        await ctx.send(f"Added {words_msg} to the banned words list.")
+
+    @words.command()
+    @checks.is_server_admin()
+    async def remove(self, ctx, words):
+        """Removes words from the banned words list.
+
+        You must have the Community Manager role to use this.
+        """
+
+        words = words.casefold().split()
+        current = await self.banned_words(ctx.guild)
+        await self.set_banned_words(ctx, [x for x in current if x not in words])
+        words_msg = ", ".join(f"**{x}**" for x in words)
+        await ctx.send(f"Removed {words_msg} from the banned words list.")
 
 
 async def setup(bot):
