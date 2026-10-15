@@ -29,6 +29,7 @@ COGS = [
     "giveaways",
     "help_desk",
     "levels",
+    "member_seen",
     "moderation",
     "names",
     "pins",
