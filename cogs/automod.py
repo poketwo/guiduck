@@ -50,7 +50,7 @@ class MassMention(AutomodModule):
 
 class ServerInvites(AutomodModule):
     bucket = "server_invites"
-    rule_name = "Guiduck: Server Invites"
+    rule_name = "Server Invites [managed by Guiduck, do not rename]"
     punishments = {
         3: ("ban", None),
         2: ("timeout", timedelta(days=3)),
