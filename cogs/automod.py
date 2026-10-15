@@ -130,7 +130,11 @@ class Automod(commands.Cog):
     async def on_automod_action(self, execution):
         """Discord AutoMod blocked a message matching one of our rules; punish as if we had caught it ourselves."""
 
-        if execution.action.type != discord.AutoModRuleActionType.block_message or execution.guild is None:
+        if (
+            execution.action.type != discord.AutoModRuleActionType.block_message
+            or execution.guild is None
+            or execution.guild.id == constants.SUPPORT_SERVER_ID
+        ):
             return
 
         rule = await execution.fetch_rule()
