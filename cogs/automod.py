@@ -142,10 +142,10 @@ class ServerInvites(AutomodModule):
     async def trigger(self, guild):
         codes = [invite.code for invite in await guild.invites()]
         if guild.vanity_url_code is not None:
-            codes.append(guild.vanity_url_code)
+            codes.insert(0, guild.vanity_url_code)
         # Allow-list entries are exact, so split links to this server are blocked too, as are foreign codes that
-        # merely start with one of ours. Discord caps the allow list at 100 entries.
-        allow_list = [f"*{host}/{code}" for code in codes for host in ("discord.gg", "discord.com/invite")]
+        # merely start with one of ours. Discord caps the allow list at 100 entries, i.e. 50 codes (vanity first).
+        allow_list = [f"*{host}/{code}" for code in codes for host in ("discord.gg", "/invite")]
         return discord.AutoModTrigger(regex_patterns=[AUTOMOD_INVITE_REGEX], allow_list=allow_list[:100])
 
 
