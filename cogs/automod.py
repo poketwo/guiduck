@@ -1,4 +1,3 @@
-import re
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
@@ -10,8 +9,6 @@ from discord.ext.menus.views import ViewMenuPages
 from cogs.moderation import FakeContext
 from helpers import checks, constants
 from helpers.pagination import EmbedListPageSource
-
-INVITE_REGEX = r"(?:https?://)?discord(?:app)?\.(?:com/invite|gg)/([a-zA-Z0-9]+)/?"
 
 BANNED_WORDS_EXEMPT_CHANNEL_ID = 984579960037576855
 
@@ -53,6 +50,7 @@ class MassMention(AutomodModule):
 
 class ServerInvites(AutomodModule):
     bucket = "server_invites"
+    rule_name = "Guiduck: Server Invites"
     punishments = {
         3: ("ban", None),
         2: ("timeout", timedelta(days=3)),
@@ -60,16 +58,8 @@ class ServerInvites(AutomodModule):
         0: ("warn", None),
     }
 
-    def __init__(self, bot):
-        self.regex = re.compile(INVITE_REGEX, flags=re.I)
-        self.bot = bot
-
-    async def check(self, ctx):
-        for code in self.regex.findall(ctx.message.content):
-            with suppress(discord.NotFound):
-                invite = await self.bot.fetch_invite(code)
-                if invite.guild != ctx.guild:
-                    return f"Sending invites to another server."
+    def automod_reason(self, execution):
+        return "Sending invites to another server."
 
 
 CATCHING_CATEGORY_ID = 717872471411261510
@@ -117,8 +107,8 @@ class Automod(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.modules = [ServerInvites(bot), MassMention(), Spamming()]
-        self.rule_modules = {BannedWords.rule_name: BannedWords()}
+        self.modules = [MassMention(), Spamming()]
+        self.rule_modules = {m.rule_name: m for m in (BannedWords(), ServerInvites())}
 
     @commands.Cog.listener(name="on_message")
     @commands.Cog.listener(name="on_message_edit")
