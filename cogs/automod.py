@@ -21,7 +21,7 @@ class AutomodModule:
 
 class BannedWords(AutomodModule):
     bucket = "banned_words"
-    rule_name = "Guiduck: Banned Words"
+    rule_name = "Banned Words [managed by Guiduck, do not rename]"
     punishments = {
         4: ("ban", None),
         3: ("timeout", timedelta(days=4)),
