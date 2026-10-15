@@ -53,6 +53,10 @@ class Names(commands.Cog):
     async def on_member_join(self, member):
         await self.normalize_member(member)
 
+    @commands.Cog.listener()
+    async def on_member_seen(self, member, message):
+        await self.normalize_member(member)
+
 
 async def setup(bot):
     await bot.add_cog(Names(bot))

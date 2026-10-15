@@ -131,6 +131,10 @@ class Levels(commands.Cog):
         await self.sync_level_roles(member)
 
     @commands.Cog.listener()
+    async def on_member_seen(self, member, message):
+        await self.sync_level_roles(member)
+
+    @commands.Cog.listener()
     async def on_command(self, ctx):
         if ctx.guild:
             await self.sync_level_roles(ctx.author)
