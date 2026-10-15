@@ -1,5 +1,3 @@
-import abc
-import json
 import re
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
@@ -13,31 +11,23 @@ from cogs.moderation import FakeContext
 from helpers import checks, constants
 from helpers.pagination import EmbedListPageSource
 
-INVITE_REGEX = r"(?:https?://)?discord(?:app)?\.(?:com/invite|gg)/([a-zA-Z0-9]+)/?"
-
 
 def _split_tolerant(text):
     return r"\s*".join(re.escape(c) for c in text)
 
 
-# Same as INVITE_REGEX but allows whitespace/newlines between characters, so "https://disc\nord\n.gg/x" is caught too.
-AUTOMOD_INVITE_REGEX = (
+# Allows whitespace/newlines between characters, so "https://disc\nord\n.gg/x" is caught too.
+INVITE_REGEX = (
     rf"(?i){_split_tolerant('discord')}(?:{_split_tolerant('app')})?\s*\.\s*"
     rf"(?:{_split_tolerant('com/invite')}|{_split_tolerant('gg')})\s*/\s*[a-z0-9]+"
 )
-URL_REGEX = r"(?:https?:)?(?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n]+)"
-
-
-class AutomodModule(abc.ABC):
-    bucket: str
-    punishments: Dict[int, Tuple[str, Optional[timedelta]]]
-
-    @abc.abstractmethod
-    async def check(self, ctx):
-        pass
-
 
 BANNED_WORDS_EXEMPT_CHANNEL_ID = 984579960037576855
+
+
+class AutomodModule:
+    bucket: str
+    punishments: Dict[int, Tuple[str, Optional[timedelta]]]
 
 
 class BannedWords(AutomodModule):
@@ -51,53 +41,22 @@ class BannedWords(AutomodModule):
         0: ("warn", None),
     }
 
-    def __init__(self, bot):
-        self.url_regex = re.compile(URL_REGEX)
-        self.bot = bot
-
-    async def fetch(self, guild):
-        words = await self.bot.redis.get(f"banned_words:{guild.id}")
-        if words is None:
-            data = await self.bot.mongo.db.guild.find_one({"_id": guild.id})
-            words = [] if data is None else data.get("banned_words")
-            await self.bot.redis.set(f"banned_words:{guild.id}", json.dumps(words), expire=3600)
-        else:
-            words = json.loads(words)
-        return words
-
-    async def update(self, guild, push=None, pull=None):
-        update = {}
-        if push is not None:
-            update["$push"] = {"banned_words": {"$each": push}}
-        if pull is not None:
-            update["$pull"] = {"banned_words": {"$in": pull}}
-        await self.bot.mongo.db.guild.update_one({"_id": guild.id}, update, upsert=True)
-        await self.bot.redis.delete(f"banned_words:{guild.id}")
-
-    async def check(self, ctx):
-        if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent.id == BANNED_WORDS_EXEMPT_CHANNEL_ID:
-            return
-
-        banned = set(await self.fetch(ctx.guild))
-
-        words = ctx.message.content.casefold().split()
-        word = discord.utils.find(lambda x: x in banned, words)
-        if word is not None:
-            return f"The word `{word}` is banned, watch your language."
-
-        domains = self.url_regex.findall(ctx.message.content.casefold())
-        domain = discord.utils.find(lambda x: x in banned, domains)
-        if domain is not None:
-            return f"The site `{domain}` is banned, watch your language."
-
     def automod_reason(self, execution):
         return f"The word `{execution.matched_keyword.strip('*')}` is banned, watch your language."
 
-    async def trigger(self, guild):
-        if not (words := await self.fetch(guild)):
-            return None
-        # Bare keywords match whole words, like the split() check above; domains have to match inside URLs.
-        return discord.AutoModTrigger(keyword_filter=[f"*{w}*" if "." in w else w for w in words])
+
+class ServerInvites(AutomodModule):
+    bucket = "server_invites"
+    rule_name = "Guiduck: Server Invites"
+    punishments = {
+        3: ("ban", None),
+        2: ("timeout", timedelta(days=3)),
+        1: ("timeout", timedelta(hours=2)),
+        0: ("warn", None),
+    }
+
+    def automod_reason(self, execution):
+        return "Sending invites to another server."
 
 
 class MassMention(AutomodModule):
@@ -113,40 +72,6 @@ class MassMention(AutomodModule):
             return
         if len(ctx.message.mentions) >= 10:
             return f"Sending too many mentions."
-
-
-class ServerInvites(AutomodModule):
-    bucket = "server_invites"
-    rule_name = "Guiduck: Server Invites"
-    punishments = {
-        3: ("ban", None),
-        2: ("timeout", timedelta(days=3)),
-        1: ("timeout", timedelta(hours=2)),
-        0: ("warn", None),
-    }
-
-    def __init__(self, bot):
-        self.regex = re.compile(INVITE_REGEX, flags=re.I)
-        self.bot = bot
-
-    async def check(self, ctx):
-        for code in self.regex.findall(ctx.message.content):
-            with suppress(discord.NotFound):
-                invite = await self.bot.fetch_invite(code)
-                if invite.guild != ctx.guild:
-                    return f"Sending invites to another server."
-
-    def automod_reason(self, execution):
-        return "Sending invites to another server."
-
-    async def trigger(self, guild):
-        codes = [invite.code for invite in await guild.invites()]
-        if guild.vanity_url_code is not None:
-            codes.insert(0, guild.vanity_url_code)
-        # Allow-list entries are exact, so split links to this server are blocked too, as are foreign codes that
-        # merely start with one of ours. Discord caps the allow list at 100 entries, i.e. 50 codes (vanity first).
-        allow_list = [f"*{host}/{code}" for code in codes for host in ("discord.gg", "/invite")]
-        return discord.AutoModTrigger(regex_patterns=[AUTOMOD_INVITE_REGEX], allow_list=allow_list[:100])
 
 
 CATCHING_CATEGORY_ID = 717872471411261510
@@ -194,10 +119,8 @@ class Automod(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.banned_words = BannedWords(bot)
-        self.server_invites = ServerInvites(bot)
-        self.modules = [self.banned_words, self.server_invites, MassMention(), Spamming()]
-        self.rules = {}  # rule id -> module, for rules created by `automod setup`
+        self.modules = [MassMention(), Spamming()]
+        self.rule_modules = {m.rule_name: m for m in (BannedWords(), ServerInvites())}
 
     @commands.Cog.listener(name="on_message")
     @commands.Cog.listener(name="on_message_edit")
@@ -225,10 +148,8 @@ class Automod(commands.Cog):
         if execution.action.type != discord.AutoModRuleActionType.block_message or execution.guild is None:
             return
 
-        if execution.rule_id not in self.rules:
-            await self.load_rules(execution.guild)
-        module = self.rules.get(execution.rule_id)
-        if module is None:
+        rule = await execution.fetch_rule()
+        if (module := self.rule_modules.get(rule.name)) is None:
             return
 
         member = execution.member or await execution.guild.fetch_member(execution.user_id)
@@ -237,36 +158,39 @@ class Automod(commands.Cog):
 
         await self.automod_punish(execution.guild, member, module, reason=module.automod_reason(execution))
 
-    async def load_rules(self, guild):
-        rules = await guild.fetch_automod_rules()
-        by_name = {m.rule_name: m for m in (self.banned_words, self.server_invites)}
-        self.rules.update({rule.id: by_name.get(rule.name) for rule in rules})
-        return rules
+    async def get_rule(self, guild, name):
+        return discord.utils.get(await guild.fetch_automod_rules(), name=name)
 
-    async def sync_rule(self, guild, module, *, reason, create=True):
-        rule = discord.utils.get(await self.load_rules(guild), name=module.rule_name)
-        if rule is None and not create:
-            return
-        if (trigger := await module.trigger(guild)) is None:
-            if rule is not None:
-                await rule.edit(enabled=False, reason=reason)
-            return
+    async def set_rule(self, ctx, name, trigger, exempt_channels=()):
         kwargs = dict(
             trigger=trigger,
             actions=[discord.AutoModRuleAction(type=discord.AutoModRuleActionType.block_message)],
-            exempt_roles=[role for role in guild.roles if role.permissions.manage_messages],
-            exempt_channels=[discord.Object(BANNED_WORDS_EXEMPT_CHANNEL_ID)] if module is self.banned_words else [],
+            exempt_roles=[role for role in ctx.guild.roles if role.permissions.manage_messages],
+            exempt_channels=list(exempt_channels),
             enabled=True,
-            reason=reason,
+            reason=f"Action done by {ctx.author} (ID: {ctx.author.id})",
         )
-        if rule is None:
-            rule = await guild.create_automod_rule(
-                name=module.rule_name, event_type=discord.AutoModRuleEventType.message_send, **kwargs
+        if (rule := await self.get_rule(ctx.guild, name)) is None:
+            await ctx.guild.create_automod_rule(
+                name=name, event_type=discord.AutoModRuleEventType.message_send, **kwargs
             )
         else:
-            rule = await rule.edit(**kwargs)
-        self.rules[rule.id] = module
-        return rule
+            await rule.edit(**kwargs)
+
+    async def banned_words(self, guild):
+        rule = await self.get_rule(guild, BannedWords.rule_name)
+        return [] if rule is None else [w.strip("*") for w in rule.trigger.keyword_filter]
+
+    async def set_banned_words(self, ctx, words):
+        if not words:
+            if (rule := await self.get_rule(ctx.guild, BannedWords.rule_name)) is not None:
+                await rule.delete()
+            return
+        # Bare keywords match whole words; domains have to match inside URLs.
+        trigger = discord.AutoModTrigger(keyword_filter=[f"*{w}*" if "." in w else w for w in words])
+        await self.set_rule(
+            ctx, BannedWords.rule_name, trigger, exempt_channels=[discord.Object(BANNED_WORDS_EXEMPT_CHANNEL_ID)]
+        )
 
     async def automod_punish(self, guild, member, module, *, reason, message=None):
         if message is not None:
@@ -312,18 +236,21 @@ class Automod(commands.Cog):
 
     @automod.command()
     @checks.is_server_admin()
-    async def setup(self, ctx):
-        """Creates or updates the Discord AutoMod rules for banned words and server invites.
+    async def invites(self, ctx):
+        """Creates or updates the Discord AutoMod rule that blocks invites to other servers.
 
-        Discord blocks matching messages and the bot applies the usual escalating punishments. Invites to this
-        server are allow-listed by code, so re-run this after creating new permanent invites.
+        Invites to this server are allow-listed by code, so re-run this after creating new permanent invites.
         """
 
-        async with ctx.typing():
-            reason = f"Action done by {ctx.author} (ID: {ctx.author.id})"
-            for module in (self.banned_words, self.server_invites):
-                await self.sync_rule(ctx.guild, module, reason=reason)
-        await ctx.send("Updated AutoMod rules.")
+        codes = [invite.code for invite in await ctx.guild.invites()]
+        if ctx.guild.vanity_url_code is not None:
+            codes.insert(0, ctx.guild.vanity_url_code)
+        # Allow-list entries are exact, so split links to this server are blocked too, as are foreign codes that
+        # merely start with one of ours. Discord caps the allow list at 100 entries, i.e. 50 codes (vanity first).
+        allow_list = [f"*{host}/{code}" for code in codes for host in ("discord.gg", "/invite")]
+        trigger = discord.AutoModTrigger(regex_patterns=[INVITE_REGEX], allow_list=allow_list[:100])
+        await self.set_rule(ctx, ServerInvites.rule_name, trigger)
+        await ctx.send("Updated the server invites AutoMod rule.")
 
     @automod.group(fallback="list")
     @checks.is_server_admin()
@@ -334,11 +261,7 @@ class Automod(commands.Cog):
         """
 
         pages = ViewMenuPages(
-            source=EmbedListPageSource(
-                await self.banned_words.fetch(ctx.guild),
-                title="Banned Words",
-                show_index=True,
-            )
+            source=EmbedListPageSource(await self.banned_words(ctx.guild), title="Banned Words", show_index=True)
         )
         await pages.start(ctx)
 
@@ -350,10 +273,9 @@ class Automod(commands.Cog):
         You must have the Community Manager role to use this.
         """
 
-        words = words.split()
-        await self.banned_words.update(ctx.guild, push=[x.casefold() for x in words])
-        reason = f"Action done by {ctx.author} (ID: {ctx.author.id})"
-        await self.sync_rule(ctx.guild, self.banned_words, reason=reason, create=False)
+        words = words.casefold().split()
+        current = await self.banned_words(ctx.guild)
+        await self.set_banned_words(ctx, list(dict.fromkeys(current + words)))
         words_msg = ", ".join(f"**{x}**" for x in words)
         await ctx.send(f"Added {words_msg} to the banned words list.")
 
@@ -365,10 +287,9 @@ class Automod(commands.Cog):
         You must have the Community Manager role to use this.
         """
 
-        words = words.split()
-        await self.banned_words.update(ctx.guild, pull=[x.casefold() for x in words])
-        reason = f"Action done by {ctx.author} (ID: {ctx.author.id})"
-        await self.sync_rule(ctx.guild, self.banned_words, reason=reason, create=False)
+        words = words.casefold().split()
+        current = await self.banned_words(ctx.guild)
+        await self.set_banned_words(ctx, [x for x in current if x not in words])
         words_msg = ", ".join(f"**{x}**" for x in words)
         await ctx.send(f"Removed {words_msg} from the banned words list.")
 
