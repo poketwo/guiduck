@@ -83,7 +83,8 @@ class BannedWords(AutomodModule):
         return f"The word `{execution.matched_keyword.strip('*')}` is banned, watch your language."
 
     async def trigger(self, guild):
-        words = await self.fetch(guild)
+        if not (words := await self.fetch(guild)):
+            return None
         # Bare keywords match whole words, like the split() check above; domains have to match inside URLs.
         return discord.AutoModTrigger(keyword_filter=[f"*{w}*" if "." in w else w for w in words])
 
@@ -233,8 +234,12 @@ class Automod(commands.Cog):
         rule = discord.utils.get(await self.load_rules(guild), name=module.rule_name)
         if rule is None and not create:
             return
+        if (trigger := await module.trigger(guild)) is None:
+            if rule is not None:
+                await rule.edit(enabled=False, reason=reason)
+            return
         kwargs = dict(
-            trigger=await module.trigger(guild),
+            trigger=trigger,
             actions=[discord.AutoModRuleAction(type=discord.AutoModRuleActionType.block_message)],
             exempt_roles=[role for role in guild.roles if role.permissions.manage_messages],
             exempt_channels=[discord.Object(BANNED_WORDS_EXEMPT_CHANNEL_ID)] if module is self.banned_words else [],
