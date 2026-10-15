@@ -617,9 +617,21 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
+        await self.reapply_mutes(member)
+
+    @commands.Cog.listener()
+    async def on_member_seen(self, member, message):
+        """Re-applies mutes lost by leaving and rejoining, since joins aren't visible without the Members intent."""
+
+        if await self.reapply_mutes(member) and message is not None:
+            with suppress(discord.HTTPException):
+                await message.delete()
+
+    async def reapply_mutes(self, member):
         data = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
         if data is None:
-            return
+            return False
+        role_names = {role.name for role in member.roles}
         ctx = FakeContext(self.bot, member.guild)
         kwargs = dict(
             target=member,
@@ -627,10 +639,14 @@ class Moderation(commands.Cog):
             reason="User rejoined guild",
             guild_id=member.guild.id,
         )
-        if data.get("muted", False):
+        applied = False
+        if data.get("muted", False) and "Muted" not in role_names:
             await Mute(**kwargs).execute(ctx)
-        if data.get("trading_muted", False):
+            applied = True
+        if data.get("trading_muted", False) and "Trading Muted" not in role_names:
             await TradingMute(**kwargs).execute(ctx)
+            applied = True
+        return applied
 
     async def save_action(self, action: Action):
         await self.bot.mongo.db.action.update_many(
