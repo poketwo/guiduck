@@ -1,3 +1,4 @@
+import re
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
@@ -9,6 +10,17 @@ from discord.ext.menus.views import ViewMenuPages
 from cogs.moderation import FakeContext
 from helpers import checks, constants
 from helpers.pagination import EmbedListPageSource
+
+
+def _split_tolerant(text):
+    return r"\s*".join(re.escape(c) for c in text)
+
+
+# Allows whitespace/newlines between characters, so "https://disc\nord\n.gg/x" is caught too.
+INVITE_REGEX = (
+    rf"(?i){_split_tolerant('discord')}(?:{_split_tolerant('app')})?\s*\.\s*"
+    rf"(?:{_split_tolerant('com/invite')}|{_split_tolerant('gg')})\s*/\s*[a-z0-9]+"
+)
 
 BANNED_WORDS_EXEMPT_CHANNEL_ID = 984579960037576855
 
@@ -225,6 +237,24 @@ class Automod(commands.Cog):
         """Utilities for automoderation."""
 
         await ctx.send_help(ctx.command)
+
+    @automod.command()
+    @checks.is_server_admin()
+    async def invites(self, ctx):
+        """Creates or updates the Discord AutoMod rule that blocks invites to other servers.
+
+        Invites to this server are allow-listed by code, so re-run this after creating new permanent invites.
+        """
+
+        codes = [invite.code for invite in await ctx.guild.invites()]
+        if ctx.guild.vanity_url_code is not None:
+            codes.insert(0, ctx.guild.vanity_url_code)
+        # Allow-list entries are exact, so split links to this server are blocked too, as are foreign codes that
+        # merely start with one of ours. Discord caps the allow list at 100 entries, i.e. 50 codes (vanity first).
+        allow_list = [f"*{host}/{code}" for code in codes for host in ("discord.gg", "/invite")]
+        trigger = discord.AutoModTrigger(regex_patterns=[INVITE_REGEX], allow_list=allow_list[:100])
+        await self.set_rule(ctx, ServerInvites.rule_name, trigger)
+        await ctx.send("Updated the server invites AutoMod rule.")
 
     @automod.group(fallback="list")
     @checks.is_server_admin()
