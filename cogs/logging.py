@@ -7,11 +7,13 @@ from urllib.parse import urlencode
 from typing import Optional
 
 import discord
+from cryptography.fernet import Fernet, InvalidToken
 from discord.ext import commands, tasks
 from discord.utils import format_dt, time_snowflake
 from pymongo import UpdateOne
 import parsedatetime as pdt
 
+import config
 from helpers import checks
 from helpers.context import GuiduckContext
 from helpers.converters import FetchChannelOrThreadConverter
@@ -73,7 +75,17 @@ class Logging(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.log = logging.getLogger("support")
+        self.fernet = Fernet(config.MESSAGE_LOG_KEY)
         self.cache_all.start()
+
+    def encrypt(self, content: str) -> str:
+        return self.fernet.encrypt(content.encode()).decode()
+
+    def decrypt(self, content: str) -> str:
+        try:
+            return self.fernet.decrypt(content.encode()).decode()
+        except InvalidToken:  # stored before encryption was added
+            return content
 
     async def cog_load(self):
         await self.bot.mongo.db.message.create_index("created_at", expireAfterSeconds=MESSAGE_RETENTION_DAYS * 86400)
@@ -215,7 +227,7 @@ class Logging(commands.Cog):
                 "channel_id": message.channel.id,
                 "guild_id": message.guild.id,
                 "created_at": message.created_at,
-                "history": {str(time): message.content},
+                "history": {str(time): self.encrypt(message.content)},
                 "attachments": [
                     {"id": attachment.id, "filename": attachment.filename} for attachment in message.attachments
                 ],
@@ -233,7 +245,7 @@ class Logging(commands.Cog):
         time = int(datetime.now(timezone.utc).timestamp()) - 3600
         await self.bot.mongo.db.message.update_one(
             {"_id": payload.message_id},
-            {"$set": {f"history.{time}": payload.data["content"]}},
+            {"$set": {f"history.{time}": self.encrypt(payload.data["content"])}},
         )
 
     @commands.Cog.listener()
@@ -353,7 +365,7 @@ class Logging(commands.Cog):
                     dt = discord.utils.snowflake_time(m["_id"])
                     author = self.bot.get_user(m["user_id"]) or await self.bot.fetch_user(m["user_id"])
 
-                    history = list(sorted(m["history"].items(), key=lambda t: -int(t[0])))
+                    history = [(k, self.decrypt(v)) for k, v in sorted(m["history"].items(), key=lambda t: -int(t[0]))]
                     content = history[0][1]
 
                     def fmt_msg(_dt, _content, *, show_indicators=True):
@@ -465,7 +477,7 @@ class Logging(commands.Cog):
             return await ctx.reply("No deleted message found.", mention_author=False)
 
         user = ctx.guild.get_member(message["user_id"]) or await self.bot.fetch_user(message["user_id"])
-        content = list(message["history"].values())[-1]
+        content = self.decrypt(list(message["history"].values())[-1])
 
         embed = discord.Embed(description=content, color=getattr(user, "color", None))
         embed.set_author(name=f"{user.display_name} ({user.id})", icon_url=user.display_avatar.url)

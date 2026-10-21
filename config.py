@@ -28,6 +28,7 @@ PREFIX = os.environ["PREFIX"].split()
 DATABASE_NAME = os.environ["DATABASE_NAME"]
 POKETWO_DATABASE_NAME = os.environ["POKETWO_DATABASE_NAME"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+MESSAGE_LOG_KEY = os.environ["MESSAGE_LOG_KEY"]
 
 
 def _flag(name):
