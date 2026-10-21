@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import date, datetime, timezone
 import math
@@ -88,7 +89,10 @@ class Logging(commands.Cog):
             return content
 
     async def cog_load(self):
-        await self.bot.mongo.db.message.create_index("created_at", expireAfterSeconds=MESSAGE_RETENTION_DAYS * 86400)
+        # Don't await: building the index scans the whole (huge) collection and would block startup.
+        self.index_task = asyncio.create_task(
+            self.bot.mongo.db.message.create_index("created_at", expireAfterSeconds=MESSAGE_RETENTION_DAYS * 86400)
+        )
 
     @tasks.loop(minutes=20)
     async def cache_all(self):
