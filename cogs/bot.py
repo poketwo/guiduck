@@ -81,6 +81,12 @@ class Bot(commands.Cog):
         seconds = (message.created_at - ctx.message.created_at).total_seconds()
         await message.edit(content=f"Pong! **{seconds * 1000:.0f} ms**")
 
+    @commands.hybrid_command()
+    async def privacy(self, ctx):
+        """View the bot's privacy policy."""
+
+        await ctx.send("Privacy policy: <https://poketwo.net/privacy#guiduck>")
+
     @commands.hybrid_command(aliases=("whois",))
     async def info(self, ctx, *, user: FetchUserConverter = None):
         """Shows info about a user."""
