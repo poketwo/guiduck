@@ -90,7 +90,7 @@ class Logging(commands.Cog):
 
     async def cog_load(self):
         # Don't await: building the index scans the whole (huge) collection and would block startup.
-        self.index_task = asyncio.create_task(
+        self.index_task = asyncio.ensure_future(
             self.bot.mongo.db.message.create_index("created_at", expireAfterSeconds=MESSAGE_RETENTION_DAYS * 86400)
         )
 
