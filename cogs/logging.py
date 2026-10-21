@@ -64,6 +64,7 @@ class LogFlags(commands.FlagConverter, case_insensitive=True):
 
 
 PARAM_OFFSETS = {"before": 1, "after": -1}
+MESSAGE_RETENTION_DAYS = 30
 
 
 class Logging(commands.Cog):
@@ -73,6 +74,9 @@ class Logging(commands.Cog):
         self.bot = bot
         self.log = logging.getLogger("support")
         self.cache_all.start()
+
+    async def cog_load(self):
+        await self.bot.mongo.db.message.create_index("created_at", expireAfterSeconds=MESSAGE_RETENTION_DAYS * 86400)
 
     @tasks.loop(minutes=20)
     async def cache_all(self):
@@ -210,6 +214,7 @@ class Logging(commands.Cog):
                 "user_id": message.author.id,
                 "channel_id": message.channel.id,
                 "guild_id": message.guild.id,
+                "created_at": message.created_at,
                 "history": {str(time): message.content},
                 "attachments": [
                     {"id": attachment.id, "filename": attachment.filename} for attachment in message.attachments
