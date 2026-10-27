@@ -1162,6 +1162,7 @@ class Moderation(commands.Cog):
             try:
                 ban = await guild.fetch_ban(discord.Object(id=raw_action["target_id"]))
             except (ValueError, discord.NotFound):
+                await self.bot.mongo.db.action.update_one({"_id": raw_action["_id"]}, {"$set": {"resolved": True}})
                 return
             target = ban.user
         elif action.type == "mute":
