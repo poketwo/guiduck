@@ -521,6 +521,7 @@ class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.cls_dict = cls_dict
+        self.reversing_action_ids = set()
         self.check_actions.start()
         self.check_expired_locks.start()
 
@@ -661,15 +662,17 @@ class Moderation(commands.Cog):
         action._id = await self.bot.mongo.reserve_id("action")
         await self.bot.mongo.db.action.insert_one({"_id": action._id, **action.to_dict()})
 
-        data = await self.bot.mongo.db.guild.find_one({"_id": action.guild_id})
-        channel = self.bot.get_channel(data["logs_channel_id"])
+        data = await self.bot.mongo.db.guild.find_one({"_id": action.guild_id}) or {}
+        channel = self.bot.get_channel(data.get("logs_channel_id"))
         if channel is not None:
-            await channel.send(embed=action.to_log_embed())
+            with suppress(discord.HTTPException):
+                await channel.send(embed=action.to_log_embed())
 
-        public_channel = self.bot.get_channel(data["public_logs_channel_id"])
+        public_channel = self.bot.get_channel(data.get("public_logs_channel_id"))
         if public_channel is not None:
             if action.type not in NO_PUBLIC:
-                await public_channel.send(embed=action.to_log_embed(anonymous=True))
+                with suppress(discord.HTTPException):
+                    await public_channel.send(embed=action.to_log_embed(anonymous=True))
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
@@ -1159,6 +1162,7 @@ class Moderation(commands.Cog):
             try:
                 ban = await guild.fetch_ban(discord.Object(id=raw_action["target_id"]))
             except (ValueError, discord.NotFound):
+                await self.bot.mongo.db.action.update_one({"_id": raw_action["_id"]}, {"$set": {"resolved": True}})
                 return
             target = ban.user
         elif action.type == "mute":
@@ -1189,7 +1193,11 @@ class Moderation(commands.Cog):
         query = {"resolved": False, "expires_at": {"$lt": datetime.now(timezone.utc)}}
 
         async for action in self.bot.mongo.db.action.find(query):
-            self.bot.loop.create_task(self.reverse_raw_action(action))
+            if action["_id"] in self.reversing_action_ids:
+                continue
+            self.reversing_action_ids.add(action["_id"])
+            task = self.bot.loop.create_task(self.reverse_raw_action(action))
+            task.add_done_callback(lambda _, id=action["_id"]: self.reversing_action_ids.discard(id))
 
     @commands.hybrid_group(aliases=("his",), fallback="list")
     @commands.guild_only()
