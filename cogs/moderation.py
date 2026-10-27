@@ -661,15 +661,17 @@ class Moderation(commands.Cog):
         action._id = await self.bot.mongo.reserve_id("action")
         await self.bot.mongo.db.action.insert_one({"_id": action._id, **action.to_dict()})
 
-        data = await self.bot.mongo.db.guild.find_one({"_id": action.guild_id})
-        channel = self.bot.get_channel(data["logs_channel_id"])
+        data = await self.bot.mongo.db.guild.find_one({"_id": action.guild_id}) or {}
+        channel = self.bot.get_channel(data.get("logs_channel_id"))
         if channel is not None:
-            await channel.send(embed=action.to_log_embed())
+            with suppress(discord.HTTPException):
+                await channel.send(embed=action.to_log_embed())
 
-        public_channel = self.bot.get_channel(data["public_logs_channel_id"])
+        public_channel = self.bot.get_channel(data.get("public_logs_channel_id"))
         if public_channel is not None:
             if action.type not in NO_PUBLIC:
-                await public_channel.send(embed=action.to_log_embed(anonymous=True))
+                with suppress(discord.HTTPException):
+                    await public_channel.send(embed=action.to_log_embed(anonymous=True))
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
