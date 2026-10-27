@@ -521,6 +521,7 @@ class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.cls_dict = cls_dict
+        self.reversing_action_ids = set()
         self.check_actions.start()
         self.check_expired_locks.start()
 
@@ -1191,7 +1192,11 @@ class Moderation(commands.Cog):
         query = {"resolved": False, "expires_at": {"$lt": datetime.now(timezone.utc)}}
 
         async for action in self.bot.mongo.db.action.find(query):
-            self.bot.loop.create_task(self.reverse_raw_action(action))
+            if action["_id"] in self.reversing_action_ids:
+                continue
+            self.reversing_action_ids.add(action["_id"])
+            task = self.bot.loop.create_task(self.reverse_raw_action(action))
+            task.add_done_callback(lambda _, id=action["_id"]: self.reversing_action_ids.discard(id))
 
     @commands.hybrid_group(aliases=("his",), fallback="list")
     @commands.guild_only()
