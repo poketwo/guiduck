@@ -2,7 +2,6 @@ import asyncio
 import logging
 from datetime import date, datetime, timezone
 import math
-from textwrap import dedent
 import time
 from urllib.parse import urlencode
 from typing import Optional
@@ -18,7 +17,6 @@ import config
 from helpers import checks
 from helpers.context import GuiduckContext
 from helpers.converters import FetchChannelOrThreadConverter
-from helpers.pagination import Paginator
 
 
 class LogFlagConverter(commands.Converter):
@@ -68,6 +66,154 @@ class LogFlags(commands.FlagConverter, case_insensitive=True):
 
 PARAM_OFFSETS = {"before": 1, "after": -1}
 MESSAGE_RETENTION_DAYS = 30
+LOGS_PER_PAGE = 10
+LOGS_TEXT_LIMIT = 3900  # Components V2 messages are capped at 4000 display characters
+
+
+def fit_cap(lengths: list[int], budget: int) -> Optional[int]:
+    """Largest per-item length cap so that the capped lengths fit in the budget, or None if no cap is needed."""
+
+    if sum(lengths) <= budget:
+        return None
+    lo, hi = 0, max(lengths)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if sum(min(n, mid) for n in lengths) <= budget:
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+
+def log_timestamp(dt: datetime) -> str:
+    """Time-only timestamp, with the date prepended when it isn't today."""
+
+    if dt.date() == discord.utils.utcnow().date():
+        return format_dt(dt, "t")
+    return f"{format_dt(dt, 'd')} {format_dt(dt, 't')}"
+
+
+def truncate(text: str, cap: Optional[int]) -> str:
+    if cap is None or len(text) <= cap:
+        return text
+    return text[: max(cap - 1, 0)].rstrip("\\") + "…"
+
+
+class LogsNavigation(discord.ui.ActionRow["LogsView"]):
+    @discord.ui.button(emoji="⏮️", style=discord.ButtonStyle.grey)
+    async def first(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.view.show_page(interaction, 0)
+
+    @discord.ui.button(emoji="◀", style=discord.ButtonStyle.grey)
+    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.view.show_page(interaction, self.view.page - 1)
+
+    @discord.ui.button(emoji="⏹", style=discord.ButtonStyle.grey)
+    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        self.view.stop()
+        try:
+            await interaction.delete_original_response()
+        except (discord.NotFound, discord.InteractionResponded):
+            if self.view.message:
+                await self.view.message.delete()
+
+    @discord.ui.button(emoji="▶", style=discord.ButtonStyle.grey)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.view.show_page(interaction, self.view.page + 1)
+
+    @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.grey)
+    async def last(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.view.show_page(interaction, self.view.num_pages - 1)
+
+
+class LogsView(discord.ui.LayoutView):
+    """Components V2 view for message logs: a header with a dashboard link, and optionally paginated log entries."""
+
+    def __init__(self, ctx: GuiduckContext, *, header: str, url: str, get_page=None, timeout: int = 120):
+        super().__init__(timeout=timeout if get_page else None)
+        self.ctx = ctx
+        self.header = header
+        self.url = url
+        self.get_page = get_page
+        self.page = 0
+        self.num_pages = None
+        self.entries = []
+        self.nav = None
+        self.message = None
+
+    @property
+    def footer(self) -> str:
+        total = "?" if self.num_pages is None else self.num_pages
+        return f"-# ✏️ Edited · ❌ Deleted · 📎 Attachments · Page {self.page + 1}/{total}"
+
+    def build(self):
+        self.clear_items()
+        container = discord.ui.Container(accent_colour=discord.Colour.blurple())
+        container.add_item(
+            discord.ui.Section(
+                discord.ui.TextDisplay(self.header),
+                accessory=discord.ui.Button(label="Dashboard", url=self.url),
+            )
+        )
+
+        if self.get_page:
+            container.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+            for i, entry in enumerate(self.entries or ["*No messages found.*"]):
+                if i:
+                    container.add_item(discord.ui.Separator())
+                container.add_item(discord.ui.TextDisplay(entry))
+            container.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+            container.add_item(discord.ui.TextDisplay(self.footer))
+
+            self.nav = LogsNavigation()
+            at_start = self.page == 0
+            at_end = self.num_pages is not None and self.page + 1 >= self.num_pages
+            self.nav.first.disabled = self.nav.previous.disabled = at_start
+            self.nav.next.disabled = at_end
+            self.nav.last.disabled = self.num_pages is None or at_end
+            if not (at_start and at_end):
+                container.add_item(self.nav)
+
+        self.add_item(container)
+
+    async def load(self, page: int):
+        budget = LOGS_TEXT_LIMIT - len(self.header) - len(self.footer)
+        self.entries = await self.get_page(page, budget)
+        self.page = page
+        self.build()
+
+    async def start(self, **kwargs):
+        if self.get_page:
+            await self.load(0)
+        else:
+            self.build()
+        self.message = await self.ctx.reply(view=self, mention_author=False, **kwargs)
+
+    async def show_page(self, interaction: discord.Interaction, page: int):
+        if page == self.page or page < 0:
+            return await interaction.response.defer()
+        await self.load(page)
+        try:
+            await interaction.response.edit_message(view=self)
+        except (discord.NotFound, discord.InteractionResponded):
+            if self.message:
+                await self.message.edit(view=self)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("You can't use this!", ephemeral=True)
+            return False
+        return True
+
+    async def on_timeout(self):
+        if self.message and self.nav:
+            for button in self.nav.children:
+                button.disabled = True
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
 
 class Logging(commands.Cog):
@@ -340,98 +486,54 @@ class Logging(commands.Cog):
         if params:
             url += f"?{urlencode(params)}"
 
-        lines = [f"### Message Logs of {channel.mention}", url]
+        lines = [f"### Message Logs of {channel.mention}", f"-# Channel ID: {channel.id}"]
         if filter_texts:
-            lines.append("### Filters")
             lines.extend([f"- **{name}**: {text}" for name, text in filter_texts.items()])
+        header = "\n".join(lines)
 
-        if not flags.no_embed:
-            filt = {"channel_id": channel.id}
-            if params.get("user"):
-                filt["user_id"] = params.get("user")
-            if params.get("deleted"):
-                filt["deleted_at"] = {"$ne": None}
+        if flags.no_embed:
+            view = LogsView(ctx, header=header, url=url)
+            return await view.start(ephemeral=flags.ephemeral, allowed_mentions=discord.AllowedMentions.none())
 
-            for f, op in zip(("before", "after"), ("$lte", "$gte")):
-                if params.get(f):
-                    filt.setdefault("_id", dict())[op] = params[f]
+        filt = {"channel_id": channel.id}
+        if params.get("user"):
+            filt["user_id"] = params.get("user")
+        if params.get("deleted"):
+            filt["deleted_at"] = {"$ne": None}
 
-            PER_PAGE = 10
-            div = "—" * 30
-            paginator = Paginator(None, loop_pages=False, disable_go=True)
-            paginator.add_item(discord.ui.Button(label=f"Jump", url=url))
+        for f, op in zip(("before", "after"), ("$lte", "$gte")):
+            if params.get(f):
+                filt.setdefault("_id", dict())[op] = params[f]
 
-            async def get_page(page: int):
-                log_lines = []
+        def render(m, versions):
+            dt = discord.utils.snowflake_time(m["_id"])
+            tags = "`❌`" * bool(m.get("deleted_at")) + "`✏️`" * (len(versions) > 1) + "`📎`" * bool(m.get("attachments"))
+            text = f"[{log_timestamp(dt)}]{tags} <@{m['user_id']}>: {versions[0][1] or '*No text content*'}"
+            for ts, content in versions[1:]:
+                edit_dt = datetime.fromtimestamp(ts + 3600, tz=timezone.utc)  # stored an hour early
+                text += f"\n> [{log_timestamp(edit_dt)}] {content or '*No text content*'}"
+            return text
 
-                offset = page * PER_PAGE
-                async for m in self.bot.mongo.db.message.find(filt).sort("_id", -1).skip(offset).limit(PER_PAGE):
-                    dt = discord.utils.snowflake_time(m["_id"])
-                    author = self.bot.get_user(m["user_id"]) or await self.bot.fetch_user(m["user_id"])
+        async def get_page(page: int, budget: int) -> list[str]:
+            cursor = self.bot.mongo.db.message.find(filt).sort("_id", -1).skip(page * LOGS_PER_PAGE)
+            docs = await cursor.limit(LOGS_PER_PAGE).to_list(None)
+            if len(docs) < LOGS_PER_PAGE:
+                view.num_pages = page + 1
 
-                    history = [(k, self.decrypt(v)) for k, v in sorted(m["history"].items(), key=lambda t: -int(t[0]))]
-                    content = history[0][1]
+            versions = []
+            for m in docs:
+                history = sorted(m["history"].items(), key=lambda t: -int(t[0]))
+                escaped = [(int(k), discord.utils.escape_markdown(self.decrypt(v))) for k, v in history]
+                versions.append([escaped[0]] + [(k, v.replace("\n", "\n> ")) for k, v in escaped[1:]])
 
-                    def fmt_msg(_dt, _content, *, show_indicators=True):
-                        ts_t = discord.utils.format_dt(_dt, "t")
-                        ts_d = (
-                            (" " + discord.utils.format_dt(_dt, "d"))
-                            if discord.utils.utcnow().date() != ctx.message.created_at.date()
-                            else ""
-                        )
-                        indicators = (
-                            f"{'`❌`' if m['deleted_at'] else ''}{'`✏️`' if edited else ''}" if show_indicators else ""
-                        )
+            entries = list(zip(docs, versions))
+            overhead = sum(len(render(m, [(k, "") for k, _ in vs])) for m, vs in entries)
+            lengths = [len(v) for _, vs in entries for _, v in vs]
+            cap = fit_cap(lengths or [0], budget - overhead)
+            return [render(m, [(k, truncate(v, cap)) for k, v in vs]) for m, vs in entries]
 
-                        return f"[{ts_t}{ts_d}]{indicators} {author.mention}: {discord.utils.escape_markdown(_content)}"
-
-                    edited = len(m["history"]) > 1
-
-                    line = fmt_msg(dt, content)
-                    if edited:
-                        line += (
-                            "".join(
-                                f"\n{div}\n"
-                                + fmt_msg(datetime.fromtimestamp(int(k) + 3600, tz=timezone.utc), v, show_indicators=False)  # +3600 because it subtracts 3600 in the message and edit code for some reason :sob:
-                                for k, v in history[1:]
-                            )
-                        ).replace("\n", "\n> ")
-
-                    log_lines.append(line)
-
-                if len(log_lines) < PER_PAGE:
-                    paginator.num_pages = page + 1
-
-                desc = f"\n{div}\n".join(log_lines)
-
-                embed = discord.Embed(title=f"#{channel.name}", description=desc)
-                embed.set_author(name=f"{channel.id}")
-                embed.set_footer(
-                    text=dedent(
-                        f"""
-                        ✏️ - edited
-                        ❌ - deleted
-                        Page {page + 1}/{'?' if paginator.num_pages is None else paginator.num_pages}
-                        """
-                    )
-                )
-
-                return embed
-
-            paginator.get_page = get_page
-            await paginator.start(
-                ctx,
-                content="\n".join(lines),
-                ephemeral=flags.ephemeral,
-                allowed_mentions=discord.AllowedMentions.none(),
-            )
-        else:
-            view = discord.ui.View()
-            view.add_item(discord.ui.Button(label=f"Jump", url=url))
-
-            await ctx.send(
-                "\n".join(lines), view=view, ephemeral=flags.ephemeral, allowed_mentions=discord.AllowedMentions.none()
-            )
+        view = LogsView(ctx, header=header, url=url, get_page=get_page)
+        await view.start(ephemeral=flags.ephemeral, allowed_mentions=discord.AllowedMentions.none())
 
     @logs.command()
     @commands.guild_only()
