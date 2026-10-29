@@ -145,7 +145,7 @@ class LogsView(discord.ui.LayoutView):
     @property
     def footer(self) -> str:
         total = "?" if self.num_pages is None else self.num_pages
-        return f"-# ✏️ Edited · ❌ Deleted · Page {self.page + 1}/{total}"
+        return f"-# ✏️ Edited · ❌ Deleted · 📎 Attachments · Page {self.page + 1}/{total}"
 
     def build(self):
         self.clear_items()
@@ -507,7 +507,7 @@ class Logging(commands.Cog):
 
         def render(m, versions):
             dt = discord.utils.snowflake_time(m["_id"])
-            tags = "`❌`" * bool(m.get("deleted_at")) + "`✏️`" * (len(versions) > 1)
+            tags = "`❌`" * bool(m.get("deleted_at")) + "`✏️`" * (len(versions) > 1) + "`📎`" * bool(m.get("attachments"))
             text = f"[{log_timestamp(dt)}]{tags} <@{m['user_id']}>: {versions[0][1] or '*No text content*'}"
             for ts, content in versions[1:]:
                 edit_dt = datetime.fromtimestamp(ts + 3600, tz=timezone.utc)  # stored an hour early
