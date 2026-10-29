@@ -497,13 +497,13 @@ class Logging(commands.Cog):
             if params.get(f):
                 filt.setdefault("_id", dict())[op] = params[f]
 
-        def render(m, versions):
+        def render(m, versions, files):
             dt = discord.utils.snowflake_time(m["_id"])
             tags = ["❌ Deleted"] * bool(m.get("deleted_at")) + ["✏️ Edited"] * (len(versions) > 1)
             text = " · ".join([f"-# {format_dt(dt, 'f')}", *tags])
             text += f"\n<@{m['user_id']}>: {versions[0][1] or '*No text content*'}"
             if m.get("attachments"):
-                text += "\n-# 📎 " + ", ".join(discord.utils.escape_markdown(a["filename"]) for a in m["attachments"])
+                text += f"\n-# 📎 {files}"
             for ts, content in versions[1:]:
                 edit_dt = datetime.fromtimestamp(ts + 3600, tz=timezone.utc)  # stored an hour early
                 text += f"\n> -# Before edit · {format_dt(edit_dt, 'f')}\n> {content or '*No text content*'}"
@@ -515,15 +515,18 @@ class Logging(commands.Cog):
             if len(docs) < LOGS_PER_PAGE:
                 view.num_pages = page + 1
 
-            versions = []
+            versions, files = [], []
             for m in docs:
+                files.append(", ".join(discord.utils.escape_markdown(a["filename"]) for a in m.get("attachments", [])))
                 history = sorted(m["history"].items(), key=lambda t: -int(t[0]))
                 escaped = [(int(k), discord.utils.escape_markdown(self.decrypt(v))) for k, v in history]
                 versions.append([escaped[0]] + [(k, v.replace("\n", "\n> ")) for k, v in escaped[1:]])
 
-            overhead = sum(len(render(m, [(k, "") for k, _ in vs])) for m, vs in zip(docs, versions))
-            cap = fit_cap([len(v) for vs in versions for _, v in vs] or [0], budget - overhead)
-            return [render(m, [(k, truncate(v, cap)) for k, v in vs]) for m, vs in zip(docs, versions)]
+            entries = list(zip(docs, versions, files))
+            overhead = sum(len(render(m, [(k, "") for k, _ in vs], "")) for m, vs, _ in entries)
+            lengths = [len(v) for _, vs, fs in entries for v in [fs, *(v for _, v in vs)]]
+            cap = fit_cap(lengths or [0], budget - overhead)
+            return [render(m, [(k, truncate(v, cap)) for k, v in vs], truncate(fs, cap)) for m, vs, fs in entries]
 
         view = LogsView(ctx, header=header, url=url, get_page=get_page)
         await view.start(ephemeral=flags.ephemeral, allowed_mentions=discord.AllowedMentions.none())
