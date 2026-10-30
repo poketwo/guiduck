@@ -549,7 +549,8 @@ def format_history_entry(action):
     if action.note is not None:
         lines.insert(1, f"– **Note:** {action.note}")
     pin = " \N{PUSHPIN}" if action.pinned else ""
-    return f"**{history_entry_title(action)}**{pin}\n" + "\n".join(lines)
+    title = f"`{action._id}.` {action.emoji} {action.past_tense.title()} by {action.user}"
+    return f"**{title}**{pin}\n" + "\n".join(lines)
 
 
 def history_entry_options(actions, option_cls, *, default=lambda action: False):
@@ -674,7 +675,7 @@ class HistoryView(discord.ui.LayoutView):
 
     @property
     def header(self):
-        header = f"### Punishment History • {self.target} ({self.target.id})"
+        header = f"### Punishment History\n{discord.utils.escape_markdown(str(self.target))} ({self.target.id})"
         if self.regex:
             header += f"\n-# Search: {discord.utils.escape_markdown(self.regex)}"
         return header
