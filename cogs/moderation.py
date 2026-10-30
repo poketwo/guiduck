@@ -531,7 +531,17 @@ HISTORY_SEARCH_HELP = (
     "- the reason and note\n"
     f"- the action type, one of {', '.join(f'`{x}`' for x in cls_dict)} "
     "(e.g. `ban`, not `banned`; `ban` also matches `unban`, so use `^ban$` for bans only)\n"
-    "- the punisher's username or nickname, or their full user ID"
+    "- the punisher's username or nickname, or their full user ID\n\n"
+    "Regex basics: `.` any character, `*` 0 or more, `+` 1 or more, `?` optional, `|` or, "
+    "`^`/`$` start/end, `\\d` digit, `\\s` whitespace, `\\b` word boundary. "
+    "Put `\\` before `.*+?()[]|^$` to match them literally (e.g. `\\.`).\n"
+    "Common patterns:\n"
+    "- `scam|phish`: either word\n"
+    "- `\\d{17,}`: a user ID (17+ digits)\n"
+    "- `^ban$`: bans only\n"
+    "- `\\bspam\\b`: \"spam\" as a whole word\n"
+    "- `alt\\s*acc`: \"alt acc\" or \"altacc\"\n"
+    "- `https?://`: links"
 )
 
 
