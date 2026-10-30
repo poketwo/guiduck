@@ -12,7 +12,7 @@ import discord
 from discord.ext import commands
 
 from helpers import checks, constants, time
-from helpers.utils import FakeUser
+from helpers.utils import FakeUser, resolve_users
 
 ALL_CATEGORIES: dict[str, Type[HelpDeskCategory]] = {}
 
@@ -59,9 +59,10 @@ class Ticket(abc.ABC):
         return self.bot.get_channel(self.mirror_status_channel_id)
 
     @classmethod
-    def build_from_mongo(cls, bot, x):
+    def build_from_mongo(cls, bot, x, users=None):
         guild = bot.get_guild(x["guild_id"])
-        user = guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
+        users = users or {}
+        user = users.get(x["user_id"]) or guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
         kwargs = {
             "bot": bot,
             "_id": x["_id"],
@@ -81,7 +82,7 @@ class Ticket(abc.ABC):
             "mirror_status_message_id": x.get("mirror_status_message_id"),
         }
         if "agent_id" in x:
-            kwargs["agent"] = guild.get_member(x["agent_id"]) or FakeUser(x["agent_id"])
+            kwargs["agent"] = users.get(x["agent_id"]) or guild.get_member(x["agent_id"]) or FakeUser(x["agent_id"])
         return cls(**kwargs)
 
     def to_dict(self):
@@ -864,20 +865,25 @@ class HelpDesk(commands.Cog):
         self.bot.add_view(self.view)
         self.bot.add_view(self.report_view)
 
+    async def build_ticket(self, data):
+        user_ids = [x for x in (data["user_id"], data.get("agent_id")) if x is not None]
+        users = await resolve_users(self.bot, data["guild_id"], user_ids, fetch=True)
+        return Ticket.build_from_mongo(self.bot, data, users)
+
     async def fetch_ticket_by_id(self, _id):
         ticket = await self.bot.mongo.db.ticket.find_one({"_id": _id})
         if ticket is not None:
-            return Ticket.build_from_mongo(self.bot, ticket)
+            return await self.build_ticket(ticket)
 
     async def fetch_ticket_by_thread(self, thread_id):
         ticket = await self.bot.mongo.db.ticket.find_one({"thread_id": thread_id})
         if ticket is not None:
-            return Ticket.build_from_mongo(self.bot, ticket)
+            return await self.build_ticket(ticket)
 
     async def fetch_ticket_by_status_message(self, message_id):
         ticket = await self.bot.mongo.db.ticket.find_one({"status_message_id": message_id})
         if ticket is not None:
-            return Ticket.build_from_mongo(self.bot, ticket)
+            return await self.build_ticket(ticket)
 
     async def save_ticket_mirror_state(self, ticket):
         await self.bot.mongo.db.ticket.update_one(

@@ -9,7 +9,7 @@ from discord.ext import commands, tasks
 from pymongo.errors import DuplicateKeyError
 
 from helpers.poketwo import format_pokemon, format_pokemon_details
-from helpers.utils import FakeUser
+from helpers.utils import FakeUser, resolve_users
 
 
 MAX_PENDING_GIVEAWAYS = 5
@@ -64,9 +64,10 @@ class Giveaway:
         return self._pokemon
 
     @classmethod
-    def build_from_mongo(cls, bot, x):
+    def build_from_mongo(cls, bot, x, users=None):
         guild = bot.get_guild(x["guild_id"])
-        user = guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
+        users = users or {}
+        user = users.get(x["user_id"]) or guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
         kwargs = {
             "bot": bot,
             "_id": x["_id"],
@@ -80,7 +81,7 @@ class Giveaway:
             "ends_at": x.get("ends_at"),
         }
         if winner_id := x.get("winner_id"):
-            kwargs["winner"] = guild.get_member(winner_id) or FakeUser(winner_id)
+            kwargs["winner"] = users.get(winner_id) or guild.get_member(winner_id) or FakeUser(winner_id)
         return cls(**kwargs)
 
     def to_dict(self):
@@ -361,12 +362,17 @@ class Giveaways(commands.Cog):
         self.start_giveaways.cancel()
         self.clear_current()
 
+    async def build_giveaway(self, data):
+        user_ids = [x for x in (data["user_id"], data.get("winner_id")) if x is not None]
+        users = await resolve_users(self.bot, data["guild_id"], user_ids, fetch=True)
+        return Giveaway.build_from_mongo(self.bot, data, users)
+
     async def fetch_giveaway(self, _id: str | ObjectId):
         if not isinstance(_id, ObjectId):
             _id = ObjectId(_id)
         data = await self.bot.mongo.db.giveaway.find_one({"_id": _id})
         if data is not None:
-            return Giveaway.build_from_mongo(self.bot, data)
+            return await self.build_giveaway(data)
 
     def validate_minimum_requirements(self, p):
         species = self.bot.data.species_by_number(p["species_id"])
@@ -469,7 +475,7 @@ class Giveaways(commands.Cog):
             {"ends_at": {"$exists": True}, "winner_id": {"$exists": False}},
             sort=[("ends_at", 1)],
         ):
-            return Giveaway.build_from_mongo(self.bot, giveaway)
+            return await self.build_giveaway(giveaway)
 
     def clear_current(self):
         if self._current is None:
@@ -508,7 +514,7 @@ class Giveaways(commands.Cog):
     @tasks.loop(seconds=30)
     async def start_giveaways(self):
         async for giveaway in self.bot.mongo.db.giveaway.find({"approval_status": True, "ends_at": {"$exists": False}}):
-            giveaway = Giveaway.build_from_mongo(self.bot, giveaway)
+            giveaway = await self.build_giveaway(giveaway)
             guild_data = await self.bot.mongo.db.guild.find_one({"_id": giveaway.guild_id})
             guild = self.bot.get_guild(giveaway.guild_id)
 

@@ -9,7 +9,7 @@ from discord.ext.menus.views import ViewMenuPages
 
 from helpers import checks
 from helpers.pagination import AsyncEmbedListPageSource
-from helpers.utils import FakeUser, log_staff_action, with_attachment_urls
+from helpers.utils import log_staff_action, resolve_users, with_attachment_urls
 
 
 CHAR_LIMIT = 1994
@@ -115,9 +115,8 @@ class Tags(commands.Cog):
         if tag is None:
             return await ctx.send("Tag not found.")
 
-        user = self.bot.get_user(tag.owner_id)
-        if user is None:
-            user = FakeUser(tag.owner_id)
+        guild_id = ctx.guild and ctx.guild.id
+        user = (await resolve_users(self.bot, guild_id, [tag.owner_id], fetch=True))[tag.owner_id]
 
         embed = discord.Embed(color=discord.Color.blurple(), title=tag.name)
         embed.add_field(name="Owner", value=user.mention)

@@ -15,7 +15,7 @@ from discord.ui import button
 
 from helpers import checks, constants, time
 from helpers.pagination import AsyncEmbedFieldsPageSource, EmbedListPageSource
-from helpers.utils import FakeUser, FetchUserConverter, with_attachment_urls
+from helpers.utils import FakeUser, FetchUserConverter, resolve_users, with_attachment_urls
 
 
 BOT_ID = 753657623739629739
@@ -152,10 +152,11 @@ class Action(abc.ABC):
             self.resolved = False
 
     @classmethod
-    def build_from_mongo(cls, bot, x):
+    def build_from_mongo(cls, bot, x, users=None):
         guild = bot.get_guild(x["guild_id"])
-        user = guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
-        target = guild.get_member(x["target_id"]) or FakeUser(x["target_id"])
+        users = users or {}
+        user = users.get(x["user_id"]) or guild.get_member(x["user_id"]) or FakeUser(x["user_id"])
+        target = users.get(x["target_id"]) or guild.get_member(x["target_id"]) or FakeUser(x["target_id"])
         kwargs = {
             "_id": x["_id"],
             "target": target,
@@ -524,6 +525,15 @@ class Moderation(commands.Cog):
         self.reversing_action_ids = set()
         self.check_actions.start()
         self.check_expired_locks.start()
+
+    async def build_actions(self, docs):
+        """Builds actions from documents of one guild, resolving their users in one batch."""
+
+        if not docs:
+            return []
+        user_ids = [user_id for x in docs for user_id in (x["user_id"], x["target_id"])]
+        users = await resolve_users(self.bot, docs[0]["guild_id"], user_ids)
+        return [Action.build_from_mongo(self.bot, x, users) for x in docs]
 
     async def retry_honeypot(self, action, guild):
         while not await self.bot.mongo.db.action.find_one({"_id": action._id, "resolved": True}):
@@ -1152,7 +1162,7 @@ class Moderation(commands.Cog):
         await ctx.send(f"Unmuted **{target}** in trading channels (Case #{action._id}).", ephemeral=True)
 
     async def reverse_raw_action(self, raw_action):
-        action = Action.build_from_mongo(self.bot, raw_action)
+        action, = await self.build_actions([raw_action])
 
         guild = self.bot.get_guild(action.guild_id)
         target = action.target
@@ -1214,7 +1224,7 @@ class Moderation(commands.Cog):
 
         async def get_actions():
             async for x in self.bot.mongo.db.action.find(query).sort("created_at", -1):
-                yield Action.build_from_mongo(self.bot, x)
+                yield (await self.build_actions([x]))[0]
 
         def format_item(i, x):
             name = f"{x._id}. {x.emoji} {x.past_tense.title()} by {x.user}"
@@ -1286,7 +1296,7 @@ class Moderation(commands.Cog):
         if result is None:
             return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
 
-        action = Action.build_from_mongo(self.bot, result)
+        action, = await self.build_actions([result])
         await ctx.send(
             f"Successfully added a note to entry **{id}**."
             if not reset
@@ -1308,7 +1318,7 @@ class Moderation(commands.Cog):
         if action is None:
             return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
 
-        action = Action.build_from_mongo(self.bot, action)
+        action, = await self.build_actions([action])
         await ctx.send(embed=action.to_info_embed())
 
     @commands.group(invoke_without_command=True)
