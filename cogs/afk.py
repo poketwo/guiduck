@@ -56,6 +56,18 @@ class Afk(commands.Cog):
             upsert=True,
         )
 
+    async def can_view(self, member: discord.Member, channel: discord.abc.GuildChannel | discord.Thread) -> bool:
+        perms = channel.permissions_for(member)
+        if not perms.view_channel:
+            return False
+        if not isinstance(channel, discord.Thread) or not channel.is_private() or perms.manage_threads:
+            return True
+        try:
+            await channel.fetch_member(member.id)
+        except discord.NotFound:
+            return False
+        return True
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.guild is None or message.author.bot:
@@ -73,8 +85,7 @@ class Afk(commands.Cog):
             if member.id == message.author.id:
                 continue
 
-            perm = message.channel.permissions_for(member)
-            if perm.read_messages is not True:
+            if not await self.can_view(member, message.channel):
                 continue
 
             info = await self.get_status(member)
@@ -83,14 +94,13 @@ class Afk(commands.Cog):
                     f"User **{member.name}** is currently `{info.reason}` since <t:{info.since}:R>.",
                     delete_after=5
                 )
-                if message.channel.permissions_for(member).view_channel:
-                    try:
-                        await member.send(
-                            f"You have been mentioned in {message.channel} while you were {info.reason}.\n"
-                            f"Jump To: {message.jump_url}"
-                        )
-                    except discord.Forbidden:
-                        pass
+                try:
+                    await member.send(
+                        f"You have been mentioned in {message.channel} while you were {info.reason}.\n"
+                        f"Jump To: {message.jump_url}"
+                    )
+                except discord.Forbidden:
+                    pass
             elif info.status == Status.DND:
                 await message.channel.send(
                     f"User **{member.name}** is currently `{info.reason}` since <t:{info.since}:R> and on **Do Not Disturb**.",
