@@ -6,15 +6,17 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Union
 import random
+import re
 
 import discord
 from discord.ext import commands, tasks
 from discord.ext.events.utils import fetch_recent_audit_log_entry
 from discord.ext.menus.views import ViewMenuPages
+from pymongo import ReturnDocument
 from discord.ui import button
 
 from helpers import checks, constants, time
-from helpers.pagination import AsyncEmbedFieldsPageSource, EmbedListPageSource
+from helpers.pagination import EmbedListPageSource, PageNavigation
 from helpers.utils import FakeUser, FetchUserConverter, get_or_fetch_member, resolve_users, with_attachment_urls
 
 
@@ -141,6 +143,7 @@ class Action(abc.ABC):
     created_at: datetime = None
     expires_at: datetime = None
     note: str = None
+    pinned: bool = False
     automod_bucket: str = None
     resolved: bool = None
     _id: int = None
@@ -174,6 +177,8 @@ class Action(abc.ABC):
             kwargs["automod_bucket"] = x["automod_bucket"]
         if "note" in x:
             kwargs["note"] = x["note"]
+        if x.get("pinned"):
+            kwargs["pinned"] = True
         return cls_dict[x["type"]](**kwargs)
 
     @property
@@ -513,7 +518,259 @@ class BanFlags(commands.FlagConverter, case_insensitive=True):
 
 class HistoryFlagConverter(commands.FlagConverter, case_insensitive=True):
     target: FetchUserConverter = commands.flag(max_args=1, positional=True)
-    ephemeral: Optional[bool] = False
+
+
+HISTORY_PER_PAGE = 5
+HISTORY_TEXT_LIMIT = 4000
+HISTORY_REGEX_MAX_LENGTH = 200
+
+
+def validate_history_regex(regex):
+    if len(regex) > HISTORY_REGEX_MAX_LENGTH:
+        raise ValueError(f"Search regexes can be at most {HISTORY_REGEX_MAX_LENGTH} characters.")
+    try:
+        re.compile(regex)
+    except re.error as e:
+        raise ValueError(f"Invalid regex: {e}")
+
+
+def history_entry_title(action):
+    return f"{action._id}. {action.emoji} {action.past_tense.title()} by {action.user}"
+
+
+def format_history_entry(action):
+    lines = [
+        f"– **Reason:** {action.reason or 'No reason provided'}",
+        f"– at {discord.utils.format_dt(action.created_at)} ({discord.utils.format_dt(action.created_at, 'R')})",
+    ]
+    if action.duration is not None:
+        lines.insert(1, f"– **Duration:** {time.human_timedelta(action.duration)}")
+    if action.note is not None:
+        lines.insert(1, f"– **Note:** {action.note}")
+    pin = " \N{PUSHPIN}" if action.pinned else ""
+    return f"**{history_entry_title(action)}**{pin}\n" + "\n".join(lines)
+
+
+def history_entry_options(actions, option_cls, *, default=lambda action: False):
+    return [
+        option_cls(
+            label=history_entry_title(action)[:100],
+            value=str(action._id),
+            description=(action.reason or "No reason provided")[:100],
+            default=default(action),
+        )
+        for action in actions
+    ]
+
+
+class HistorySearchModal(discord.ui.Modal, title="Search History"):
+    def __init__(self, view):
+        super().__init__()
+        self.view = view
+        self.regex = discord.ui.TextInput(
+            placeholder="Matches reason, note and action type (case-insensitive)",
+            default=view.regex,
+            max_length=HISTORY_REGEX_MAX_LENGTH,
+        )
+        self.add_item(discord.ui.Label(text="Regex", component=self.regex))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.view.search(interaction, self.regex.value or None)
+
+
+class HistoryInfoModal(discord.ui.Modal, title="Entry Info"):
+    def __init__(self, view):
+        super().__init__()
+        self.view = view
+        self.entry = discord.ui.RadioGroup(options=history_entry_options(view.actions, discord.RadioGroupOption))
+        self.add_item(discord.ui.Label(text="Entry", component=self.entry))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        embed = await self.view.cog.history_info_embed(interaction.guild_id, int(self.entry.value))
+        if embed is None:
+            return await interaction.response.send_message("Could not find an entry with that ID.", ephemeral=True)
+        await interaction.response.send_message(embed=embed)
+
+
+class HistoryNoteModal(discord.ui.Modal, title="Edit Note"):
+    def __init__(self, view):
+        super().__init__()
+        self.view = view
+        self.entry = discord.ui.RadioGroup(options=history_entry_options(view.actions, discord.RadioGroupOption))
+        self.note = discord.ui.TextInput(
+            style=discord.TextStyle.paragraph,
+            placeholder='Type "reset" to remove the note',
+            max_length=constants.EMBED_FIELD_CHAR_LIMIT,
+        )
+        self.add_item(discord.ui.Label(text="Entry", component=self.entry))
+        self.add_item(discord.ui.Label(text="Note", component=self.note))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        action = await self.view.cog.set_history_note(interaction.guild_id, int(self.entry.value), self.note.value)
+        if action is None:
+            return await interaction.response.send_message("Could not find an entry with that ID.", ephemeral=True)
+        await self.view.refresh(interaction)
+
+
+class HistoryPinModal(discord.ui.Modal, title="Pin Entries"):
+    def __init__(self, view):
+        super().__init__()
+        self.view = view
+        self.entries = discord.ui.CheckboxGroup(
+            required=False,
+            min_values=0,
+            max_values=len(view.actions),
+            options=history_entry_options(
+                view.actions, discord.CheckboxGroupOption, default=lambda action: action.pinned
+            ),
+        )
+        self.add_item(discord.ui.Label(text="Pinned entries", component=self.entries))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        selected = {int(x) for x in self.entries.values}
+        page_ids = {action._id for action in self.view.actions}
+        await self.view.cog.set_history_pins(interaction.guild_id, pin=selected, unpin=page_ids - selected)
+        await self.view.refresh(interaction)
+
+
+class HistoryTools(discord.ui.ActionRow["HistoryView"]):
+    @button(label="Search", emoji="\N{LEFT-POINTING MAGNIFYING GLASS}", style=discord.ButtonStyle.grey)
+    async def search(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(HistorySearchModal(self.view))
+
+    @button(label="Clear", emoji="\N{HEAVY MULTIPLICATION X}", style=discord.ButtonStyle.grey)
+    async def clear_search(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.view.search(interaction, None)
+
+    @button(label="Info", emoji="\N{INFORMATION SOURCE}", style=discord.ButtonStyle.grey)
+    async def info(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(HistoryInfoModal(self.view))
+
+    @button(label="Note", emoji="\N{MEMO}", style=discord.ButtonStyle.grey)
+    async def note(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(HistoryNoteModal(self.view))
+
+    @button(label="Pin", emoji="\N{PUSHPIN}", style=discord.ButtonStyle.grey)
+    async def pin(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(HistoryPinModal(self.view))
+
+
+class HistoryView(discord.ui.LayoutView):
+    """Components V2 punishment history, shared by ?his, ?his search and the history buttons."""
+
+    def __init__(self, cog, ctx, target, *, regex=None, timeout=300):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.ctx = ctx
+        self.target = target
+        self.regex = regex
+        self.page = 0
+        self.num_pages = 1
+        self.count = 0
+        self.actions = []
+        self.message = None
+
+    @property
+    def header(self):
+        header = f"### Punishment History • {self.target} ({self.target.id})"
+        if self.regex:
+            header += f"\n-# Search: {discord.utils.escape_markdown(self.regex)}"
+        return header
+
+    @property
+    def footer(self):
+        word = "entry" if self.count == 1 else "entries"
+        return f"-# Page {self.page + 1}/{self.num_pages} · {self.count} {word}"
+
+    def build(self):
+        self.clear_items()
+        container = discord.ui.Container(accent_colour=discord.Colour.blurple())
+        container.add_item(
+            discord.ui.Section(
+                discord.ui.TextDisplay(self.header),
+                accessory=discord.ui.Thumbnail(self.target.display_avatar.url),
+            )
+        )
+        container.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+
+        empty = "*No entries match this search.*" if self.regex else "*No punishment history found.*"
+        entries = [format_history_entry(action) for action in self.actions] or [empty]
+        cap = (HISTORY_TEXT_LIMIT - len(self.header) - len(self.footer)) // len(entries)
+        for i, entry in enumerate(entries):
+            if i:
+                container.add_item(discord.ui.Separator())
+            container.add_item(discord.ui.TextDisplay(entry[:cap]))
+
+        container.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        container.add_item(discord.ui.TextDisplay(self.footer))
+
+        self.nav = PageNavigation()
+        self.nav.first.disabled = self.nav.previous.disabled = self.page == 0
+        self.nav.next.disabled = self.nav.last.disabled = self.page + 1 >= self.num_pages
+        if self.num_pages > 1:
+            container.add_item(self.nav)
+
+        self.tools = HistoryTools()
+        if not self.regex:
+            self.tools.remove_item(self.tools.clear_search)
+        self.tools.info.disabled = self.tools.note.disabled = self.tools.pin.disabled = not self.actions
+        container.add_item(self.tools)
+
+        self.add_item(container)
+
+    async def load(self, page):
+        self.actions, self.count, self.page = await self.cog.fetch_history(
+            self.ctx.guild.id, self.target.id, self.regex, page
+        )
+        self.num_pages = max(1, -(-self.count // HISTORY_PER_PAGE))
+        self.build()
+
+    async def start(self):
+        await self.load(0)
+        if self.count == 0 and not self.regex:
+            return await self.ctx.send("No punishment history found.")
+        self.message = await self.ctx.reply(view=self, mention_author=False)
+
+    async def edit(self, interaction):
+        try:
+            await interaction.response.edit_message(view=self)
+        except (discord.NotFound, discord.InteractionResponded):
+            if self.message:
+                await self.message.edit(view=self)
+
+    async def show_page(self, interaction, page):
+        if page == self.page or page < 0:
+            return await interaction.response.defer()
+        await self.load(page)
+        await self.edit(interaction)
+
+    async def refresh(self, interaction):
+        await self.load(self.page)
+        await self.edit(interaction)
+
+    async def search(self, interaction, regex):
+        if regex:
+            try:
+                validate_history_regex(regex)
+            except ValueError as e:
+                return await interaction.response.send_message(str(e), ephemeral=True)
+        self.regex = regex
+        await self.load(0)
+        await self.edit(interaction)
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("You can't use this!", ephemeral=True)
+            return False
+        return True
+
+    async def on_timeout(self):
+        if self.message is None:
+            return
+        for item in [*self.nav.children, *self.tools.children]:
+            item.disabled = True
+        with suppress(discord.HTTPException):
+            await self.message.edit(view=self)
 
 
 class Moderation(commands.Cog):
@@ -534,6 +791,53 @@ class Moderation(commands.Cog):
         user_ids = [user_id for x in docs for user_id in (x["user_id"], x["target_id"])]
         users = await resolve_users(self.bot, docs[0]["guild_id"], user_ids)
         return [Action.build_from_mongo(self.bot, x, users) for x in docs]
+
+    async def fetch_history(self, guild_id, target_id, regex, page):
+        """Returns one page of history with pinned entries first, the total count, and the clamped page."""
+
+        query = {"target_id": target_id, "guild_id": guild_id}
+        if regex:
+            pattern = {"$regex": regex, "$options": "i"}
+            query["$or"] = [{"reason": pattern}, {"note": pattern}, {"type": pattern}]
+
+        count = await self.bot.mongo.db.action.count_documents(query)
+        page = max(0, min(page, -(-count // HISTORY_PER_PAGE) - 1))
+        cursor = (
+            self.bot.mongo.db.action.find(query)
+            .sort([("pinned", -1), ("created_at", -1)])
+            .skip(page * HISTORY_PER_PAGE)
+            .limit(HISTORY_PER_PAGE)
+        )
+        return await self.build_actions(await cursor.to_list(None)), count, page
+
+    async def history_info_embed(self, guild_id, id):
+        data = await self.bot.mongo.db.action.find_one({"_id": id, "guild_id": guild_id})
+        if data is None:
+            return None
+        (action,) = await self.build_actions([data])
+        return action.to_info_embed()
+
+    async def set_history_note(self, guild_id, id, note):
+        """Sets an entry's note, or removes it if the note is "reset". Returns the updated action, if found."""
+
+        update = {"$unset": {"note": 1}} if note.lower() == "reset" else {"$set": {"note": note}}
+        data = await self.bot.mongo.db.action.find_one_and_update(
+            {"_id": id, "guild_id": guild_id}, update, return_document=ReturnDocument.AFTER
+        )
+        if data is None:
+            return None
+        (action,) = await self.build_actions([data])
+        return action
+
+    async def set_history_pins(self, guild_id, *, pin=(), unpin=()):
+        if pin:
+            await self.bot.mongo.db.action.update_many(
+                {"_id": {"$in": list(pin)}, "guild_id": guild_id}, {"$set": {"pinned": True}}
+            )
+        if unpin:
+            await self.bot.mongo.db.action.update_many(
+                {"_id": {"$in": list(unpin)}, "guild_id": guild_id}, {"$unset": {"pinned": 1}}
+            )
 
     async def retry_honeypot(self, action, guild):
         while not await self.bot.mongo.db.action.find_one({"_id": action._id, "resolved": True}):
@@ -559,9 +863,7 @@ class Moderation(commands.Cog):
 
         if checks.is_protected(user, self.bot):
             with suppress(discord.Forbidden, discord.HTTPException):
-                await user.send(
-                    f"You're in staff, why are you messaging in <#{HONEYPOT_CHANNEL_ID}>?"
-                )
+                await user.send(f"You're in staff, why are you messaging in <#{HONEYPOT_CHANNEL_ID}>?")
             return
 
         reason = (
@@ -1191,7 +1493,7 @@ class Moderation(commands.Cog):
         await ctx.send(f"Unmuted **{target}** in trading channels (Case #{action._id}).", ephemeral=True)
 
     async def reverse_raw_action(self, raw_action):
-        action, = await self.build_actions([raw_action])
+        (action,) = await self.build_actions([raw_action])
 
         guild = self.bot.get_guild(action.guild_id)
         target = action.target
@@ -1250,43 +1552,41 @@ class Moderation(commands.Cog):
         You must have the Trial Moderator role to use this.
         """
 
-        target = flags.target
-        query = {"target_id": target.id, "guild_id": ctx.guild.id}
-        count = await self.bot.mongo.db.action.count_documents(query)
+        await HistoryView(self, ctx, flags.target).start()
 
-        async def get_actions():
-            async for x in self.bot.mongo.db.action.find(query).sort("created_at", -1):
-                yield (await self.build_actions([x]))[0]
+    @history.command(name="search")
+    @commands.guild_only()
+    @checks.is_trial_moderator()
+    async def history_search(self, ctx, target: FetchUserConverter, *, regex: str):
+        """Searches a member's punishment history by reason, note and action type.
 
-        def format_item(i, x):
-            name = f"{x._id}. {x.emoji} {x.past_tense.title()} by {x.user}"
-            reason = x.reason or "No reason provided"
-            lines = [
-                f"– **Reason:** {reason}",
-                f"– at {discord.utils.format_dt(x.created_at)} ({discord.utils.format_dt(x.created_at, 'R')})",
-            ]
-            if x.duration is not None:
-                lines.insert(1, f"– **Duration:** {time.human_timedelta(x.duration)}")
-            if x.note is not None:
-                lines.insert(1, f"– **Note:** {x.note}")
-            return {"name": name, "value": "\n".join(lines)[:1024], "inline": False}
-
-        pages = ViewMenuPages(
-            source=AsyncEmbedFieldsPageSource(
-                get_actions(),
-                title=f"Punishment History • {target} ({target.id})",
-                format_item=format_item,
-                count=count,
-            )
-        )
-
-        if ctx.interaction and flags.ephemeral:
-            await ctx.interaction.response.defer(ephemeral=True)
+        You must have the Trial Moderator role to use this.
+        """
 
         try:
-            await pages.start(ctx)
-        except IndexError:
-            await ctx.send("No punishment history found.")
+            validate_history_regex(regex)
+        except ValueError as e:
+            return await ctx.send(str(e), ephemeral=True)
+        await HistoryView(self, ctx, target, regex=regex).start()
+
+    @history.command(name="pin")
+    @commands.guild_only()
+    @checks.is_trial_moderator()
+    async def history_pin(self, ctx, id: int):
+        """Pins an entry to the top of punishment history, or unpins it if already pinned.
+
+        You must have the Trial Moderator role to use this.
+        """
+
+        action = await self.bot.mongo.db.action.find_one({"_id": id, "guild_id": ctx.guild.id}, {"pinned": 1})
+        if action is None:
+            return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
+        if action.get("pinned"):
+            await self.set_history_pins(ctx.guild.id, unpin=[id])
+            await ctx.send(f"Unpinned entry **{id}**.")
+        else:
+            await self.set_history_pins(ctx.guild.id, pin=[id])
+            await ctx.send(f"Pinned entry **{id}**.")
 
     @history.command(aliases=("del",))
     @commands.guild_only()
@@ -1319,16 +1619,11 @@ class Moderation(commands.Cog):
                 f"History notes (including attachment URLs) can be at most {constants.EMBED_FIELD_CHAR_LIMIT} characters."
             )
 
-        reset = note.lower() == "reset"
-
-        result = await self.bot.mongo.db.action.find_one_and_update(
-            {"_id": id, "guild_id": ctx.guild.id},
-            {"$set": {"note": note}} if not reset else {"$unset": {"note": 1}},
-        )
-        if result is None:
+        action = await self.set_history_note(ctx.guild.id, id, note)
+        if action is None:
             return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
 
-        action, = await self.build_actions([result])
+        reset = note.lower() == "reset"
         await ctx.send(
             f"Successfully added a note to entry **{id}**."
             if not reset
@@ -1346,12 +1641,10 @@ class Moderation(commands.Cog):
         You must have the Trial Moderator role to use this.
         """
 
-        action = await self.bot.mongo.db.action.find_one({"_id": id, "guild_id": ctx.guild.id})
-        if action is None:
+        embed = await self.history_info_embed(ctx.guild.id, id)
+        if embed is None:
             return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
-
-        action, = await self.build_actions([action])
-        await ctx.send(embed=action.to_info_embed())
+        await ctx.send(embed=embed)
 
     @commands.group(invoke_without_command=True)
     @commands.guild_only()
