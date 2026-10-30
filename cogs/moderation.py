@@ -814,17 +814,19 @@ class Moderation(commands.Cog):
         """IDs of this target's punishers whose username, nickname or full ID matches the regex."""
 
         user_ids = await self.bot.mongo.db.action.distinct("user_id", {"target_id": target_id, "guild_id": guild_id})
-        users = await resolve_users(self.bot, guild_id, user_ids)
+        names = {
+            user_id: {str(user), getattr(user, "display_name", None)}
+            for user_id, user in (await resolve_users(self.bot, guild_id, user_ids)).items()
+        }
+        query = {"_id": {"$in": [{"id": x, "guild_id": guild_id} for x in user_ids]}}
+        async for data in self.bot.mongo.db.member.find(query, {"name": 1, "nick": 1}):
+            names[data["_id"]["id"]].update((data.get("name"), data.get("nick")))
+
         pattern = re.compile(regex, re.IGNORECASE)
         return [
             user_id
-            for user_id, user in users.items()
-            if pattern.fullmatch(str(user_id))
-            or any(
-                pattern.search(x)
-                for x in (str(user), getattr(user, "display_name", None))
-                if x and x != str(user_id)
-            )
+            for user_id, candidates in names.items()
+            if pattern.fullmatch(str(user_id)) or any(pattern.search(x) for x in candidates if x and x != str(user_id))
         ]
 
     async def fetch_history(self, guild_id, target_id, regex, page):
@@ -942,7 +944,7 @@ class Moderation(commands.Cog):
             guild=message.guild,
             channel=message.channel,
             message_id=message.id,
-            created_at=message.created_at
+            created_at=message.created_at,
         )
 
     @commands.Cog.listener()
@@ -962,7 +964,7 @@ class Moderation(commands.Cog):
             guild=interaction.guild,
             channel=interaction.channel,
             message_id=getattr(interaction, "id", None),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
     @commands.Cog.listener()
