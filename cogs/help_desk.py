@@ -387,11 +387,13 @@ class CloseTicketButton(discord.ui.Button):
         self.ticket = ticket
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user == self.ticket.user or any(
+        if interaction.user.id == self.ticket.user.id or any(
             x.id in constants.TRIAL_MODERATOR_ROLES for x in interaction.user.roles
         ):
             await self.ticket.close(interaction.user)
             await interaction.response.defer()
+        else:
+            await interaction.response.send_message("You can't do this!", ephemeral=True)
 
 
 class JumpToTicketButton(discord.ui.Button):
@@ -978,7 +980,7 @@ class HelpDesk(commands.Cog):
         if ticket is None:
             return await ctx.send("Could not find ticket!", ephemeral=True)
 
-        if ctx.author == ticket.user or any(x.id in constants.TRIAL_MODERATOR_ROLES for x in ctx.author.roles):
+        if ctx.author.id == ticket.user.id or any(x.id in constants.TRIAL_MODERATOR_ROLES for x in ctx.author.roles):
             result = await ticket.close(ctx.author)
             if ctx.channel != ticket_thread:
                 if result:
