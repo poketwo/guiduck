@@ -518,6 +518,7 @@ class BanFlags(commands.FlagConverter, case_insensitive=True):
 
 class HistoryFlagConverter(commands.FlagConverter, case_insensitive=True):
     target: FetchUserConverter = commands.flag(max_args=1, positional=True)
+    ephemeral: Optional[bool] = False
 
 
 HISTORY_PER_PAGE = 5
@@ -658,12 +659,13 @@ class HistoryTools(discord.ui.ActionRow["HistoryView"]):
 class HistoryView(discord.ui.LayoutView):
     """Components V2 punishment history, shared by ?his, ?his search and the history buttons."""
 
-    def __init__(self, cog, ctx, target, *, regex=None, timeout=300):
+    def __init__(self, cog, ctx, target, *, regex=None, ephemeral=False, timeout=300):
         super().__init__(timeout=timeout)
         self.cog = cog
         self.ctx = ctx
         self.target = target
         self.regex = regex
+        self.ephemeral = ephemeral
         self.page = 0
         self.num_pages = 1
         self.count = 0
@@ -728,8 +730,8 @@ class HistoryView(discord.ui.LayoutView):
     async def start(self):
         await self.load(0)
         if self.count == 0 and not self.regex:
-            return await self.ctx.send("No punishment history found.")
-        self.message = await self.ctx.reply(view=self, mention_author=False)
+            return await self.ctx.send("No punishment history found.", ephemeral=self.ephemeral)
+        self.message = await self.ctx.reply(view=self, mention_author=False, ephemeral=self.ephemeral)
 
     async def edit(self, interaction):
         try:
@@ -1514,7 +1516,7 @@ class Moderation(commands.Cog):
         You must have the Trial Moderator role to use this.
         """
 
-        await HistoryView(self, ctx, flags.target).start()
+        await HistoryView(self, ctx, flags.target, ephemeral=flags.ephemeral).start()
 
     @history.command(name="search")
     @commands.guild_only()
