@@ -518,11 +518,33 @@ class BanFlags(commands.FlagConverter, case_insensitive=True):
 
 class HistoryFlagConverter(commands.FlagConverter, case_insensitive=True):
     target: FetchUserConverter = commands.flag(max_args=1, positional=True)
+    ephemeral: Optional[bool] = False
 
 
 HISTORY_PER_PAGE = 5
 HISTORY_TEXT_LIMIT = 4000
 HISTORY_REGEX_MAX_LENGTH = 200
+
+
+HISTORY_SEARCH_HELP = (
+    "Searches are case-insensitive regexes matched against:\n"
+    "- the reason and note\n"
+    f"- the action type, one of {', '.join(f'`{x}`' for x in cls_dict)} "
+    "(e.g. `ban`, not `banned`; `ban` also matches `unban`, so use `^ban$` for bans only)\n"
+    "- the punisher's username or nickname, or their full user ID\n\n"
+    "Regex basics: `.` any character, `*` 0 or more, `+` 1 or more, `?` optional, `|` or, "
+    "`^`/`$` start/end, `\\d` digit, `\\s` whitespace, `\\b` word boundary. "
+    "Put `\\` before `.*+?()[]|^$` to match them literally (e.g. `\\.`).\n"
+    "When typing `history search` in chat, Discord eats single backslashes, so double them "
+    "(e.g. `\\\\d{17,}`); the Search button takes regexes as typed.\n"
+    "Common patterns:\n"
+    "- `scam|phish`: either word\n"
+    "- `\\d{17,}`: a user ID (17+ digits)\n"
+    "- `^ban$`: bans only\n"
+    "- `\\bspam\\b`: \"spam\" as a whole word\n"
+    "- `alt\\s*acc`: \"alt acc\" or \"altacc\"\n"
+    "- `https?://`: links"
+)
 
 
 def validate_history_regex(regex):
@@ -548,7 +570,8 @@ def format_history_entry(action):
     if action.note is not None:
         lines.insert(1, f"– **Note:** {action.note}")
     pin = " \N{PUSHPIN}" if action.pinned else ""
-    return f"**{history_entry_title(action)}**{pin}\n" + "\n".join(lines)
+    title = f"`{action._id}.` {action.emoji} {action.past_tense.title()} by {action.user}"
+    return f"**{title}**{pin}\n" + "\n".join(lines)
 
 
 def history_entry_options(actions, option_cls, *, default=lambda action: False):
@@ -568,11 +591,18 @@ class HistorySearchModal(discord.ui.Modal, title="Search History"):
         super().__init__()
         self.view = view
         self.regex = discord.ui.TextInput(
-            placeholder="Matches reason, note and action type (case-insensitive)",
+            placeholder="e.g. spam|scam, ^ban$, timeout, punisher name or ID",
             default=view.regex,
             max_length=HISTORY_REGEX_MAX_LENGTH,
         )
-        self.add_item(discord.ui.Label(text="Regex", component=self.regex))
+        self.add_item(
+            discord.ui.Label(
+                text="Regex",
+                description="Matches reason, note, action type (ban, timeout, ...), punisher name or ID",
+                component=self.regex,
+            )
+        )
+        self.add_item(discord.ui.TextDisplay(HISTORY_SEARCH_HELP))
 
     async def on_submit(self, interaction: discord.Interaction):
         await self.view.search(interaction, self.regex.value or None)
@@ -658,12 +688,13 @@ class HistoryTools(discord.ui.ActionRow["HistoryView"]):
 class HistoryView(discord.ui.LayoutView):
     """Components V2 punishment history, shared by ?his, ?his search and the history buttons."""
 
-    def __init__(self, cog, ctx, target, *, regex=None, timeout=300):
+    def __init__(self, cog, ctx, target, *, regex=None, ephemeral=False, timeout=300):
         super().__init__(timeout=timeout)
         self.cog = cog
         self.ctx = ctx
         self.target = target
         self.regex = regex
+        self.ephemeral = ephemeral
         self.page = 0
         self.num_pages = 1
         self.count = 0
@@ -672,7 +703,7 @@ class HistoryView(discord.ui.LayoutView):
 
     @property
     def header(self):
-        header = f"### Punishment History • {self.target} ({self.target.id})"
+        header = f"### Punishment History\n{discord.utils.escape_markdown(str(self.target))} ({self.target.id})"
         if self.regex:
             header += f"\n-# Search: {discord.utils.escape_markdown(self.regex)}"
         return header
@@ -728,8 +759,8 @@ class HistoryView(discord.ui.LayoutView):
     async def start(self):
         await self.load(0)
         if self.count == 0 and not self.regex:
-            return await self.ctx.send("No punishment history found.")
-        self.message = await self.ctx.reply(view=self, mention_author=False)
+            return await self.ctx.send("No punishment history found.", ephemeral=self.ephemeral)
+        self.message = await self.ctx.reply(view=self, mention_author=False, ephemeral=self.ephemeral)
 
     async def edit(self, interaction):
         try:
@@ -792,6 +823,25 @@ class Moderation(commands.Cog):
         users = await resolve_users(self.bot, docs[0]["guild_id"], user_ids)
         return [Action.build_from_mongo(self.bot, x, users) for x in docs]
 
+    async def find_punishers(self, guild_id, target_id, regex):
+        """IDs of this target's punishers whose username, nickname or full ID matches the regex."""
+
+        user_ids = await self.bot.mongo.db.action.distinct("user_id", {"target_id": target_id, "guild_id": guild_id})
+        names = {
+            user_id: {str(user), getattr(user, "display_name", None)}
+            for user_id, user in (await resolve_users(self.bot, guild_id, user_ids)).items()
+        }
+        query = {"_id": {"$in": [{"id": x, "guild_id": guild_id} for x in user_ids]}}
+        async for data in self.bot.mongo.db.member.find(query, {"name": 1, "nick": 1}):
+            names[data["_id"]["id"]].update((data.get("name"), data.get("nick")))
+
+        pattern = re.compile(regex, re.IGNORECASE)
+        return [
+            user_id
+            for user_id, candidates in names.items()
+            if pattern.fullmatch(str(user_id)) or any(pattern.search(x) for x in candidates if x and x != str(user_id))
+        ]
+
     async def fetch_history(self, guild_id, target_id, regex, page):
         """Returns one page of history with pinned entries first, the total count, and the clamped page."""
 
@@ -799,6 +849,8 @@ class Moderation(commands.Cog):
         if regex:
             pattern = {"$regex": regex, "$options": "i"}
             query["$or"] = [{"reason": pattern}, {"note": pattern}, {"type": pattern}]
+            if punisher_ids := await self.find_punishers(guild_id, target_id, regex):
+                query["$or"].append({"user_id": {"$in": punisher_ids}})
 
         count = await self.bot.mongo.db.action.count_documents(query)
         page = max(0, min(page, -(-count // HISTORY_PER_PAGE) - 1))
@@ -905,7 +957,7 @@ class Moderation(commands.Cog):
             guild=message.guild,
             channel=message.channel,
             message_id=message.id,
-            created_at=message.created_at
+            created_at=message.created_at,
         )
 
     @commands.Cog.listener()
@@ -925,7 +977,7 @@ class Moderation(commands.Cog):
             guild=interaction.guild,
             channel=interaction.channel,
             message_id=getattr(interaction, "id", None),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
     @commands.Cog.listener()
@@ -1505,25 +1557,28 @@ class Moderation(commands.Cog):
             task = self.bot.loop.create_task(self.reverse_raw_action(action))
             task.add_done_callback(lambda _, id=action["_id"]: self.reversing_action_ids.discard(id))
 
-    @commands.hybrid_group(aliases=("his",), fallback="list")
+    @commands.hybrid_group(
+        aliases=("his",),
+        fallback="list",
+        help="Views a member's punishment history.\n\n"
+        f"Use the Search button or `history search` to filter it. {HISTORY_SEARCH_HELP}\n\n"
+        "You must have the Trial Moderator role to use this.",
+    )
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def history(self, ctx, *, flags: HistoryFlagConverter):
-        """Views a member's punishment history.
 
-        You must have the Trial Moderator role to use this.
-        """
+        await HistoryView(self, ctx, flags.target, ephemeral=flags.ephemeral).start()
 
-        await HistoryView(self, ctx, flags.target).start()
-
-    @history.command(name="search")
+    @history.command(
+        name="search",
+        help="Searches a member's punishment history by reason, note, action type or punisher.\n\n"
+        f"{HISTORY_SEARCH_HELP}\n\n"
+        "You must have the Trial Moderator role to use this.",
+    )
     @commands.guild_only()
     @checks.is_trial_moderator()
     async def history_search(self, ctx, target: FetchUserConverter, *, regex: str):
-        """Searches a member's punishment history by reason, note and action type.
-
-        You must have the Trial Moderator role to use this.
-        """
 
         try:
             validate_history_regex(regex)
