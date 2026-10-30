@@ -535,6 +535,8 @@ HISTORY_SEARCH_HELP = (
     "Regex basics: `.` any character, `*` 0 or more, `+` 1 or more, `?` optional, `|` or, "
     "`^`/`$` start/end, `\\d` digit, `\\s` whitespace, `\\b` word boundary. "
     "Put `\\` before `.*+?()[]|^$` to match them literally (e.g. `\\.`).\n"
+    "When typing `history search` in chat, Discord eats single backslashes, so double them "
+    "(e.g. `\\\\d{17,}`); the Search button takes regexes as typed.\n"
     "Common patterns:\n"
     "- `scam|phish`: either word\n"
     "- `\\d{17,}`: a user ID (17+ digits)\n"
