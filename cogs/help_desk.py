@@ -392,6 +392,8 @@ class CloseTicketButton(discord.ui.Button):
         ):
             await self.ticket.close(interaction.user)
             await interaction.response.defer()
+        else:
+            await interaction.response.send_message("You can't do this!", ephemeral=True)
 
 
 class JumpToTicketButton(discord.ui.Button):
