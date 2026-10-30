@@ -706,21 +706,50 @@ class Moderation(commands.Cog):
         if entry.user == self.bot.user:
             return
 
-        if after.timed_out_until is None:
-            action_cls = SymbolicUntimeout
-        else:
-            action_cls = Timeout
+        await self.save_manual_timeout(after, entry.user, entry, after.timed_out_until)
 
+    async def save_manual_timeout(self, target, moderator, entry, timed_out_until):
+        action_cls = SymbolicUntimeout if timed_out_until is None else Timeout
         action = action_cls(
-            target=after,
-            user=entry.user,
+            target=target,
+            user=moderator,
             reason=entry.reason,
-            guild_id=after.guild.id,
+            guild_id=target.guild.id,
             created_at=entry.created_at,
-            expires_at=after.timed_out_until,
+            expires_at=timed_out_until,
         )
         await action.notify()
         await self.save_action(action)
+
+    @commands.Cog.listener()
+    async def on_audit_log_entry_create(self, entry):
+        """Logs manual timeouts and kicks, since the member events for them need the Members intent."""
+
+        if self.bot.intents.members or entry.user_id == self.bot.user.id or entry.target is None:
+            return
+
+        if entry.action == discord.AuditLogAction.member_update:
+            if not hasattr(entry.after, "timed_out_until"):
+                return
+            timed_out_until = entry.after.timed_out_until
+            if timed_out_until is not None and timed_out_until < datetime.now(timezone.utc):
+                return
+            target = await get_or_fetch_member(entry.guild, entry.target.id)
+            if target is None:
+                return
+            users = await resolve_users(self.bot, entry.guild.id, [entry.user_id], fetch=True)
+            await self.save_manual_timeout(target, users[entry.user_id], entry, timed_out_until)
+
+        elif entry.action == discord.AuditLogAction.kick:
+            users = await resolve_users(self.bot, entry.guild.id, [entry.user_id, entry.target.id], fetch=True)
+            action = Kick(
+                target=users[entry.target.id],
+                user=users[entry.user_id],
+                reason=entry.reason,
+                guild_id=entry.guild.id,
+                created_at=entry.created_at,
+            )
+            await self.save_action(action)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, target):
