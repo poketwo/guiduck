@@ -120,9 +120,8 @@ class RoleSync(commands.Cog):
                     await other_member.remove_roles(discord.Object(other_role))
                     other_role_ids.discard(other_role)
 
-            if not self.bot.intents.members:
-                await self.cache_roles(member, {x.id for x in member.roles})
-                await self.cache_roles(other_member, other_role_ids)
+            await self.cache_roles(member, {x.id for x in member.roles})
+            await self.cache_roles(other_member, other_role_ids)
 
     async def cache_roles(self, member, role_ids):
         """Keeps cached roles current so `find_unsynced_member_ids` doesn't refetch already-synced members."""
@@ -139,10 +138,8 @@ class RoleSync(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_seen(self, member, message):
-        """Syncs active members, since member update events need the Members intent."""
+        """Syncs active members whose cached roles are out of sync, in case member update events are missed."""
 
-        if self.bot.intents.members:
-            return
         if member.guild.id == constants.COMMUNITY_SERVER_ID:
             other_guild_id = constants.SUPPORT_SERVER_ID
         elif member.guild.id == constants.SUPPORT_SERVER_ID:

@@ -986,30 +986,6 @@ class Moderation(commands.Cog):
                 with suppress(discord.HTTPException):
                     await public_channel.send(embed=action.to_log_embed(anonymous=True))
 
-    @commands.Cog.listener()
-    async def on_member_update(self, before, after):
-        if after.timed_out_until == before.timed_out_until:
-            return
-
-        if after.timed_out_until is not None and after.timed_out_until < datetime.now(timezone.utc):
-            return
-
-        entry = await fetch_recent_audit_log_entry(
-            self.bot,
-            after.guild,
-            target=after,
-            action=discord.AuditLogAction.member_update,
-            retry=3,
-        )
-
-        if entry is None:
-            return
-
-        if entry.user == self.bot.user:
-            return
-
-        await self.save_manual_timeout(after, entry.user, entry, after.timed_out_until)
-
     async def save_manual_timeout(self, target, moderator, entry, timed_out_until):
         action_cls = SymbolicUntimeout if timed_out_until is None else Timeout
         action = action_cls(
@@ -1025,9 +1001,9 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_audit_log_entry_create(self, entry):
-        """Logs manual timeouts and kicks, since the member events for them need the Members intent."""
+        """Logs timeouts and kicks not made through the bot."""
 
-        if self.bot.intents.members or entry.user_id == self.bot.user.id or entry.target is None:
+        if entry.user_id == self.bot.user.id or entry.target is None:
             return
 
         if entry.action == discord.AuditLogAction.member_update:
@@ -1085,20 +1061,6 @@ class Moderation(commands.Cog):
             user=entry.user,
             reason=entry.reason,
             guild_id=guild.id,
-            created_at=entry.created_at,
-        )
-        await self.save_action(action)
-
-    @commands.Cog.listener()
-    async def on_member_kick(self, target, entry):
-        if entry.user == self.bot.user:
-            return
-
-        action = Kick(
-            target=target,
-            user=entry.user,
-            reason=entry.reason,
-            guild_id=target.guild.id,
             created_at=entry.created_at,
         )
         await self.save_action(action)

@@ -300,10 +300,8 @@ class Logging(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_seen(self, member, message):
-        """Keeps the member cache fresh, since member join/update events need the Members intent."""
+        """Keeps the member cache fresh, in case member join/update events are missed."""
 
-        if self.bot.intents.members:
-            return
         await self.bot.mongo.db.member.bulk_write([self.make_cache_member(member)])
 
     @commands.Cog.listener()

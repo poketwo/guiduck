@@ -22,9 +22,9 @@ class Boosts(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_seen(self, member, message):
-        """Removes the hoisted role from ex-boosters, since member update events need the Members intent."""
+        """Removes the hoisted role from ex-boosters, in case member update events are missed."""
 
-        if self.bot.intents.members or member.guild.id != constants.COMMUNITY_SERVER_ID:
+        if member.guild.id != constants.COMMUNITY_SERVER_ID:
             return
 
         has_booster_role = discord.utils.get(member.roles, id=constants.SERVER_BOOSTER_ROLE)
