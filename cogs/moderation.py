@@ -703,7 +703,7 @@ class HistoryView(discord.ui.LayoutView):
 
     @property
     def header(self):
-        header = f"### Punishment History\n{discord.utils.escape_markdown(str(self.target))} ({self.target.id})"
+        header = f"### Punishment History\n**{discord.utils.escape_markdown(str(self.target))}**\n`{self.target.id}`"
         if self.regex:
             header += f"\n-# Search: {discord.utils.escape_markdown(self.regex)}"
         return header
