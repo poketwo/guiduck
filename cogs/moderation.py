@@ -600,6 +600,7 @@ class HistorySearchModal(discord.ui.Modal, title="Search History"):
                 component=self.regex,
             )
         )
+        self.add_item(discord.ui.TextDisplay(HISTORY_SEARCH_HELP))
 
     async def on_submit(self, interaction: discord.Interaction):
         await self.view.search(interaction, self.regex.value or None)
