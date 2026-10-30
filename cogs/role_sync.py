@@ -126,9 +126,8 @@ class RoleSync(commands.Cog):
     async def cache_roles(self, member, role_ids):
         """Keeps cached roles current so `find_unsynced_member_ids` doesn't refetch already-synced members."""
 
-        await self.bot.mongo.db.member.update_one(
-            {"_id": {"id": member.id, "guild_id": member.guild.id}}, {"$set": {"roles": list(role_ids)}}
-        )
+        logging = self.bot.get_cog("Logging")
+        await self.bot.mongo.db.member.bulk_write([logging.make_cache_member(member, role_ids)])
 
     @commands.Cog.listener(name="on_member_join")
     @commands.Cog.listener(name="on_member_update")

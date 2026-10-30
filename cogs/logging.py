@@ -272,7 +272,7 @@ class Logging(commands.Cog):
 
         return UpdateOne({"_id": channel.id}, {"$set": base}, upsert=True)
 
-    def make_cache_member(self, member):
+    def make_cache_member(self, member, role_ids=None):
         return UpdateOne(
             {"_id": {"id": member.id, "guild_id": member.guild.id}},
             {
@@ -281,7 +281,7 @@ class Logging(commands.Cog):
                     "discriminator": member.discriminator,
                     "nick": member.nick,
                     "avatar": str(member.display_avatar.url),
-                    "roles": [x.id for x in member.roles],
+                    "roles": list(role_ids) if role_ids is not None else [x.id for x in member.roles],
                 }
             },
             upsert=True,
