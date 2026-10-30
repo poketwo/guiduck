@@ -139,11 +139,11 @@ class Afk(commands.Cog):
 
     @afk.command(aliases=("fr",))
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_trial_moderator()
     async def forcereset(self, ctx: commands.Context, member: discord.Member, *, note: Optional[str] = None):
         """Resets user's status.
 
-        You must have the Community Manager role to use this."""
+        You must have the Trial Moderator role to use this."""
 
         await self.clear_status(member.id, ctx.guild.id)
         await ctx.send(f"Status force cleared for user **{member.name}**.")
