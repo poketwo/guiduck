@@ -17,6 +17,7 @@ import config
 from helpers import checks
 from helpers.context import GuiduckContext
 from helpers.converters import FetchChannelOrThreadConverter
+from helpers.pagination import PageNavigation
 
 
 class LogFlagConverter(commands.Converter):
@@ -99,34 +100,6 @@ def truncate(text: str, cap: Optional[int]) -> str:
     return text[: max(cap - 1, 0)].rstrip("\\") + "…"
 
 
-class LogsNavigation(discord.ui.ActionRow["LogsView"]):
-    @discord.ui.button(emoji="⏮️", style=discord.ButtonStyle.grey)
-    async def first(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.view.show_page(interaction, 0)
-
-    @discord.ui.button(emoji="◀", style=discord.ButtonStyle.grey)
-    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.view.show_page(interaction, self.view.page - 1)
-
-    @discord.ui.button(emoji="⏹", style=discord.ButtonStyle.grey)
-    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer()
-        self.view.stop()
-        try:
-            await interaction.delete_original_response()
-        except (discord.NotFound, discord.InteractionResponded):
-            if self.view.message:
-                await self.view.message.delete()
-
-    @discord.ui.button(emoji="▶", style=discord.ButtonStyle.grey)
-    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.view.show_page(interaction, self.view.page + 1)
-
-    @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.grey)
-    async def last(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.view.show_page(interaction, self.view.num_pages - 1)
-
-
 class LogsView(discord.ui.LayoutView):
     """Components V2 view for message logs: a header with a dashboard link, and optionally paginated log entries."""
 
@@ -166,7 +139,7 @@ class LogsView(discord.ui.LayoutView):
             container.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
             container.add_item(discord.ui.TextDisplay(self.footer))
 
-            self.nav = LogsNavigation()
+            self.nav = PageNavigation()
             at_start = self.page == 0
             at_end = self.num_pages is not None and self.page + 1 >= self.num_pages
             self.nav.first.disabled = self.nav.previous.disabled = at_start

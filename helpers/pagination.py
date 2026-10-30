@@ -353,3 +353,33 @@ class Paginator(discord.ui.View):
                 await interaction.response.send_message("You can't use this!", ephemeral=True)
                 return False
         return True
+
+
+class PageNavigation(discord.ui.ActionRow):
+    """First/previous/stop/next/last buttons for a LayoutView with `page`, `num_pages`, `message` and `show_page`."""
+
+    @discord.ui.button(emoji="⏮️", style=discord.ButtonStyle.grey)
+    async def first(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.view.show_page(interaction, 0)
+
+    @discord.ui.button(emoji="◀", style=discord.ButtonStyle.grey)
+    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.view.show_page(interaction, self.view.page - 1)
+
+    @discord.ui.button(emoji="⏹", style=discord.ButtonStyle.grey)
+    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        self.view.stop()
+        try:
+            await interaction.delete_original_response()
+        except (discord.NotFound, discord.InteractionResponded):
+            if self.view.message:
+                await self.view.message.delete()
+
+    @discord.ui.button(emoji="▶", style=discord.ButtonStyle.grey)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.view.show_page(interaction, self.view.page + 1)
+
+    @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.grey)
+    async def last(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.view.show_page(interaction, self.view.num_pages - 1)
