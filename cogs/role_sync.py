@@ -107,15 +107,29 @@ class RoleSync(commands.Cog):
             if other_member is None:
                 return
 
+            other_role_ids = {x.id for x in other_member.roles}
             for role, other_role in mapping.items():
                 if discord.utils.get(member.roles, id=role) and not discord.utils.get(
                     other_member.roles, id=other_role
                 ):
                     await other_member.add_roles(discord.Object(other_role))
+                    other_role_ids.add(other_role)
                 if not discord.utils.get(member.roles, id=role) and discord.utils.get(
                     other_member.roles, id=other_role
                 ):
                     await other_member.remove_roles(discord.Object(other_role))
+                    other_role_ids.discard(other_role)
+
+            if not self.bot.intents.members:
+                await self.cache_roles(member, {x.id for x in member.roles})
+                await self.cache_roles(other_member, other_role_ids)
+
+    async def cache_roles(self, member, role_ids):
+        """Keeps cached roles current so `find_unsynced_member_ids` doesn't refetch already-synced members."""
+
+        await self.bot.mongo.db.member.update_one(
+            {"_id": {"id": member.id, "guild_id": member.guild.id}}, {"$set": {"roles": list(role_ids)}}
+        )
 
     @commands.Cog.listener(name="on_member_join")
     @commands.Cog.listener(name="on_member_update")
