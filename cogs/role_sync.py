@@ -84,7 +84,9 @@ class RoleSync(commands.Cog):
             for x in guild_roles.get(constants.COMMUNITY_SERVER_ID, [])
             if x in ROLE_MAPPING_COMMUNITY_TO_SUPPORT
         }
-        support = {x for x in guild_roles.get(constants.SUPPORT_SERVER_ID, []) if x in ROLE_MAPPING_SUPPORT_TO_COMMUNITY}
+        support = {
+            x for x in guild_roles.get(constants.SUPPORT_SERVER_ID, []) if x in ROLE_MAPPING_SUPPORT_TO_COMMUNITY
+        }
         return community == support
 
     async def sync_member(self, member):
@@ -134,7 +136,9 @@ class RoleSync(commands.Cog):
         else:
             return
 
-        other = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": other_guild_id}}, {"roles": 1})
+        other = await self.bot.mongo.db.member.find_one(
+            {"_id": {"id": member.id, "guild_id": other_guild_id}}, {"roles": 1}
+        )
         if other is None:
             return
         guild_roles = {member.guild.id: [x.id for x in member.roles], other_guild_id: other.get("roles", [])}

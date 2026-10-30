@@ -135,7 +135,9 @@ async def fetch_role_members(bot, guild, role_ids):
     if guild.chunked:
         return [m for m in guild.members if any(r.id in role_ids for r in m.roles)]
 
-    member_ids = await bot.mongo.db.member.distinct("_id.id", {"_id.guild_id": guild.id, "roles": {"$in": list(role_ids)}})
+    member_ids = await bot.mongo.db.member.distinct(
+        "_id.id", {"_id.guild_id": guild.id, "roles": {"$in": list(role_ids)}}
+    )
     members = [await get_or_fetch_member(guild, member_id) for member_id in member_ids]
     return [m for m in members if m is not None]
 
