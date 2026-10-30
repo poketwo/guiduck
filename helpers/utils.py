@@ -1,3 +1,4 @@
+from contextlib import suppress
 from datetime import datetime
 import io
 from textwrap import shorten
@@ -64,6 +65,81 @@ class FakeUser(discord.Object):
 
     async def remove_roles(self, *args, **kwargs):
         pass
+
+
+class CachedUser(FakeUser):
+    """A user built from the `member` collection, for members not in the gateway cache."""
+
+    def __init__(self, data):
+        super().__init__(data["_id"]["id"])
+        self.name = data.get("name") or str(self.id)
+        self.discriminator = data.get("discriminator") or "0"
+        self.nick = data.get("nick")
+        self.avatar_url = data.get("avatar")
+
+    @property
+    def display_name(self):
+        return self.nick or self.name
+
+    @property
+    def display_avatar(self):
+        return FakeAvatar(self.avatar_url) if self.avatar_url else self.default_avatar
+
+    def __str__(self):
+        return self.name if self.discriminator == "0" else f"{self.name}#{self.discriminator}"
+
+
+async def resolve_users(bot, guild_id, user_ids, *, fetch=False):
+    """Maps user IDs to the best available user object without needing the Members intent.
+
+    Tries the gateway cache, then one query on the `member` collection, then (if `fetch`) the API.
+    """
+
+    guild = bot.get_guild(guild_id)
+    users = {}
+    for user_id in set(user_ids):
+        if user := (guild and guild.get_member(user_id)) or bot.get_user(user_id):
+            users[user_id] = user
+
+    missing = [x for x in set(user_ids) if x not in users]
+    if missing:
+        query = {"_id": {"$in": [{"id": x, "guild_id": guild_id} for x in missing]}}
+        async for data in bot.mongo.db.member.find(query, {"name": 1, "discriminator": 1, "nick": 1, "avatar": 1}):
+            users[data["_id"]["id"]] = CachedUser(data)
+
+    for user_id in missing:
+        if user_id in users:
+            continue
+        user = None
+        if fetch:
+            with suppress(discord.HTTPException):
+                user = await bot.fetch_user(user_id)
+        users[user_id] = user or FakeUser(user_id)
+
+    return users
+
+
+async def get_or_fetch_member(guild, user_id):
+    if member := guild.get_member(user_id):
+        return member
+    try:
+        return await guild.fetch_member(user_id)
+    except discord.NotFound:
+        return None
+
+
+async def fetch_role_members(bot, guild, role_ids):
+    """Members holding any of the given roles, using the `member` collection when the guild isn't chunked."""
+
+    role_ids = set(role_ids)
+    if guild.chunked:
+        return [m for m in guild.members if any(r.id in role_ids for r in m.roles)]
+
+    member_ids = await bot.mongo.db.member.distinct(
+        "_id.id", {"_id.guild_id": guild.id, "roles": {"$in": list(role_ids)}}
+    )
+    members = [await get_or_fetch_member(guild, member_id) for member_id in member_ids]
+    return [m for m in members if m is not None]
 
 
 class FetchUserConverter(commands.Converter):

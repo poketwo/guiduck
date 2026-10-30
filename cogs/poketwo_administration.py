@@ -16,7 +16,7 @@ from helpers.converters import SpeciesConverter
 from helpers.converters import ActivityArgs
 from helpers.outline.decorators import with_typing
 from helpers.poketwo import format_pokemon_details
-from helpers.utils import FetchUserConverter, as_line_chunks_by_len
+from helpers.utils import FetchUserConverter, as_line_chunks_by_len, fetch_role_members
 
 REFUND_CHANNEL_ID = 973239955784614008
 
@@ -230,18 +230,6 @@ class PoketwoAdministration(commands.Cog):
             return await ctx.guild.fetch_member(user.id)
         except discord.NotFound:
             return None
-
-    async def role_members(self, ctx, role):
-        if ctx.guild.chunked:
-            return role.members
-
-        member_ids = await self.bot.mongo.db.member.distinct("_id.id", {"_id.guild_id": ctx.guild.id, "roles": role.id})
-        members = []
-        for member_id in member_ids:
-            member = await self.resolve_member(ctx, discord.Object(member_id))
-            if member is not None:
-                members.append(member)
-        return members
 
     async def ensure_can_pay_user(self, ctx, user):
         if await self.can_pay_anyone(ctx):
@@ -574,8 +562,10 @@ class PoketwoAdministration(commands.Cog):
             role = next((r for r_id in constants.MODERATOR_ROLES[-2:] if (r := ctx.guild.get_role(r_id))), None)
 
         members = []
+        role_member_ids = set()
         if role:
-            members = await self.role_members(ctx, role)
+            members = await fetch_role_members(self.bot, ctx.guild, [role.id])
+            role_member_ids = {member.id for member in members}
         elif users:
             members = users
 
@@ -633,7 +623,7 @@ class PoketwoAdministration(commands.Cog):
                 if not args.show_ids
                 else str(member.id)
             )
-            ex_member = role and member not in role.members
+            ex_member = role and member.id not in role_member_ids
             if ex_member and not (tickets or bot_logs):
                 continue
 

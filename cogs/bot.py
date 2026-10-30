@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 
 from helpers import time
-from helpers.utils import FetchUserConverter
+from helpers.utils import FetchUserConverter, get_or_fetch_member
 
 
 def format_date(date):
@@ -93,7 +93,7 @@ class Bot(commands.Cog):
 
         user = user or ctx.author
         if ctx.guild is not None and isinstance(user, discord.User):
-            user = ctx.guild.get_member(user.id) or user
+            user = await get_or_fetch_member(ctx.guild, user.id) or user
 
         embed = discord.Embed(title=user.display_name)
         embed.set_author(name=str(user))

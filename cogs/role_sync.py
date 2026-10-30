@@ -5,6 +5,7 @@ import discord
 from discord.ext import commands, tasks
 
 from helpers import checks, constants
+from helpers.utils import get_or_fetch_member
 
 ROLE_MAPPING_COMMUNITY_TO_SUPPORT = {
     974942298301431809: 930346838589063208,
@@ -44,12 +45,53 @@ class RoleSync(commands.Cog):
         if not guild:
             return
 
-        for member in guild.members:
-            await self.sync_member(member)
+        if guild.chunked:
+            for member in guild.members:
+                await self.sync_member(member)
+            return
+
+        for member_id in await self.find_unsynced_member_ids():
+            if member := await get_or_fetch_member(guild, member_id):
+                await self.sync_member(member)
+
+    async def find_unsynced_member_ids(self):
+        """Compares cached roles in the `member` collection, so only out-of-sync members need fetching."""
+
+        role_ids = [*ROLE_MAPPING_COMMUNITY_TO_SUPPORT, *ROLE_MAPPING_SUPPORT_TO_COMMUNITY]
+        guild_ids = [constants.COMMUNITY_SERVER_ID, constants.SUPPORT_SERVER_ID]
+        roles = defaultdict(dict)
+
+        async for x in self.bot.mongo.db.member.find({"_id.guild_id": {"$in": guild_ids}, "roles": {"$in": role_ids}}):
+            roles[x["_id"]["id"]][x["_id"]["guild_id"]] = x.get("roles", [])
+
+        missing = [
+            {"id": member_id, "guild_id": constants.SUPPORT_SERVER_ID}
+            for member_id, guild_roles in roles.items()
+            if constants.SUPPORT_SERVER_ID not in guild_roles
+        ]
+        async for x in self.bot.mongo.db.member.find({"_id": {"$in": missing}}):
+            roles[x["_id"]["id"]][x["_id"]["guild_id"]] = x.get("roles", [])
+
+        return [
+            member_id
+            for member_id, guild_roles in roles.items()
+            if constants.SUPPORT_SERVER_ID in guild_roles and not self.is_synced(guild_roles)
+        ]
+
+    def is_synced(self, guild_roles):
+        community = {
+            ROLE_MAPPING_COMMUNITY_TO_SUPPORT[x]
+            for x in guild_roles.get(constants.COMMUNITY_SERVER_ID, [])
+            if x in ROLE_MAPPING_COMMUNITY_TO_SUPPORT
+        }
+        support = {
+            x for x in guild_roles.get(constants.SUPPORT_SERVER_ID, []) if x in ROLE_MAPPING_SUPPORT_TO_COMMUNITY
+        }
+        return community == support
 
     async def sync_member(self, member):
         async with self.locks[member.id]:
-            member = member.guild.get_member(member.id)
+            member = member.guild.get_member(member.id) or member
 
             if member.guild.id == constants.COMMUNITY_SERVER_ID:
                 other_guild = constants.SUPPORT_SERVER_ID
@@ -61,25 +103,62 @@ class RoleSync(commands.Cog):
                 return
 
             other_guild = self.bot.get_guild(other_guild)
-            other_member = other_guild.get_member(member.id)
+            other_member = await get_or_fetch_member(other_guild, member.id)
             if other_member is None:
                 return
 
+            other_role_ids = {x.id for x in other_member.roles}
             for role, other_role in mapping.items():
                 if discord.utils.get(member.roles, id=role) and not discord.utils.get(
                     other_member.roles, id=other_role
                 ):
                     await other_member.add_roles(discord.Object(other_role))
+                    other_role_ids.add(other_role)
                 if not discord.utils.get(member.roles, id=role) and discord.utils.get(
                     other_member.roles, id=other_role
                 ):
                     await other_member.remove_roles(discord.Object(other_role))
+                    other_role_ids.discard(other_role)
+
+            await self.cache_roles(member, {x.id for x in member.roles})
+            await self.cache_roles(other_member, other_role_ids)
+
+    async def cache_roles(self, member, role_ids):
+        """Keeps cached roles current so `find_unsynced_member_ids` doesn't refetch already-synced members."""
+
+        logging = self.bot.get_cog("Logging")
+        await self.bot.mongo.db.member.bulk_write([logging.make_cache_member(member, role_ids)])
 
     @commands.Cog.listener(name="on_member_join")
     @commands.Cog.listener(name="on_member_update")
     async def on_member_updates(self, *args):
         thing = args[-1]
         await self.sync_member(thing)
+
+    @commands.Cog.listener()
+    async def on_member_seen(self, member, message):
+        """Syncs active members whose cached roles are out of sync, in case member update events are missed."""
+
+        if member.guild.id == constants.COMMUNITY_SERVER_ID:
+            other_guild_id = constants.SUPPORT_SERVER_ID
+        elif member.guild.id == constants.SUPPORT_SERVER_ID:
+            other_guild_id = constants.COMMUNITY_SERVER_ID
+        else:
+            return
+
+        other = await self.bot.mongo.db.member.find_one(
+            {"_id": {"id": member.id, "guild_id": other_guild_id}}, {"roles": 1}
+        )
+        if other is None:
+            return
+        guild_roles = {member.guild.id: [x.id for x in member.roles], other_guild_id: other.get("roles", [])}
+        if self.is_synced(guild_roles):
+            return
+
+        if member.guild.id != constants.COMMUNITY_SERVER_ID:
+            member = await get_or_fetch_member(self.bot.get_guild(constants.COMMUNITY_SERVER_ID), member.id)
+        if member is not None:
+            await self.sync_member(member)
 
     @commands.hybrid_command(name="sync-roles")
     @commands.guild_only()

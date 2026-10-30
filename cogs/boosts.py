@@ -20,6 +20,19 @@ class Boosts(commands.Cog):
         if had_booster_role and not has_booster_role and hoisted_role:
             await after.remove_roles(hoisted_role)
 
+    @commands.Cog.listener()
+    async def on_member_seen(self, member, message):
+        """Removes the hoisted role from ex-boosters, in case member update events are missed."""
+
+        if member.guild.id != constants.COMMUNITY_SERVER_ID:
+            return
+
+        has_booster_role = discord.utils.get(member.roles, id=constants.SERVER_BOOSTER_ROLE)
+        hoisted_role = discord.utils.get(member.roles, id=constants.BOOSTER_HOISTED_ROLE)
+
+        if hoisted_role and not has_booster_role:
+            await member.remove_roles(hoisted_role)
+
 
 async def setup(bot):
     await bot.add_cog(Boosts(bot))
