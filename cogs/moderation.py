@@ -15,7 +15,7 @@ from discord.ui import button
 
 from helpers import checks, constants, time
 from helpers.pagination import AsyncEmbedFieldsPageSource, EmbedListPageSource
-from helpers.utils import FakeUser, FetchUserConverter, resolve_users, with_attachment_urls
+from helpers.utils import FakeUser, FetchUserConverter, get_or_fetch_member, resolve_users, with_attachment_urls
 
 
 BOT_ID = 753657623739629739
@@ -1183,6 +1183,9 @@ class Moderation(commands.Cog):
             action_type = TradingUnmute
         else:
             return
+
+        if action.type in ("mute", "trading_mute"):
+            target = await get_or_fetch_member(guild, target.id) or target
 
         new_action = action_type(
             target=target,
