@@ -562,8 +562,10 @@ class PoketwoAdministration(commands.Cog):
             role = next((r for r_id in constants.MODERATOR_ROLES[-2:] if (r := ctx.guild.get_role(r_id))), None)
 
         members = []
+        role_member_ids = set()
         if role:
             members = await fetch_role_members(self.bot, ctx.guild, [role.id])
+            role_member_ids = {member.id for member in members}
         elif users:
             members = users
 
@@ -621,7 +623,7 @@ class PoketwoAdministration(commands.Cog):
                 if not args.show_ids
                 else str(member.id)
             )
-            ex_member = role and member not in role.members
+            ex_member = role and member.id not in role_member_ids
             if ex_member and not (tickets or bot_logs):
                 continue
 
