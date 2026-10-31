@@ -228,6 +228,7 @@ class Logging(commands.Cog):
             "name": role.name,
             "color": role.color.value,
             "position": role.position,
+            "permissions": role.permissions.value,
         }
 
     async def bulk_write(self, collection_name: str, updates: list):
@@ -263,6 +264,10 @@ class Logging(commands.Cog):
 
         if isinstance(channel, (discord.TextChannel, discord.VoiceChannel, discord.CategoryChannel)):
             base["position"] = channel.position
+        if isinstance(channel, discord.abc.GuildChannel):
+            base["overwrites"] = [
+                {"id": ow.id, "type": ow.type, "allow": ow.allow, "deny": ow.deny} for ow in channel._overwrites
+            ]
         if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
             base["category_id"] = channel.category_id
         if isinstance(channel, (discord.TextChannel, discord.Thread)):
@@ -420,6 +425,18 @@ class Logging(commands.Cog):
         """
 
         channel = flags.channel or ctx.channel
+        try:
+            member = channel.guild.get_member(ctx.author.id) or await channel.guild.fetch_member(ctx.author.id)
+        except discord.NotFound:
+            member = None
+        if member is None or not channel.permissions_for(member).view_channel:
+            raise commands.BadArgument("You can't view that channel.")
+        if channel.type == discord.ChannelType.private_thread and not channel.permissions_for(member).manage_threads:
+            try:
+                await channel.fetch_member(member.id)
+            except discord.NotFound:
+                raise commands.BadArgument("You can't view that channel.")
+
         url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
 
         params = {}
@@ -513,19 +530,6 @@ class Logging(commands.Cog):
 
         view = LogsView(ctx, header=header, url=url, get_page=get_page)
         await view.start(ephemeral=flags.ephemeral, allowed_mentions=discord.AllowedMentions.none())
-
-    @logs.command()
-    @commands.guild_only()
-    @checks.is_server_admin()
-    async def restrict(self, ctx, channel: discord.TextChannel | discord.Thread | discord.VoiceChannel = None):
-        """Restricts the logs for a channel to Admins.
-
-        You must have the Community Manager role to use this.
-        """
-
-        channel = channel or ctx.channel
-        await self.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"restricted": True}})
-        await ctx.send(f"Restricted logs for **#{channel}** to Admins.")
 
     @logs.command(name="sync-cache")
     @commands.guild_only()
