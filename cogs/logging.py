@@ -228,6 +228,7 @@ class Logging(commands.Cog):
             "name": role.name,
             "color": role.color.value,
             "position": role.position,
+            "permissions": role.permissions.value,
         }
 
     async def bulk_write(self, collection_name: str, updates: list):
@@ -263,6 +264,10 @@ class Logging(commands.Cog):
 
         if isinstance(channel, (discord.TextChannel, discord.VoiceChannel, discord.CategoryChannel)):
             base["position"] = channel.position
+        if isinstance(channel, discord.abc.GuildChannel):
+            base["overwrites"] = [
+                {"id": ow.id, "type": ow.type, "allow": ow.allow, "deny": ow.deny} for ow in channel._overwrites
+            ]
         if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
             base["category_id"] = channel.category_id
         if isinstance(channel, (discord.TextChannel, discord.Thread)):
