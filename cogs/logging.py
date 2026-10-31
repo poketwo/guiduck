@@ -522,19 +522,6 @@ class Logging(commands.Cog):
         view = LogsView(ctx, header=header, url=url, get_page=get_page)
         await view.start(ephemeral=flags.ephemeral, allowed_mentions=discord.AllowedMentions.none())
 
-    @logs.command()
-    @commands.guild_only()
-    @checks.is_server_admin()
-    async def restrict(self, ctx, channel: discord.TextChannel | discord.Thread | discord.VoiceChannel = None):
-        """Restricts the logs for a channel to Admins.
-
-        You must have the Community Manager role to use this.
-        """
-
-        channel = channel or ctx.channel
-        await self.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"restricted": True}})
-        await ctx.send(f"Restricted logs for **#{channel}** to Admins.")
-
     @logs.command(name="sync-cache")
     @commands.guild_only()
     @checks.is_community_manager()
