@@ -425,6 +425,9 @@ class Logging(commands.Cog):
         """
 
         channel = flags.channel or ctx.channel
+        if not channel.permissions_for(ctx.author).view_channel:
+            raise commands.BadArgument("You can't view that channel.")
+
         url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
 
         params = {}
