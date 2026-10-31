@@ -425,7 +425,11 @@ class Logging(commands.Cog):
         """
 
         channel = flags.channel or ctx.channel
-        if not channel.permissions_for(ctx.author).view_channel:
+        try:
+            member = channel.guild.get_member(ctx.author.id) or await channel.guild.fetch_member(ctx.author.id)
+        except discord.NotFound:
+            member = None
+        if member is None or not channel.permissions_for(member).view_channel:
             raise commands.BadArgument("You can't view that channel.")
 
         url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
