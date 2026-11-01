@@ -38,6 +38,7 @@ COGS = [
     "reminders",
     "reputation",
     "role_sync",
+    "staff_roster",
     "tags",
     "outline",
 ]
