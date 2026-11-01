@@ -25,6 +25,7 @@ STAFF_ROLE_IDS = [
 
 AUDIT_LOG_LIMIT = 100
 AVATAR_SIZE = 256
+MESSAGE_CHAR_LIMIT = 2000
 
 
 class StaffRoster(commands.Cog):
@@ -115,8 +116,10 @@ class StaffRoster(commands.Cog):
             entries = await self.refresh()
         if entries is None:
             return await ctx.send("Community server not found.")
-        lines = [f"{x['name']} — {' / '.join(r['name'] for r in x['roles'])}" for x in entries]
-        await ctx.send(f"{len(entries)} staff:\n" + "\n".join(lines))
+        lines = [f"{len(entries)} staff:"]
+        lines += [f"{x['name']} — {' / '.join(r['name'] for r in x['roles'])}" for x in entries]
+        for chunk in as_line_chunks_by_len("\n".join(lines), MESSAGE_CHAR_LIMIT):
+            await ctx.send(chunk)
 
 
 async def setup(bot):
