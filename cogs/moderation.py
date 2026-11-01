@@ -23,6 +23,7 @@ from helpers.utils import FakeUser, FetchUserConverter, get_or_fetch_member, res
 BOT_ID = 753657623739629739
 HONEYPOT_CHANNEL_ID = 1493349791017472062
 HONEYPOT_RETRY_DELAY = 30
+HONEYPOT_UNBAN_ATTEMPTS = 5
 MAX_DELETE_MESSAGE_SECONDS = 604800  # 7 days
 DEFAULT_DELETE_MESSAGE_SECONDS = 3600  # 1 hour
 
@@ -899,8 +900,14 @@ class Moderation(commands.Cog):
 
         # Re-ban only to delete messages that slipped through; the original case already logs the ban.
         await guild.ban(action.target, reason=action.reason, delete_message_seconds=action.delete_message_seconds)
-        with suppress(discord.NotFound):
-            await guild.unban(action.target, reason="Honeypot message cleanup")
+        for _ in range(HONEYPOT_UNBAN_ATTEMPTS):
+            try:
+                await guild.unban(action.target, reason="Honeypot message cleanup")
+                return
+            except discord.NotFound:
+                return
+            except discord.HTTPException:
+                await asyncio.sleep(HONEYPOT_RETRY_DELAY)
 
     async def handle_honeypot(self, user, guild, channel, message_id=None, created_at=None):
 
