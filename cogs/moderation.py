@@ -897,19 +897,10 @@ class Moderation(commands.Cog):
 
         await asyncio.sleep(HONEYPOT_RETRY_DELAY)
 
-        created_at = datetime.now(timezone.utc)
-        retry_action = Ban(
-            target=action.target,
-            user=self.bot.user,
-            reason=action.reason,
-            guild_id=guild.id,
-            channel_id=action.channel_id,
-            message_id=action.message_id,
-            created_at=created_at,
-            expires_at=created_at + timedelta(seconds=1),
-        )
-        retry_action.delete_message_seconds = action.delete_message_seconds
-        await retry_action.execute(FakeContext(self.bot, guild))
+        # Re-ban only to delete messages that slipped through; the original case already logs the ban.
+        await guild.ban(action.target, reason=action.reason, delete_message_seconds=action.delete_message_seconds)
+        with suppress(discord.NotFound):
+            await guild.unban(action.target, reason="Honeypot message cleanup")
 
     async def handle_honeypot(self, user, guild, channel, message_id=None, created_at=None):
 
