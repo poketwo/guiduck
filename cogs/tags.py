@@ -234,6 +234,7 @@ class Tags(commands.Cog):
             await ctx.send(f'A tag with the name "{tag.name}" already exists.')
 
     @tag.command()
+    @commands.check_any(checks.is_trial_moderator(), commands.has_role("Create Tags"))
     async def edit(self, ctx, name, *, content = ""):
         """Modifies an existing tag that you own. Attachments will have their URLs appended to the tag."""
 
