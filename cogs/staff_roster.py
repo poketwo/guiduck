@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands, tasks
 
 from helpers import checks, constants
-from helpers.utils import get_or_fetch_member
+from helpers.utils import as_line_chunks_by_len
 
 # Roles that put someone on poketwo.net/people. The site maps these IDs to titles.
 STAFF_ROLE_IDS = [
@@ -32,7 +32,8 @@ class StaffRoster(commands.Cog):
 
     The Members intent isn't available, so candidates come from the `member` cache (refreshed whenever
     someone talks), the previous roster and recent role grants in the audit log. Each candidate is then
-    fetched from the API so people who left or lost their roles drop off.
+    fetched from the API (never the gateway cache, which goes stale without the intent) so people who
+    left or lost their roles drop off.
     """
 
     def __init__(self, bot):
@@ -90,9 +91,12 @@ class StaffRoster(commands.Cog):
 
         entries = []
         for user_id in await self.find_candidate_ids(guild):
-            if member := await get_or_fetch_member(guild, user_id):
-                if entry := self.make_entry(member):
-                    entries.append(entry)
+            try:
+                member = await guild.fetch_member(user_id)
+            except discord.NotFound:
+                continue
+            if entry := self.make_entry(member):
+                entries.append(entry)
 
         entries.sort(key=lambda x: x["name"])
         await self.bot.mongo.db.staff_roster.replace_one(
