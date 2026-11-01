@@ -297,6 +297,12 @@ class Logging(commands.Cog):
     async def on_guild_updates(self, *args):
         await self.bot.mongo.db.guild.bulk_write([self.make_cache_guild(args[-1])])
 
+    @commands.Cog.listener(name="on_guild_role_create")
+    @commands.Cog.listener(name="on_guild_role_update")
+    @commands.Cog.listener(name="on_guild_role_delete")
+    async def on_guild_role_updates(self, *args):
+        await self.bot.mongo.db.guild.bulk_write([self.make_cache_guild(args[-1].guild)])
+
     @commands.Cog.listener(name="on_member_join")
     @commands.Cog.listener(name="on_member_update")
     async def on_member_updates(self, *args):
