@@ -23,6 +23,7 @@ from helpers.utils import FakeUser, FetchUserConverter, get_or_fetch_member, res
 BOT_ID = 753657623739629739
 HONEYPOT_CHANNEL_ID = 1493349791017472062
 HONEYPOT_RETRY_DELAY = 30
+HONEYPOT_UNBAN_ATTEMPTS = 5
 MAX_DELETE_MESSAGE_SECONDS = 604800  # 7 days
 DEFAULT_DELETE_MESSAGE_SECONDS = 3600  # 1 hour
 
@@ -897,19 +898,16 @@ class Moderation(commands.Cog):
 
         await asyncio.sleep(HONEYPOT_RETRY_DELAY)
 
-        created_at = datetime.now(timezone.utc)
-        retry_action = Ban(
-            target=action.target,
-            user=self.bot.user,
-            reason=action.reason,
-            guild_id=guild.id,
-            channel_id=action.channel_id,
-            message_id=action.message_id,
-            created_at=created_at,
-            expires_at=created_at + timedelta(seconds=1),
-        )
-        retry_action.delete_message_seconds = action.delete_message_seconds
-        await retry_action.execute(FakeContext(self.bot, guild))
+        # Re-ban only to delete messages that slipped through; the original case already logs the ban.
+        await guild.ban(action.target, reason=action.reason, delete_message_seconds=action.delete_message_seconds)
+        for _ in range(HONEYPOT_UNBAN_ATTEMPTS):
+            try:
+                await guild.unban(action.target, reason="Honeypot message cleanup")
+                return
+            except discord.NotFound:
+                return
+            except discord.HTTPException:
+                await asyncio.sleep(HONEYPOT_RETRY_DELAY)
 
     async def handle_honeypot(self, user, guild, channel, message_id=None, created_at=None):
 
