@@ -195,7 +195,7 @@ class Suspensions(commands.Cog):
 
         suspended_role = member.guild.get_role(config.get("suspended_role_id"))
         stripped_ids = set(config.get("suspension_stripped_role_ids", []))
-        to_remove = [role for role in member.roles if role.id in stripped_ids]
+        to_remove = [role for role in member.roles if role.id in stripped_ids and role != suspended_role]
 
         # Flag first, so the levels cog stops re-adding stripped roles before they're removed.
         before = await self.set_flag(member.id, member.guild.id, [role.id for role in to_remove])
