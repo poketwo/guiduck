@@ -77,6 +77,8 @@ class Levels(commands.Cog):
         """Grants and removes level roles to reflect a level change, returning the roles changed."""
 
         add_roles = self.roles_between_levels(member.guild, old_level, new_level)
+        if suspensions := self.bot.get_cog("Suspensions"):
+            add_roles = [role for role in add_roles if not await suspensions.is_withheld(member, role.id)]
         remove_roles = self.roles_between_levels(member.guild, new_level, old_level)
         if add_roles:
             await member.add_roles(*add_roles)
