@@ -14,7 +14,7 @@ from pymongo import UpdateOne
 import parsedatetime as pdt
 
 import config
-from helpers import checks
+from helpers import checks, constants
 from helpers.context import GuiduckContext
 from helpers.converters import FetchChannelOrThreadConverter
 from helpers.pagination import PageNavigation
@@ -402,6 +402,35 @@ class Logging(commands.Cog):
             {"$set": {"deleted_at": datetime.now(timezone.utc)}},
         )
 
+    async def is_log_admin(self, member: discord.Member) -> bool:
+        if await self.bot.is_owner(member) or member.guild_permissions.administrator:
+            return True
+        return any(role.id in constants.COMMUNITY_MANAGER_ROLES for role in member.roles)
+
+    async def is_restricted(self, channel) -> bool:
+        """Whether a channel's logs are restricted to admins, either directly or through its parent or category."""
+
+        ids = {channel.id, getattr(channel, "parent_id", None), getattr(channel, "category_id", None)}
+        ids.discard(None)
+        return await self.bot.mongo.db.channel.count_documents({"_id": {"$in": list(ids)}, "restricted": True}) > 0
+
+    async def can_view_logs(self, channel, user, *, history: bool = False) -> bool:
+        try:
+            member = channel.guild.get_member(user.id) or await channel.guild.fetch_member(user.id)
+        except discord.NotFound:
+            return False
+
+        permissions = channel.permissions_for(member)
+        if not permissions.view_channel or (history and not permissions.read_message_history):
+            return False
+        if channel.type == discord.ChannelType.private_thread and not permissions.manage_threads:
+            try:
+                await channel.fetch_member(member.id)
+            except discord.NotFound:
+                return False
+
+        return not await self.is_restricted(channel) or await self.is_log_admin(member)
+
     @commands.hybrid_group(fallback="get")
     @checks.is_trial_moderator()
     @commands.guild_only()
@@ -431,17 +460,8 @@ class Logging(commands.Cog):
         """
 
         channel = flags.channel or ctx.channel
-        try:
-            member = channel.guild.get_member(ctx.author.id) or await channel.guild.fetch_member(ctx.author.id)
-        except discord.NotFound:
-            member = None
-        if member is None or not channel.permissions_for(member).view_channel:
-            raise commands.BadArgument("You can't view that channel.")
-        if channel.type == discord.ChannelType.private_thread and not channel.permissions_for(member).manage_threads:
-            try:
-                await channel.fetch_member(member.id)
-            except discord.NotFound:
-                raise commands.BadArgument("You can't view that channel.")
+        if not await self.can_view_logs(channel, ctx.author):
+            raise commands.BadArgument("You can't view the logs of that channel.")
 
         url = f"https://admin.poketwo.net/logs/{channel.guild.id}/{channel.id}"
 
@@ -549,6 +569,61 @@ class Logging(commands.Cog):
         await self.full_cache_guild(ctx.guild)
         await ctx.send("Completed cache sync.")
 
+    @logs.command()
+    @commands.guild_only()
+    @checks.is_manager_or_admin()
+    async def restrict(
+        self,
+        ctx,
+        channel: discord.TextChannel
+        | discord.VoiceChannel
+        | discord.Thread
+        | discord.CategoryChannel = commands.CurrentChannel,
+    ):
+        """Restricts the logs of a channel, or every channel in a category, to admins.
+
+        You must be a Manager or admin to use this."""
+
+        await self.set_restricted(channel, True)
+        await ctx.send(f"Restricted logs for **{channel}** to admins.")
+
+    @logs.command()
+    @commands.guild_only()
+    @checks.is_admin_or_administrator()
+    async def unrestrict(
+        self,
+        ctx,
+        channel: discord.TextChannel
+        | discord.VoiceChannel
+        | discord.Thread
+        | discord.CategoryChannel = commands.CurrentChannel,
+    ):
+        """Removes the admin-only restriction from a channel's or category's logs.
+
+        You must be an admin to use this."""
+
+        await self.set_restricted(channel, False)
+        await ctx.send(f"Unrestricted logs for **{channel}**.")
+
+    @logs.command()
+    @commands.guild_only()
+    @checks.is_manager_or_admin()
+    async def restricted(self, ctx):
+        """Lists the channels and categories whose logs are restricted to admins.
+
+        You must be a Manager or admin to use this."""
+
+        docs = await self.bot.mongo.db.channel.find({"guild_id": ctx.guild.id, "restricted": True}, {"_id": 1}).to_list(
+            None
+        )
+        if not docs:
+            return await ctx.send("No channels have restricted logs.")
+        await ctx.send("\n".join(f"- <#{doc['_id']}>" for doc in docs))
+
+    async def set_restricted(self, channel, restricted: bool):
+        await self.bot.mongo.db.channel.bulk_write([self.make_cache_channel(channel)])
+        await self.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": {"restricted": restricted}})
+
     @checks.is_trial_moderator()
     @commands.guild_only()
     @commands.hybrid_command()
@@ -558,9 +633,8 @@ class Logging(commands.Cog):
         channel: Optional[discord.TextChannel | discord.Thread | discord.VoiceChannel] = commands.CurrentChannel,
         nth: int = 1,
     ):
-        permissions = channel.permissions_for(ctx.author)
-        if not all([getattr(permissions, perm, False) for perm in ("read_messages", "read_message_history")]):
-            return await ctx.reply("You don't have permissions to view that channel.")
+        if not await self.can_view_logs(channel, ctx.author, history=True):
+            return await ctx.reply("You can't view the logs of that channel.")
 
         if nth <= 0:
             return await ctx.reply("The nth deleted message to show cannot be 0 or less.", mention_author=False)
