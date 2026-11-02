@@ -38,6 +38,14 @@ def is_trial_moderator():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.TRIAL_MODERATOR_ROLES))
 
 
+def is_trial_manager():
+    return commands.check_any(
+        commands.is_owner(),
+        commands.has_guild_permissions(administrator=True),
+        commands.has_any_role(*constants.TRIAL_MANAGER_ROLES),
+    )
+
+
 def is_developer():
     return commands.check_any(commands.is_owner(), commands.has_role(constants.DEVELOPER_ROLE))
 

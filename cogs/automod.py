@@ -232,14 +232,14 @@ class Automod(commands.Cog):
         await action.execute(FakeContext(self.bot, guild))
 
     @commands.hybrid_group()
-    @checks.is_server_admin()
+    @checks.is_trial_manager()
     async def automod(self, ctx):
         """Utilities for automoderation."""
 
         await ctx.send_help(ctx.command)
 
     @automod.command()
-    @checks.is_server_admin()
+    @checks.is_trial_manager()
     async def invites(self, ctx):
         """Creates or updates the Discord AutoMod rule that blocks invites to other servers.
 
@@ -257,11 +257,11 @@ class Automod(commands.Cog):
         await ctx.send("Updated the server invites AutoMod rule.")
 
     @automod.group(fallback="list")
-    @checks.is_server_admin()
+    @checks.is_trial_manager()
     async def words(self, ctx):
         """Displays the banned words list.
 
-        You must have the Community Manager role to use this.
+        You must be a Trial Manager or higher to use this.
         """
 
         pages = ViewMenuPages(
@@ -270,11 +270,11 @@ class Automod(commands.Cog):
         await pages.start(ctx)
 
     @words.command()
-    @checks.is_server_admin()
+    @checks.is_trial_manager()
     async def add(self, ctx, words):
         """Adds words to the banned words list.
 
-        You must have the Community Manager role to use this.
+        You must be a Trial Manager or higher to use this.
         """
 
         words = words.casefold().split()
@@ -284,11 +284,11 @@ class Automod(commands.Cog):
         await ctx.send(f"Added {words_msg} to the banned words list.")
 
     @words.command()
-    @checks.is_server_admin()
+    @checks.is_trial_manager()
     async def remove(self, ctx, words):
         """Removes words from the banned words list.
 
-        You must have the Community Manager role to use this.
+        You must be a Trial Manager or higher to use this.
         """
 
         words = words.casefold().split()
