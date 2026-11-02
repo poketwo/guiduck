@@ -238,7 +238,7 @@ class Suspensions(commands.Cog):
         if booster_access_role is None:
             return
 
-        source_ids = set(config.get("booster_access_source_role_ids", []))
+        source_ids = set(config.get("booster_access_source_role_ids", [])) - {booster_access_role.id}
         eligible = not suspended and any(role.id in source_ids for role in member.roles)
         has_role = booster_access_role in member.roles
         if eligible and not has_role:
