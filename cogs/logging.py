@@ -607,11 +607,11 @@ class Logging(commands.Cog):
 
     @logs.command()
     @commands.guild_only()
-    @checks.is_manager_or_admin()
+    @checks.is_admin_or_administrator()
     async def restricted(self, ctx):
         """Lists the channels and categories whose logs are restricted to admins.
 
-        You must be a Manager or admin to use this."""
+        You must be an admin to use this."""
 
         docs = await self.bot.mongo.db.channel.find({"guild_id": ctx.guild.id, "restricted": True}, {"_id": 1}).to_list(
             None
