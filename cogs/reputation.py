@@ -89,6 +89,8 @@ class Reputation(commands.Cog):
         match = GIVEREP_TRIGGERS_REGEX.search(content)
         if match is not None:
             ctx = await self.bot.get_context(message)
+            if ctx.valid:
+                return
             await self.process_giverep(ctx, message.mentions[0])
 
     @commands.hybrid_command()
