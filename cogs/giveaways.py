@@ -218,7 +218,8 @@ class Giveaway:
             ],
             allowDiskUse=True,
         ).to_list(1):
-            self.winner = self.guild.get_member(winner[0]["user_id"]) or FakeUser(winner[0]["user_id"])
+            winner_id = winner[0]["user_id"]
+            self.winner = (await resolve_users(self.bot, self.guild_id, [winner_id], fetch=True))[winner_id]
             await self.bot.mongo.db.giveaway.update_one({"_id": self._id}, {"$set": {"winner_id": self.winner.id}})
             await self.send_pokemon_to_user(self.winner)
             await self.channel.send(
