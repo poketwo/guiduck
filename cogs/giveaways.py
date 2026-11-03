@@ -234,9 +234,11 @@ class Giveaway:
 
             embed = await self.approval_embed()
             embed.title = "Giveaway Won!"
-            return await self.winner.send(
-                f"Congratulations! You have won **{self.user}'s {await self.title()}**!", embed=embed
-            )
+            with suppress(discord.HTTPException):
+                await self.winner.send(
+                    f"Congratulations! You have won **{self.user}'s {await self.title()}**!", embed=embed
+                )
+            return
 
         await self.send_pokemon_to_user(self.user)
         await self.bot.mongo.db.giveaway.update_one({"_id": self._id}, {"$set": {"winner_id": None}})
