@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import NamedTuple, Optional
@@ -219,7 +220,12 @@ class Giveaway:
             allowDiskUse=True,
         ).to_list(1):
             winner_id = winner[0]["user_id"]
-            self.winner = (await resolve_users(self.bot, self.guild_id, [winner_id], fetch=True))[winner_id]
+            self.winner = self.guild.get_member(winner_id)
+            if self.winner is None:
+                with suppress(discord.HTTPException):
+                    self.winner = await self.bot.fetch_user(winner_id)
+            if self.winner is None:
+                self.winner = FakeUser(winner_id)
             await self.bot.mongo.db.giveaway.update_one({"_id": self._id}, {"$set": {"winner_id": self.winner.id}})
             await self.send_pokemon_to_user(self.winner)
             await self.channel.send(
