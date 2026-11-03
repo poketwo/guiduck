@@ -232,11 +232,11 @@ class Levels(commands.Cog):
 
     @commands.hybrid_command()
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_trial_manager()
     async def setlevel(self, ctx, member: discord.Member, level: int):
         """Sets a user's level to a given value.
 
-        You must have the Community Manager role to use this."""
+        You must have the Trial Manager role or higher to use this."""
 
         level_logs_channel_id = await self.get_level_logs_channel_id(ctx.guild)
         if level_logs_channel_id is None:
@@ -284,11 +284,11 @@ class Levels(commands.Cog):
 
     @commands.hybrid_command(aliases=("addxp",))
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_trial_manager()
     async def givexp(self, ctx, member: discord.Member, xp: int):
         """Gives a user an amount of XP, updating their level accordingly.
 
-        A negative amount takes XP away instead. You must have the Server Administrator role to use this."""
+        A negative amount takes XP away instead. You must have the Trial Manager role or higher to use this."""
 
         if xp == 0:
             return await ctx.send("No changes made.")

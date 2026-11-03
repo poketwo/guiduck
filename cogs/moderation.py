@@ -1427,11 +1427,11 @@ class Moderation(commands.Cog):
 
     @commands.hybrid_command(name="setup-muted-role", aliases=("sync-muted-role",))
     @commands.guild_only()
-    @checks.is_community_manager()
+    @checks.is_admin()
     async def setup_muted_role(self, ctx):
         """Sets up the Muted role's permissions.
 
-        You must have the Community Manager role to use this.
+        You must have the Admin role to use this.
         """
 
         role = discord.utils.get(ctx.guild.roles, name="Muted")
@@ -1450,59 +1450,6 @@ class Moderation(commands.Cog):
                 )
 
         await ctx.send("I've set up permissions for the Muted role.")
-
-    @commands.hybrid_command(aliases=("tmute",), usage="<target> [expires_at] [reason]")
-    @checks.community_server_only()
-    @checks.is_trial_moderator()
-    async def tradingmute(self, ctx, target: discord.Member, *, time_and_reason):
-        """Mutes a member in trading channels.
-
-        You must have the Trial Moderator role to use this.
-        """
-
-        if any(role.id in constants.TRIAL_MODERATOR_ROLES for role in getattr(target, "roles", [])):
-            return await ctx.send("You can't punish that person!")
-
-        expires_at, reason = await self.parse_time_and_reason(ctx, time_and_reason)
-
-        action = TradingMute(
-            target=target,
-            user=ctx.author,
-            reason=reason,
-            guild_id=ctx.guild.id,
-            created_at=ctx.message.created_at,
-            expires_at=expires_at,
-        )
-        await action.execute(ctx)
-        await action.notify()
-        if action.duration is None:
-            await ctx.send(f"Muted **{target}** in trading channels (Case #{action._id}).")
-        else:
-            await ctx.send(
-                f"Muted **{target}** in trading channels for **{time.human_timedelta(action.duration)}** (Case #{action._id})."
-            )
-
-    @commands.hybrid_command(aliases=("untradingmute", "tunmute", "untmute"))
-    @checks.community_server_only()
-    @checks.is_trial_moderator()
-    async def tradingunmute(self, ctx, target: discord.Member, *, reason=None):
-        """Unmutes a member in trading channels.
-
-        You must have the Trial Moderator role to use this.
-        """
-
-        if not discord.utils.get(target.roles, name="Trading Muted"):
-            return await ctx.send("This member is not trading muted.")
-
-        action = TradingUnmute(
-            target=target,
-            user=ctx.author,
-            reason=reason,
-            guild_id=ctx.guild.id,
-        )
-        await action.execute(ctx)
-        await action.notify()
-        await ctx.send(f"Unmuted **{target}** in trading channels (Case #{action._id}).", ephemeral=True)
 
     async def reverse_raw_action(self, raw_action):
         (action,) = await self.build_actions([raw_action])

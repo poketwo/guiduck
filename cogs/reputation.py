@@ -67,16 +67,19 @@ class Reputation(commands.Cog):
         if member == ctx.author:
             return "You can't give rep to yourself!"
 
-        cd = await self.bot.redis.pttl(key := f"rep:{ctx.author.id}")
-        if cd >= 0:
+        redis = self.bot.redis
+        key = f"rep:{ctx.author.id}"
+        user_key = f"rep:{ctx.author.id}:{member.id}"
+
+        if not await redis.set(key, 1, expire=120, exist=redis.SET_IF_NOT_EXIST):
+            cd = max(await redis.pttl(key), 0)
             return f"You're on cooldown! Try again in **{time.human_timedelta(timedelta(seconds=cd / 1000))}**."
 
-        user_cd = await self.bot.redis.pttl(user_key := f"rep:{ctx.author.id}:{member.id}")
-        if user_cd >= 0:
+        if not await redis.set(user_key, 1, expire=3600, exist=redis.SET_IF_NOT_EXIST):
+            await redis.delete(key)
+            user_cd = max(await redis.pttl(user_key), 0)
             return f"You can rep **{member}** again in **{time.human_timedelta(timedelta(seconds=user_cd / 1000))}**."
 
-        await self.bot.redis.set(key, 1, expire=120)
-        await self.bot.redis.set(user_key, 1, expire=3600)
         await self.update_rep(member, inc=1)
         await ctx.send(f"Gave 1 rep to **{member}**.")
 
@@ -89,6 +92,8 @@ class Reputation(commands.Cog):
         match = GIVEREP_TRIGGERS_REGEX.search(content)
         if match is not None:
             ctx = await self.bot.get_context(message)
+            if ctx.valid:
+                return
             await self.process_giverep(ctx, message.mentions[0])
 
     @commands.hybrid_command()
@@ -121,11 +126,11 @@ class Reputation(commands.Cog):
 
     @commands.hybrid_command()
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_trial_manager()
     async def setrep(self, ctx, member: discord.Member, value: int):
         """Sets a user's reputation to a given value.
 
-        You must have the Community Manager role to use this."""
+        You must have the Trial Manager role or higher to use this."""
 
         data = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
         old_value = (data or {}).get("reputation", 0)

@@ -14,20 +14,20 @@ def is_admin():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.ADMIN_ROLES))
 
 
-def is_community_manager():
-    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.COMMUNITY_MANAGER_ROLES))
+def is_admin_or_administrator():
+    return commands.check_any(
+        commands.is_owner(),
+        commands.has_guild_permissions(administrator=True),
+        commands.has_any_role(*constants.ADMIN_ROLES),
+    )
 
 
-def is_bot_admin():
-    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.BOT_ADMIN_ROLES))
-
-
-def is_server_admin():
-    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.SERVER_ADMIN_ROLES))
-
-
-def is_senior_moderator():
-    return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.SENIOR_MODERATOR_ROLES))
+def is_manager_or_admin():
+    return commands.check_any(
+        commands.is_owner(),
+        commands.has_guild_permissions(administrator=True),
+        commands.has_any_role(*constants.ADMIN_ROLES, *constants.MANAGER_ROLE_IDS),
+    )
 
 
 def is_moderator():
@@ -38,14 +38,22 @@ def is_trial_moderator():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.TRIAL_MODERATOR_ROLES))
 
 
+def is_trial_manager():
+    return commands.check_any(
+        commands.is_owner(),
+        commands.has_guild_permissions(administrator=True),
+        commands.has_any_role(*constants.TRIAL_MANAGER_ROLES),
+    )
+
+
 def is_developer():
     return commands.check_any(commands.is_owner(), commands.has_role(constants.DEVELOPER_ROLE))
 
 
-def is_lower_than_senior_moderator(member):
+def is_payable_by_manager(member):
     role_ids = {role.id for role in member.roles}
-    return bool(role_ids & set(constants.SENIOR_MODERATOR_PAYABLE_ROLES)) and not bool(
-        role_ids & set(constants.SENIOR_MODERATOR_ROLES)
+    return bool(role_ids & set(constants.MANAGER_PAYABLE_ROLES)) and not bool(
+        role_ids & set(constants.TRIAL_MANAGER_ROLES)
     )
 
 
@@ -55,10 +63,7 @@ def is_protected(member, bot):
 
     role_ids = {role.id for role in member.roles}
 
-    protected_roles = set(constants.TRIAL_MODERATOR_ROLES)
-    protected_roles.add(constants.DEVELOPER_ROLE)
-
-    return bool(role_ids & protected_roles)
+    return bool(role_ids & set(constants.TRIAL_MODERATOR_ROLES))
 
 
 def in_guilds(*guild_ids):
@@ -93,19 +98,8 @@ def in_categories(*category_ids, channel_ids=()):
     return commands.check_any(is_admin(), commands.check(predicate))
 
 
-def staff_categories_only(*channel_ids):
-    return in_categories(
-        717881335313858610,
-        1122578424867864616,
-        1219502312859500644,
-        1219501926081630259,
-        1196191915272577134,
-        1300547040480333894,
-        730992224635977748,
-        1103248448934912052,
-        1104727423603449866,
-        channel_ids=channel_ids,
-    )
+def staff_categories_only():
+    return in_categories(*constants.STAFF_CATEGORY_IDS)
 
 
 def is_level(level):

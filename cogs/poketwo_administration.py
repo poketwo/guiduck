@@ -15,14 +15,12 @@ from helpers import checks, constants
 from helpers.converters import SpeciesConverter
 from helpers.converters import ActivityArgs
 from helpers.outline.decorators import with_typing
-from helpers.poketwo import format_pokemon_details
+from helpers.poketwo import computed_fields, format_pokemon_details
 from helpers.utils import FetchUserConverter, as_line_chunks_by_len, fetch_role_members
 
 REFUND_CHANNEL_ID = 973239955784614008
 
 MANAGEMENT_LOGS_CHANNEL_ID = 1301202435380871230
-ADMIN_PAY_CHANNEL_IDS = (1514309909389246494, 1514310056152272926)
-ADMIN_PAY_STAFF_ROLE_ID = 1483963509275623444
 
 IV_FLAGS = "iv_hp", "iv_atk", "iv_defn", "iv_satk", "iv_sdef", "iv_spd"
 random_level = lambda ctx: max(1, min(int(random.normalvariate(20, 10)), 100))
@@ -214,9 +212,7 @@ class PoketwoAdministration(commands.Cog):
         self.bot = bot
 
     async def can_pay_anyone(self, ctx):
-        return await checks.passes_check(checks.is_server_admin, ctx) or await checks.passes_check(
-            checks.is_bot_admin, ctx
-        )
+        return await checks.passes_check(checks.is_admin, ctx)
 
     async def resolve_member(self, ctx, user):
         if isinstance(user, discord.Member):
@@ -236,10 +232,10 @@ class PoketwoAdministration(commands.Cog):
             return True
 
         member = await self.resolve_member(ctx, user)
-        if member is not None and checks.is_lower_than_senior_moderator(member):
+        if member is not None and checks.is_payable_by_manager(member):
             return True
 
-        await ctx.send("Senior Moderators can only pay Moderators and Trial Moderators.", ephemeral=True)
+        await ctx.send("Managers can only pay Moderators and Trial Moderators.", ephemeral=True)
         return False
 
     async def save_refund(self, refund: Refund):
@@ -410,6 +406,7 @@ class PoketwoAdministration(commands.Cog):
             "shiny": flags.shiny,
             "idx": await self.bot.mongo.fetch_next_idx(ctx.author),
         }
+        pokemon["computed"] = computed_fields([pokemon[x] for x in IV_FLAGS])
 
         refund = Refund(
             user=ctx.author,
@@ -439,21 +436,16 @@ class PoketwoAdministration(commands.Cog):
         return embed
 
     @commands.hybrid_group(aliases=["administration"], invoke_without_command=True)
-    @commands.check_any(
-        checks.is_server_admin(),
-        checks.is_bot_admin(),
-        checks.is_senior_moderator(),
-        commands.has_role(ADMIN_PAY_STAFF_ROLE_ID),
-    )
+    @checks.is_trial_manager()
     async def admin(self, ctx):
         """Administration commands
 
-        You must have the Server Admin, Bot Admin, or Senior Moderator role to use this."""
+        You must have the Trial Manager role or higher to use this."""
 
         await ctx.send_help(ctx.command)
 
     @admin.command(aliases=("givecoins", "ac", "gc"))
-    @commands.check_any(checks.is_server_admin(), checks.is_bot_admin())
+    @checks.is_admin()
     async def addcoins(self, ctx, user: FetchUserConverter, amt: int, *, notes: Optional[str] = None):
         """Add to a user's balance."""
 
@@ -470,13 +462,8 @@ class PoketwoAdministration(commands.Cog):
         )
 
     @admin.command(aliases=("giveshard", "as", "gs"))
-    @checks.staff_categories_only(*ADMIN_PAY_CHANNEL_IDS)
-    @commands.check_any(
-        checks.is_server_admin(),
-        checks.is_bot_admin(),
-        checks.is_senior_moderator(),
-        commands.has_role(ADMIN_PAY_STAFF_ROLE_ID),
-    )
+    @checks.staff_categories_only()
+    @checks.is_trial_manager()
     async def addshards(self, ctx, user: FetchUserConverter, amt: int, *, notes: Optional[str] = None):
         """Add to a user's shard balance."""
 
@@ -498,10 +485,8 @@ class PoketwoAdministration(commands.Cog):
     @admin.command(
         usage="[role: ROLE=Moderator] [users: USER1 USER2 ...] [month: MONTH=Previous] [year: YEAR=Current] [all-users: yes/no=no] [show-ids: yes/no=no]"
     )
-    @checks.staff_categories_only(*ADMIN_PAY_CHANNEL_IDS)
-    @commands.check_any(
-        checks.is_server_admin(), checks.is_senior_moderator(), commands.has_role(ADMIN_PAY_STAFF_ROLE_ID)
-    )
+    @checks.staff_categories_only()
+    @checks.is_trial_manager()
     @with_typing()
     async def activity(
         self,
@@ -546,20 +531,18 @@ class PoketwoAdministration(commands.Cog):
         users = [member for user in args.users or [] if (member := await self.resolve_member(ctx, user)) is not None]
         restricted_payout = not await self.can_pay_anyone(ctx)
         if restricted_payout and args.show_all:
-            return await ctx.send("Senior Moderators can only pay Moderators and Trial Moderators.", ephemeral=True)
-        if restricted_payout and role and role.id not in constants.SENIOR_MODERATOR_PAYABLE_ROLES:
-            return await ctx.send("Senior Moderators can only pay Moderator and Trial Moderator roles.", ephemeral=True)
+            return await ctx.send("Managers can only pay Moderators and Trial Moderators.", ephemeral=True)
+        if restricted_payout and role and role.id not in constants.MANAGER_PAYABLE_ROLES:
+            return await ctx.send("Managers can only pay Moderator and Trial Moderator roles.", ephemeral=True)
         if (
             restricted_payout
             and args.users
-            and (
-                len(users) != len(args.users) or not all(checks.is_lower_than_senior_moderator(user) for user in users)
-            )
+            and (len(users) != len(args.users) or not all(checks.is_payable_by_manager(user) for user in users))
         ):
-            return await ctx.send("Senior Moderators can only pay Moderators and Trial Moderators.", ephemeral=True)
+            return await ctx.send("Managers can only pay Moderators and Trial Moderators.", ephemeral=True)
 
         if not (role or args.users or args.show_all):
-            role = next((r for r_id in constants.MODERATOR_ROLES[-2:] if (r := ctx.guild.get_role(r_id))), None)
+            role = next((r for r_id in constants.MODERATOR_ROLE_IDS if (r := ctx.guild.get_role(r_id))), None)
 
         members = []
         role_member_ids = set()
@@ -570,7 +553,7 @@ class PoketwoAdministration(commands.Cog):
             members = users
 
         if restricted_payout:
-            members = [member for member in members if checks.is_lower_than_senior_moderator(member)]
+            members = [member for member in members if checks.is_payable_by_manager(member)]
 
         if args.show_all:
             if args.users:
