@@ -126,11 +126,11 @@ class Reputation(commands.Cog):
 
     @commands.hybrid_command()
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_trial_manager()
     async def setrep(self, ctx, member: discord.Member, value: int):
         """Sets a user's reputation to a given value.
 
-        You must have the Community Manager role to use this."""
+        You must have the Trial Manager role or higher to use this."""
 
         data = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
         old_value = (data or {}).get("reputation", 0)

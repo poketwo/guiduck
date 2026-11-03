@@ -12,7 +12,7 @@ class ReactionRoles(commands.Cog):
 
     @commands.hybrid_group()
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_admin()
     async def rolemenu(self, ctx):
         """Utilities for reaction role menus."""
 
@@ -32,11 +32,11 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="create")
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_admin()
     async def create(self, ctx, message: discord.Message, *, name):
         """Creates a role menu on a certain message.
 
-        You must have the Community Manager role to use this.
+        You must have the Admin role to use this.
         """
 
         if message.guild.id != ctx.guild.id:
@@ -55,11 +55,11 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="list")
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_admin()
     async def list(self, ctx):
         """Lists this server's role menus.
 
-        You must have the Community Manager role to use this.
+        You must have the Admin role to use this.
         """
 
         rr = await self.bot.mongo.db.rolemenu.find({"guild_id": ctx.guild.id}).to_list(None)
@@ -67,11 +67,11 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="delete")
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_admin()
     async def delete(self, ctx, name):
         """Deletes an existing role menu.
 
-        You must have the Community Manager role to use this.
+        You must have the Admin role to use this.
         """
 
         result = await self.bot.mongo.db.rolemenu.delete_one({"name": name, "guild_id": ctx.guild.id})
@@ -82,11 +82,11 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="view")
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_admin()
     async def view(self, ctx, name):
         """Shows information about a role menu.
 
-        You must have the Community Manager role to use this.
+        You must have the Admin role to use this.
         """
 
         obj = await self.get_menu(name, ctx.guild)
@@ -109,11 +109,11 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="add")
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_admin()
     async def add(self, ctx, name, emoji, role: discord.Role):
         """Adds an emoji and role to a role menu.
 
-        You must have the Community Manager role to use this.
+        You must have the Admin role to use this.
         """
 
         menu = await self.get_menu(name, ctx.guild)
@@ -139,11 +139,11 @@ class ReactionRoles(commands.Cog):
 
     @rolemenu.command(name="remove")
     @commands.guild_only()
-    @checks.is_server_admin()
+    @checks.is_admin()
     async def rolemenu_remove(self, ctx, name, emoji):
         """Removes an emoji and role from a role menu.
 
-        You must have the Community Manager role to use this.
+        You must have the Admin role to use this.
         """
 
         menu = await self.get_menu(name, ctx.guild)

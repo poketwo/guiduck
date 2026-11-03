@@ -1427,11 +1427,11 @@ class Moderation(commands.Cog):
 
     @commands.hybrid_command(name="setup-muted-role", aliases=("sync-muted-role",))
     @commands.guild_only()
-    @checks.is_community_manager()
+    @checks.is_admin()
     async def setup_muted_role(self, ctx):
         """Sets up the Muted role's permissions.
 
-        You must have the Community Manager role to use this.
+        You must have the Admin role to use this.
         """
 
         role = discord.utils.get(ctx.guild.roles, name="Muted")

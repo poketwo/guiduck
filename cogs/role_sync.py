@@ -162,11 +162,11 @@ class RoleSync(commands.Cog):
 
     @commands.hybrid_command(name="sync-roles")
     @commands.guild_only()
-    @checks.is_community_manager()
+    @checks.is_admin()
     async def sync_roles(self, ctx):
         """Syncs all roles from the community server to the support server.
 
-        You must have the Community Manager role to use this."""
+        You must have the Admin role to use this."""
 
         await ctx.send("Syncing all roles...")
         await self.sync_all()

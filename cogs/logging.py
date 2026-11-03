@@ -405,7 +405,7 @@ class Logging(commands.Cog):
     async def is_log_admin(self, member: discord.Member) -> bool:
         if await self.bot.is_owner(member) or member.guild_permissions.administrator:
             return True
-        return any(role.id in constants.COMMUNITY_MANAGER_ROLES for role in member.roles)
+        return any(role.id in constants.ADMIN_ROLES for role in member.roles)
 
     async def is_restricted(self, channel) -> bool:
         """Whether a channel's logs are restricted to admins, either directly or through its parent or category."""
@@ -559,11 +559,11 @@ class Logging(commands.Cog):
 
     @logs.command(name="sync-cache")
     @commands.guild_only()
-    @checks.is_community_manager()
+    @checks.is_admin()
     async def sync_cache(self, ctx):
         """Syncs all caches for the current server.
 
-        You must have the Community Manager role to use this."""
+        You must have the Admin role to use this."""
 
         await ctx.send("Syncing all caches for this guild...")
         await self.full_cache_guild(ctx.guild)
