@@ -10,15 +10,12 @@ from helpers.utils import get_or_fetch_member
 ROLE_MAPPING_COMMUNITY_TO_SUPPORT = {
     974942298301431809: 930346838589063208,
     718006431231508481: 930346842586218607,
-    1219500643731898450: 1260660223618580572,
-    1219500880534179892: 1260660172561322005,
-    1219501382437048402: 1260660162620821547,
-    1219501453240959006: 1260660160708214907,
+    1120600250474827856: 1465406787976036382,
+    1483963509275623444: 1561594404291092521,
+    1556701034921992322: 1564260545811714139,
     974937010462683166: 964026958117748816,
     724879492622843944: 930346843521556540,
     813433839471820810: 930346845547409439,
-    732712709514199110: 930346847443255306,
-    794438698241884200: 930346848529547314,
 }
 
 ROLE_MAPPING_SUPPORT_TO_COMMUNITY = {v: k for k, v in ROLE_MAPPING_COMMUNITY_TO_SUPPORT.items()}
@@ -162,11 +159,11 @@ class RoleSync(commands.Cog):
 
     @commands.hybrid_command(name="sync-roles")
     @commands.guild_only()
-    @checks.is_community_manager()
+    @checks.is_admin()
     async def sync_roles(self, ctx):
         """Syncs all roles from the community server to the support server.
 
-        You must have the Community Manager role to use this."""
+        You must have the Admin role to use this."""
 
         await ctx.send("Syncing all roles...")
         await self.sync_all()
