@@ -182,6 +182,9 @@ class ReactionRoles(commands.Cog):
             guild = self.bot.get_guild(payload.guild_id)
             role = guild.get_role(menu["options"][emoji])
             member = payload.member or await guild.fetch_member(payload.user_id)
+            suspensions = self.bot.get_cog("Suspensions")
+            if suspensions is not None and await suspensions.is_withheld(member, role.id):
+                return
             await member.add_roles(role)
             await member.send(f"Gave you the **{role}** role!")
 

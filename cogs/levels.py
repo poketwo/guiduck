@@ -77,6 +77,8 @@ class Levels(commands.Cog):
         """Grants and removes level roles to reflect a level change, returning the roles changed."""
 
         add_roles = self.roles_between_levels(member.guild, old_level, new_level)
+        if suspensions := self.bot.get_cog("Suspensions"):
+            add_roles = [role for role in add_roles if not await suspensions.is_withheld(member, role.id)]
         remove_roles = self.roles_between_levels(member.guild, new_level, old_level)
         if add_roles:
             await member.add_roles(*add_roles)
@@ -114,11 +116,20 @@ class Levels(commands.Cog):
     def format_roles(self, roles: list[discord.Role]) -> str:
         return ", ".join(f"**{role.mention}**" for role in roles)
 
+    async def withheld_role_ids(self, guild: discord.Guild, user: dict) -> set[int]:
+        """Level roles held back from a member suspended on Pokétwo (see the suspensions cog)."""
+
+        suspensions = self.bot.get_cog("Suspensions")
+        if suspensions is None or not user.get("poketwo_suspended"):
+            return set()
+        return await suspensions.stripped_role_ids(guild.id)
+
     async def sync_level_roles(self, member):
         user = await self.bot.mongo.db.member.find_one({"_id": {"id": member.id, "guild_id": member.guild.id}})
         if user is None:
             return
         level_role_ids = {x for k, r in ROLES.items() if k <= user.get("level", 0) for x in r}
+        level_role_ids -= await self.withheld_role_ids(member.guild, user)
         role_ids = {x.id for x in member.roles}
         if level_role_ids <= role_ids:
             return
@@ -178,7 +189,8 @@ class Levels(commands.Cog):
         if user.get("xp", 0) + xp > self.min_xp_at(user.get("level", 0) + 1):
             new_level = user.get("level", 0) + 1
 
-            roles = [message.guild.get_role(x) for x in ROLES[new_level]]
+            withheld = await self.withheld_role_ids(message.guild, user)
+            roles = [message.guild.get_role(x) for x in ROLES[new_level] if x not in withheld]
             await message.author.add_roles(*roles)
             u = await self.bot.mongo.db.member.update_one(
                 {"_id": {"id": message.author.id, "guild_id": message.guild.id}, "level": user.get("level", None)},

@@ -39,6 +39,7 @@ COGS = [
     "reputation",
     "role_sync",
     "staff_roster",
+    "suspensions",
     "tags",
     "outline",
 ]
