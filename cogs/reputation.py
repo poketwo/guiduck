@@ -7,7 +7,7 @@ from discord.ext.menus.views import ViewMenuPages
 
 from helpers import checks, time
 from helpers.pagination import AsyncEmbedCodeBlockTablePageSource
-from helpers.utils import log_staff_action
+from helpers.utils import format_tag, log_staff_action
 
 GIVEREP_TRIGGERS = [
     "+rep",
@@ -159,7 +159,7 @@ class Reputation(commands.Cog):
             )
 
         def format_item(x):
-            name = f"{x['name']}#{x['discriminator']}"
+            name = format_tag(x["name"], x.get("discriminator"))
             return f"{x.get('reputation', 0)}", "-", name
 
         pages = ViewMenuPages(
