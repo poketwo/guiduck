@@ -404,7 +404,7 @@ class PoketwoAdministration(commands.Cog):
             "iv_total": flags.iv_total,
             "moves": [],
             "shiny": flags.shiny,
-            "idx": await self.bot.mongo.fetch_next_idx(ctx.author),
+            "idx": await self.bot.mongo.fetch_next_idx(member),
         }
         pokemon["computed"] = computed_fields([pokemon[x] for x in IV_FLAGS])
 
