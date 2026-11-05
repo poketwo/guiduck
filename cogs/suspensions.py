@@ -342,7 +342,7 @@ class Suspensions(commands.Cog):
                 await self.clear_flag(user_id, guild.id)
             else:
                 await self.lift(member, config)
-                await self.sync_booster_access(member, config, False)
+                await self.skip_on_http_error(user_id, self.sync_booster_access(member, config, False))
         return True
 
     async def reconcile_apply(self, guild: discord.Guild, config: dict, user_id: int) -> bool:
@@ -353,7 +353,7 @@ class Suspensions(commands.Cog):
                 await self.set_flag(user_id, guild.id)
                 return False
             applied = await self.apply(member, config)
-            await self.sync_booster_access(member, config, True)
+            await self.skip_on_http_error(user_id, self.sync_booster_access(member, config, True))
         return applied
 
     async def reconcile_booster_access_member(
