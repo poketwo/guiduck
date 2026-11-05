@@ -9,7 +9,11 @@ class Boosts(commands.Cog):
         self.bot = bot
 
     async def remove_booster_only_roles(self, member: discord.Member):
-        roles = [role for role in member.roles if role.id in constants.BOOSTER_ONLY_ROLES]
+        role_ids = {constants.BOOSTER_HOISTED_ROLE}
+        # Old Patrons and Specials keep booster-giveaway access, so they keep its ping role too.
+        if not any(role.id in (constants.OLD_PATRON_ROLE, constants.SPECIAL_ROLE) for role in member.roles):
+            role_ids.add(constants.BOOSTER_GIVEAWAY_PINGS_ROLE)
+        roles = [role for role in member.roles if role.id in role_ids]
         if roles:
             await member.remove_roles(*roles, reason="No longer boosting")
 
