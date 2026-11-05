@@ -309,35 +309,59 @@ class Suspensions(commands.Cog):
         still_suspended = await self.fetch_suspended_ids(list(flagged))
         lifted = 0
         for user_id in flagged - still_suspended:
-            member = await self.fetch_member(guild, user_id)
-            async with self.locks[user_id]:
-                if member is None:
-                    await self.clear_flag(user_id, guild.id)
-                else:
-                    await self.lift(member, config)
-                    await self.sync_booster_access(member, config, False)
-            lifted += 1
+            if await self.skip_on_http_error(user_id, self.reconcile_lift(guild, config, user_id)):
+                lifted += 1
 
         applied = 0
         checked_new = await self.has_suspension_indexes()
         if checked_new:
             new_ids = await self.fetch_all_suspended_ids() - flagged
             for user_id in await self.cached_member_ids(guild.id, list(new_ids)):
-                member = await self.fetch_member(guild, user_id)
-                async with self.locks[user_id]:
-                    if member is None:
-                        # Not in the server: flag only, so they aren't fetched every run. Roles go on when they're seen.
-                        await self.set_flag(user_id, guild.id)
-                        continue
-                    if await self.apply(member, config):
-                        applied += 1
-                    await self.sync_booster_access(member, config, True)
+                if await self.skip_on_http_error(user_id, self.reconcile_apply(guild, config, user_id)):
+                    applied += 1
 
         await self.reconcile_booster_access(guild, config)
 
         if applied or lifted:
             await self.log(guild, f"Pokétwo suspension sync: applied to **{applied:,}**, lifted from **{lifted:,}**.")
         return applied, lifted, checked_new
+
+    async def skip_on_http_error(self, user_id: int, coro) -> bool:
+        """Runs one member's reconcile step, logging and skipping Discord errors so one bad request doesn't end the run."""
+
+        try:
+            return await coro
+        except discord.HTTPException as error:
+            self.bot.log.warning(f"Suspension reconcile skipped {user_id}: {error!r}")
+            return False
+
+    async def reconcile_lift(self, guild: discord.Guild, config: dict, user_id: int) -> bool:
+        member = await self.fetch_member(guild, user_id)
+        async with self.locks[user_id]:
+            if member is None:
+                await self.clear_flag(user_id, guild.id)
+            else:
+                await self.lift(member, config)
+                await self.sync_booster_access(member, config, False)
+        return True
+
+    async def reconcile_apply(self, guild: discord.Guild, config: dict, user_id: int) -> bool:
+        member = await self.fetch_member(guild, user_id)
+        async with self.locks[user_id]:
+            if member is None:
+                # Not in the server: flag only, so they aren't fetched every run. Roles go on when they're seen.
+                await self.set_flag(user_id, guild.id)
+                return False
+            applied = await self.apply(member, config)
+            await self.sync_booster_access(member, config, True)
+        return applied
+
+    async def reconcile_booster_access_member(
+        self, guild: discord.Guild, config: dict, member_id: int, suspended: bool
+    ):
+        if member := await self.fetch_member(guild, member_id):
+            async with self.locks[member_id]:
+                await self.sync_booster_access(member, config, suspended)
 
     async def reconcile_booster_access(self, guild: discord.Guild, config: dict):
         if guild.get_role(config.get("booster_access_role_id")) is None:
@@ -349,9 +373,9 @@ class Suspensions(commands.Cog):
         )
         flagged = await self.flagged_ids(guild.id)
         for member_id in member_ids:
-            if member := await self.fetch_member(guild, member_id):
-                async with self.locks[member_id]:
-                    await self.sync_booster_access(member, config, member_id in flagged)
+            await self.skip_on_http_error(
+                member_id, self.reconcile_booster_access_member(guild, config, member_id, member_id in flagged)
+            )
 
     # Listeners
 
