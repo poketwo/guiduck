@@ -22,14 +22,6 @@ def is_admin_or_administrator():
     )
 
 
-def is_manager_or_admin():
-    return commands.check_any(
-        commands.is_owner(),
-        commands.has_guild_permissions(administrator=True),
-        commands.has_any_role(*constants.ADMIN_ROLES, *constants.MANAGER_ROLE_IDS),
-    )
-
-
 def is_moderator():
     return commands.check_any(commands.is_owner(), commands.has_any_role(*constants.MODERATOR_ROLES))
 
