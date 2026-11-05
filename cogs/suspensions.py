@@ -410,7 +410,7 @@ class Suspensions(commands.Cog):
     async def suspension(self, ctx):
         """Shows the Pokétwo suspension role settings.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         config = await self.get_config(ctx.guild.id)
@@ -438,7 +438,7 @@ class Suspensions(commands.Cog):
     async def suspension_role(self, ctx, role: discord.Role):
         """Sets the role given to members suspended on Pokétwo.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         await self.update_config(ctx, {"$set": {"suspended_role_id": role.id}})
@@ -450,7 +450,7 @@ class Suspensions(commands.Cog):
     async def suspension_strip(self, ctx):
         """Manages the roles removed from suspended members and given back when the suspension ends.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         await ctx.send_help(ctx.command)
@@ -461,7 +461,7 @@ class Suspensions(commands.Cog):
     async def suspension_strip_add(self, ctx, roles: commands.Greedy[discord.Role]):
         """Adds roles to remove from suspended members.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         if not roles:
@@ -475,7 +475,7 @@ class Suspensions(commands.Cog):
     async def suspension_strip_remove(self, ctx, roles: commands.Greedy[discord.Role]):
         """Stops removing roles from suspended members.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         if not roles:
@@ -489,7 +489,7 @@ class Suspensions(commands.Cog):
     async def suspension_booster(self, ctx):
         """Manages the booster access role, given to boosters who aren't suspended.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         await ctx.send_help(ctx.command)
@@ -500,7 +500,7 @@ class Suspensions(commands.Cog):
     async def suspension_booster_role(self, ctx, role: discord.Role):
         """Sets the booster access role.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         await self.update_config(ctx, {"$set": {"booster_access_role_id": role.id}})
@@ -512,7 +512,7 @@ class Suspensions(commands.Cog):
     async def suspension_booster_add(self, ctx, roles: commands.Greedy[discord.Role]):
         """Adds roles whose members get booster access (e.g. Server Booster).
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         if not roles:
@@ -528,7 +528,7 @@ class Suspensions(commands.Cog):
     async def suspension_booster_remove(self, ctx, roles: commands.Greedy[discord.Role]):
         """Removes roles whose members get booster access.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         if not roles:
@@ -576,7 +576,7 @@ class Suspensions(commands.Cog):
         """Denies View Channel to the suspended role in channels or categories.
 
         For a category, channels synced to it are updated too.
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         await self.set_view_deny(ctx, channels, True)
@@ -588,7 +588,7 @@ class Suspensions(commands.Cog):
         """Removes the suspended role's View Channel deny from channels or categories.
 
         For a category, channels synced to it are updated too.
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         await self.set_view_deny(ctx, channels, False)
@@ -599,7 +599,7 @@ class Suspensions(commands.Cog):
     async def suspension_check(self, ctx, user: FetchUserConverter):
         """Shows a user's Pokétwo suspension and suspended role state, and syncs them if they're in the server.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         doc = await self.bot.mongo.poketwo_db.member.find_one({"_id": user.id}, POKETWO_SUSPENSION_PROJECTION) or {}
@@ -634,7 +634,7 @@ class Suspensions(commands.Cog):
     async def suspension_sync(self, ctx):
         """Runs the suspension reconcile now instead of waiting for the loop.
 
-        You must have the Server Admin role to use this.
+        You must have the Admin role to use this.
         """
 
         async with ctx.typing():
