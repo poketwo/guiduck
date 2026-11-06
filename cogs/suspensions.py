@@ -475,6 +475,46 @@ class Suspensions(commands.Cog):
     async def update_config(self, ctx, update: dict):
         await self.bot.mongo.db.guild.update_one({"_id": ctx.guild.id}, update, upsert=True)
 
+    async def set_config_role(self, ctx, field: str, role: discord.Role) -> bool:
+        """Sets a role config field, returning False if it was already that role."""
+
+        if (await self.get_config(ctx.guild.id)).get(field) == role.id:
+            return False
+        await self.update_config(ctx, {"$set": {field: role.id}})
+        return True
+
+    async def edit_role_list(
+        self, ctx, field: str, roles: list[discord.Role], add: bool
+    ) -> tuple[list[discord.Role], list[discord.Role]]:
+        """Adds or removes roles from a role list config field, returning (changed, already in that state)."""
+
+        current = set((await self.get_config(ctx.guild.id)).get(field, []))
+        roles = list(dict.fromkeys(roles))
+        changed = [r for r in roles if (r.id in current) != add]
+        unchanged = [r for r in roles if (r.id in current) == add]
+        if changed:
+            ids = [r.id for r in changed]
+            await self.update_config(ctx, {"$addToSet": {field: {"$each": ids}}} if add else {"$pullAll": {field: ids}})
+        return changed, unchanged
+
+    async def send_role_list_result(
+        self,
+        ctx,
+        changed: list[discord.Role],
+        unchanged: list[discord.Role],
+        changed_message: str,
+        unchanged_message: str,
+    ):
+        def names(roles):
+            return ", ".join(f"**{r}**" for r in roles)
+
+        lines = []
+        if changed:
+            lines.append(changed_message.format(names(changed)))
+        if unchanged:
+            lines.append(unchanged_message.format(names(unchanged)))
+        await ctx.send("\n".join(lines))
+
     def format_role(self, guild: discord.Guild, role_id: Optional[int]) -> str:
         role = guild.get_role(role_id) if role_id is not None else None
         return role.mention if role is not None else "*not set*"
@@ -628,7 +668,8 @@ class Suspensions(commands.Cog):
         You must have the Trial Manager role or higher to use this.
         """
 
-        await self.update_config(ctx, {"$set": {"suspended_role_id": role.id}})
+        if not await self.set_config_role(ctx, "suspended_role_id", role):
+            return await ctx.send(f"**{role}** is already the suspended role.")
         await ctx.send(f"Set the suspended role to **{role}**.")
 
     @suspension.group(name="strip", invoke_without_command=True)
@@ -653,8 +694,10 @@ class Suspensions(commands.Cog):
 
         if not roles:
             return await ctx.send("Please specify one or more roles.", ephemeral=True)
-        await self.update_config(ctx, {"$addToSet": {"suspension_stripped_role_ids": {"$each": [r.id for r in roles]}}})
-        await ctx.send(f"Suspended members will lose {', '.join(f'**{r}**' for r in roles)}.")
+        changed, unchanged = await self.edit_role_list(ctx, "suspension_stripped_role_ids", roles, True)
+        await self.send_role_list_result(
+            ctx, changed, unchanged, "Suspended members will lose {}.", "Already removed from suspended members: {}."
+        )
 
     @suspension_strip.command(name="remove")
     @commands.guild_only()
@@ -667,8 +710,10 @@ class Suspensions(commands.Cog):
 
         if not roles:
             return await ctx.send("Please specify one or more roles.", ephemeral=True)
-        await self.update_config(ctx, {"$pullAll": {"suspension_stripped_role_ids": [r.id for r in roles]}})
-        await ctx.send(f"Suspended members will keep {', '.join(f'**{r}**' for r in roles)}.")
+        changed, unchanged = await self.edit_role_list(ctx, "suspension_stripped_role_ids", roles, False)
+        await self.send_role_list_result(
+            ctx, changed, unchanged, "Suspended members will keep {}.", "Already kept by suspended members: {}."
+        )
 
     @suspension.group(name="booster", invoke_without_command=True)
     @commands.guild_only()
@@ -690,7 +735,8 @@ class Suspensions(commands.Cog):
         You must have the Trial Manager role or higher to use this.
         """
 
-        await self.update_config(ctx, {"$set": {"booster_access_role_id": role.id}})
+        if not await self.set_config_role(ctx, "booster_access_role_id", role):
+            return await ctx.send(f"**{role}** is already the booster access role.")
         await ctx.send(f"Set the booster access role to **{role}**.")
 
     @suspension_booster.command(name="add")
@@ -704,10 +750,10 @@ class Suspensions(commands.Cog):
 
         if not roles:
             return await ctx.send("Please specify one or more roles.", ephemeral=True)
-        await self.update_config(
-            ctx, {"$addToSet": {"booster_access_source_role_ids": {"$each": [r.id for r in roles]}}}
+        changed, unchanged = await self.edit_role_list(ctx, "booster_access_source_role_ids", roles, True)
+        await self.send_role_list_result(
+            ctx, changed, unchanged, "Members with {} will get booster access.", "Already giving booster access: {}."
         )
-        await ctx.send(f"Members with {', '.join(f'**{r}**' for r in roles)} will get booster access.")
 
     @suspension_booster.command(name="remove")
     @commands.guild_only()
@@ -720,8 +766,14 @@ class Suspensions(commands.Cog):
 
         if not roles:
             return await ctx.send("Please specify one or more roles.", ephemeral=True)
-        await self.update_config(ctx, {"$pullAll": {"booster_access_source_role_ids": [r.id for r in roles]}})
-        await ctx.send(f"Members with {', '.join(f'**{r}**' for r in roles)} no longer get booster access.")
+        changed, unchanged = await self.edit_role_list(ctx, "booster_access_source_role_ids", roles, False)
+        await self.send_role_list_result(
+            ctx,
+            changed,
+            unchanged,
+            "Members with {} no longer get booster access.",
+            "Already not giving booster access: {}.",
+        )
 
     async def set_view_deny(self, ctx, channels: list[HideableChannel], hidden: bool):
         config = await self.get_config(ctx.guild.id)
@@ -742,14 +794,25 @@ class Suspensions(commands.Cog):
                 targets += [c for c in channel.channels if c.permissions_synced]
                 unsynced = [c for c in channel.channels if not c.permissions_synced]
 
-            for target in targets:
+            changed = [t for t in targets if (t.overwrites_for(role).view_channel is False) != hidden]
+            for target in changed:
                 overwrite = target.overwrites_for(role)
                 overwrite.view_channel = False if hidden else None
                 await target.set_permissions(role, overwrite=None if overwrite.is_empty() else overwrite, reason=reason)
 
-            line = f"{verb} {channel.mention}"
-            if len(targets) > 1:
-                line += f" and {len(targets) - 1} synced channel(s)"
+            synced_changed = len(changed) - (channel in changed)
+            if not changed:
+                line = f"{channel.mention} is already {verb.lower()}"
+                if len(targets) > 1:
+                    line += ", along with its synced channels"
+            elif channel in changed:
+                line = f"{verb} {channel.mention}"
+                if synced_changed:
+                    line += f" and {synced_changed} synced channel(s)"
+            else:
+                line = (
+                    f"{channel.mention} was already {verb.lower()}; {verb.lower()} {synced_changed} synced channel(s)"
+                )
             if unsynced:
                 line += f". Not synced, so unchanged: {', '.join(c.mention for c in unsynced)}"
             lines.append(line)
