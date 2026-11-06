@@ -5,7 +5,7 @@ from enum import Enum
 
 import discord
 from discord.ext import commands
-from helpers.utils import FakeUser
+from helpers.utils import resolve_users
 
 
 class SubmissionStatus(Enum):
@@ -53,7 +53,10 @@ class Forms(commands.Cog):
 
     async def send_submission(self, channel, submission):
         status = submission.get("status", 0)
-        user = self.bot.get_user(submission["user_id"]) or FakeUser(submission["user_id"])
+        reviewer_id = submission.get("reviewer_id")
+        user_ids = [x for x in (submission["user_id"], reviewer_id) if x is not None]
+        users = await resolve_users(self.bot, channel.guild.id, user_ids, fetch=True)
+        user = users[submission["user_id"]]
 
         embed = discord.Embed(
             title=f"{TEXT[status]} ({submission['form_id']})",
@@ -63,9 +66,8 @@ class Forms(commands.Cog):
         embed.set_author(name=submission["user_tag"], icon_url=user.display_avatar.url)
         embed.set_footer(text=f"User ID • {user.id}")
 
-        if reviewer_id := submission.get("reviewer_id"):
-            reviewer = self.bot.get_user(reviewer_id) or FakeUser(reviewer_id)
-            embed.set_footer(text=embed.footer.text + f"\nReviewed by • {reviewer}")
+        if reviewer_id is not None:
+            embed.set_footer(text=embed.footer.text + f"\nReviewed by • {users[reviewer_id]}")
 
         if embedded_id := submission.get("embedded_id"):
             message = await channel.fetch_message(embedded_id)
