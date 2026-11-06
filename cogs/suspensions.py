@@ -65,6 +65,8 @@ def paginate_lines(lines: list[str]) -> list[str]:
 
     pages, current = [], []
     for line in lines:
+        if len(line) > OVERVIEW_PAGE_CHARS:
+            line = line[: OVERVIEW_PAGE_CHARS - 1] + "…"
         if current and (
             len(current) >= OVERVIEW_PAGE_LINES or sum(len(x) + 1 for x in current) + len(line) > OVERVIEW_PAGE_CHARS
         ):
