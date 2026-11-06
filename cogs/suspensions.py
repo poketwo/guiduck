@@ -794,10 +794,11 @@ class Suspensions(commands.Cog):
                 targets += [c for c in channel.channels if c.permissions_synced]
                 unsynced = [c for c in channel.channels if not c.permissions_synced]
 
-            changed = [t for t in targets if (t.overwrites_for(role).view_channel is False) != hidden]
+            desired = False if hidden else None
+            changed = [t for t in targets if t.overwrites_for(role).view_channel is not desired]
             for target in changed:
                 overwrite = target.overwrites_for(role)
-                overwrite.view_channel = False if hidden else None
+                overwrite.view_channel = desired
                 await target.set_permissions(role, overwrite=None if overwrite.is_empty() else overwrite, reason=reason)
 
             synced_changed = len(changed) - (channel in changed)
