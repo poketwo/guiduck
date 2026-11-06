@@ -5,7 +5,7 @@ from enum import Enum
 
 import discord
 from discord.ext import commands
-from helpers.utils import FakeUser
+from helpers.utils import FakeUser, format_tag
 
 
 class SubmissionStatus(Enum):
@@ -60,7 +60,8 @@ class Forms(commands.Cog):
             url=f"https://forms.poketwo.net/a/{submission['form_id']}/submissions/{submission['_id']}",
             color=COLORS[status],
         )
-        embed.set_author(name=submission["user_tag"], icon_url=user.display_avatar.url)
+        name, _, discriminator = submission["user_tag"].partition("#")
+        embed.set_author(name=format_tag(name, discriminator), icon_url=user.display_avatar.url)
         embed.set_footer(text=f"User ID • {user.id}")
 
         if reviewer_id := submission.get("reviewer_id"):

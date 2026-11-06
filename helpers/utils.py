@@ -29,6 +29,12 @@ async def log_staff_action(ctx, title, *, fields=(), files=()):
     await channel.send(embed=embed, files=files, view=view, allowed_mentions=discord.AllowedMentions.none())
 
 
+def format_tag(name, discriminator):
+    """Discord tag for display; users on the new username system have discriminator "0" and no tag suffix."""
+
+    return str(name) if discriminator in (None, "", "0") else f"{name}#{discriminator}"
+
+
 class FakeAvatar(NamedTuple):
     url: str
 
@@ -86,7 +92,7 @@ class CachedUser(FakeUser):
         return FakeAvatar(self.avatar_url) if self.avatar_url else self.default_avatar
 
     def __str__(self):
-        return self.name if self.discriminator == "0" else f"{self.name}#{self.discriminator}"
+        return format_tag(self.name, self.discriminator)
 
 
 async def resolve_users(bot, guild_id, user_ids, *, fetch=False):
