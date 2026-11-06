@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import NamedTuple, Optional
@@ -218,7 +219,13 @@ class Giveaway:
             ],
             allowDiskUse=True,
         ).to_list(1):
-            self.winner = self.guild.get_member(winner[0]["user_id"]) or FakeUser(winner[0]["user_id"])
+            winner_id = winner[0]["user_id"]
+            self.winner = self.guild.get_member(winner_id)
+            if self.winner is None:
+                with suppress(discord.HTTPException):
+                    self.winner = await self.bot.fetch_user(winner_id)
+            if self.winner is None:
+                self.winner = FakeUser(winner_id)
             await self.bot.mongo.db.giveaway.update_one({"_id": self._id}, {"$set": {"winner_id": self.winner.id}})
             await self.send_pokemon_to_user(self.winner)
             await self.channel.send(
@@ -227,9 +234,11 @@ class Giveaway:
 
             embed = await self.approval_embed()
             embed.title = "Giveaway Won!"
-            return await self.winner.send(
-                f"Congratulations! You have won **{self.user}'s {await self.title()}**!", embed=embed
-            )
+            with suppress(discord.HTTPException):
+                await self.winner.send(
+                    f"Congratulations! You have won **{self.user}'s {await self.title()}**!", embed=embed
+                )
+            return
 
         await self.send_pokemon_to_user(self.user)
         await self.bot.mongo.db.giveaway.update_one({"_id": self._id}, {"$set": {"winner_id": None}})
