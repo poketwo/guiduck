@@ -540,13 +540,14 @@ class Suspensions(commands.Cog):
         return {doc["_id"]: doc["count"] async for doc in self.bot.mongo.db.member.aggregate(pipeline)}
 
     def channel_access(
-        self, guild: discord.Guild, config: dict, flagged_role_counts: dict[int, int]
+        self, guild: discord.Guild, config: dict, flagged_role_counts: dict[int, int], flagged_ids: set[int]
     ) -> tuple[list[str], list[str], list[str]]:
         """Lines for channels the suspended role is denied in, channels gated by stripped roles, and leaks.
 
         A leak is a channel where the suspended role is denied View Channel but another role allows it. Role allows
         beat role denies, so suspended members holding that role still see the channel. Only roles a flagged member
-        holds count; stripped and booster access roles don't, since suspended members lose them.
+        holds count; stripped and booster access roles don't, since suspended members lose them. Member allows beat
+        role denies too, so flagged members with their own View Channel allow are leaks in hidden and gated channels.
         """
 
         suspended_role = guild.get_role(config.get("suspended_role_id"))
@@ -566,6 +567,14 @@ class Suspensions(commands.Cog):
                     and target not in (suspended_role, guild.default_role)
                     and overwrite.view_channel is True
                 ]
+                member_allows = sum(
+                    1
+                    for target, overwrite in overwrites.items()
+                    if not isinstance(target, discord.Role)
+                    and target.id in flagged_ids
+                    and overwrite.view_channel is True
+                )
+                member_leak = [f"{member_allows:,} flagged member overwrite(s)"] if member_allows else []
                 label = self.channel_label(channel)
                 if category and channel is not category:
                     label = f"- {label}"
@@ -583,7 +592,7 @@ class Suspensions(commands.Cog):
                         f"{role.mention} ({flagged_role_counts[role.id]:,} flagged)"
                         for role in allowed
                         if role.id not in withheld and flagged_role_counts.get(role.id)
-                    ]
+                    ] + member_leak
                     if leaking:
                         leaks.append(f"{label}: {', '.join(leaking)}")
                     continue
@@ -593,11 +602,14 @@ class Suspensions(commands.Cog):
                 gating = [role for role in allowed if role.id in withheld]
                 if not everyone_can_view and gating and len(gating) == len(allowed):
                     gated.append(f"{label}: {', '.join(role.mention for role in gating)}")
+                    if member_leak:
+                        leaks.append(f"{label}: {member_leak[0]}")
 
         return hidden, gated, leaks
 
     async def overview_pages(self, guild: discord.Guild) -> list[tuple[str, str]]:
         config = await self.get_config(guild.id)
+        flagged = await self.flagged_ids(guild.id)
 
         counts = {}
         with suppress(discord.HTTPException):
@@ -612,7 +624,7 @@ class Suspensions(commands.Cog):
         next_sync = self.reconcile_task.next_iteration
         overview = [
             f"**Suspended role:** {with_count(config.get('suspended_role_id'))}",
-            f"**Flagged as suspended:** {len(await self.flagged_ids(guild.id)):,} (includes members who left)",
+            f"**Flagged as suspended:** {len(flagged):,} (includes members who left)",
             f"**Stripped while suspended:** {self.format_roles(guild, config.get('suspension_stripped_role_ids', []))}",
             f"**Booster access role:** {with_count(config.get('booster_access_role_id'))}",
             "**Booster access given to:** "
@@ -624,7 +636,7 @@ class Suspensions(commands.Cog):
         ]
         pages = [("Overview", "\n".join(overview))]
 
-        hidden, gated, leaks = self.channel_access(guild, config, await self.flagged_role_counts(guild.id))
+        hidden, gated, leaks = self.channel_access(guild, config, await self.flagged_role_counts(guild.id), flagged)
         sections = [
             (
                 "Hidden channels",
