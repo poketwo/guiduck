@@ -2,7 +2,8 @@
   description = "Helper bot for Pokétwo's servers";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # python310 was dropped from nixos-unstable; 25.05 still has it.
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
