@@ -485,8 +485,8 @@ source = { git = "https://github.com/oliver-ni/discord-ext-menus-views.git?rev=a
 
 [[package]]
 name = "discord-py"
-version = "2.8.0a5408+g3270121c"
-source = { git = "https://github.com/Rapptz/discord.py.git?rev=3270121c8098539fa8420ce89104943e3adb88e2#3270121c8098539fa8420ce89104943e3adb88e2" }
+version = "2.8.0a5432+g65232c38"
+source = { git = "https://github.com/Rapptz/discord.py.git?rev=65232c38702be5844cf2ce865a4777eb1928b5d0#65232c38702be5844cf2ce865a4777eb1928b5d0" }
 dependencies = [
     { name = "aiohttp" },
     { name = "audioop-lts", marker = "python_full_version >= '3.13'" },
@@ -1018,7 +1018,7 @@ requires-dist = [
     { name = "discord-ext-events", git = "https://github.com/oliver-ni/discord-ext-events?rev=a91ba6441705bc2a319a387cfbc139cc2e8c1472" },
     { name = "discord-ext-menus", git = "https://github.com/Rapptz/discord-ext-menus.git?rev=8686b5d1bbc1d3c862292eb436ab630d6e9c9b53" },
     { name = "discord-ext-menus-views", git = "https://github.com/oliver-ni/discord-ext-menus-views.git?rev=a472f3de648eb9e0fcffc2e101c69841de92f3ff" },
-    { name = "discord-py", git = "https://github.com/Rapptz/discord.py.git?rev=3270121c8098539fa8420ce89104943e3adb88e2" },
+    { name = "discord-py", git = "https://github.com/Rapptz/discord.py.git?rev=65232c38702be5844cf2ce865a4777eb1928b5d0" },
     { name = "dnspython", specifier = ">=2.0.0,<3" },
     { name = "durations-nlp", specifier = ">=1.0.1,<2" },
     { name = "httpx", specifier = ">=0.25.0,<0.26" },

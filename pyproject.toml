@@ -31,7 +31,7 @@ jishaku = {git = "https://github.com/Gorialis/jishaku.git", rev = "700fa24d8b671
 discord-ext-menus = {git = "https://github.com/Rapptz/discord-ext-menus.git", rev = "8686b5d1bbc1d3c862292eb436ab630d6e9c9b53"}
 discord-ext-events = {git = "https://github.com/oliver-ni/discord-ext-events", rev = "a91ba6441705bc2a319a387cfbc139cc2e8c1472"}
 discord-ext-menus-views = {git = "https://github.com/oliver-ni/discord-ext-menus-views.git", rev = "a472f3de648eb9e0fcffc2e101c69841de92f3ff"}
-discord-py = {git = "https://github.com/Rapptz/discord.py.git", rev = "3270121c8098539fa8420ce89104943e3adb88e2"}
+discord-py = {git = "https://github.com/Rapptz/discord.py.git", rev = "65232c38702be5844cf2ce865a4777eb1928b5d0"}
 
 [tool.black]
 line-length = 120
