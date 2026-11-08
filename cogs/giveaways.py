@@ -496,7 +496,7 @@ class Giveaways(commands.Cog):
                 return
 
         if self._current is not None and not self._current.task.done():
-            if giveaway.ends_at > self._current.giveaway.ends_at:
+            if giveaway.ends_at >= self._current.giveaway.ends_at:
                 return
             self.clear_current()
 
