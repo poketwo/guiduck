@@ -6,7 +6,7 @@ from typing import NamedTuple, Optional
 import discord
 from bson.objectid import ObjectId
 from discord.ext import commands, tasks
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import ConnectionFailure, DuplicateKeyError
 
 from helpers.poketwo import format_pokemon, format_pokemon_details
 from helpers.utils import FakeUser, resolve_users, start_resilient_loop
@@ -203,10 +203,14 @@ class Giveaway:
         self.channel_id = channel.id
         self._message = None
 
-        await self.bot.mongo.db.giveaway.update_one(
-            {"_id": self._id},
-            {"$set": {"ends_at": self.ends_at, "channel_id": channel.id, "message_id": message.id}},
-        )
+        try:
+            await self.bot.mongo.db.giveaway.update_one(
+                {"_id": self._id},
+                {"$set": {"ends_at": self.ends_at, "channel_id": channel.id, "message_id": message.id}},
+            )
+        except ConnectionFailure:
+            await message.delete()
+            raise
 
     async def end(self):
         """Ends a giveaway."""
