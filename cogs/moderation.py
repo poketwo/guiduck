@@ -17,7 +17,14 @@ from discord.ui import button
 
 from helpers import checks, constants, time
 from helpers.pagination import EmbedListPageSource, PageNavigation
-from helpers.utils import FakeUser, FetchUserConverter, get_or_fetch_member, resolve_users, with_attachment_urls
+from helpers.utils import (
+    FakeUser,
+    FetchUserConverter,
+    get_or_fetch_member,
+    resolve_users,
+    start_resilient_loop,
+    with_attachment_urls,
+)
 
 
 BOT_ID = 753657623739629739
@@ -812,8 +819,8 @@ class Moderation(commands.Cog):
         self.bot = bot
         self.cls_dict = cls_dict
         self.reversing_action_ids = set()
-        self.check_actions.start()
-        self.check_expired_locks.start()
+        start_resilient_loop(self.check_actions)
+        start_resilient_loop(self.check_expired_locks)
 
     async def build_actions(self, docs):
         """Builds actions from documents of one guild, resolving their users in one batch."""

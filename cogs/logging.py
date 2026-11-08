@@ -18,6 +18,7 @@ from helpers import checks, constants
 from helpers.context import GuiduckContext
 from helpers.converters import FetchChannelOrThreadConverter
 from helpers.pagination import PageNavigation
+from helpers.utils import start_resilient_loop
 
 
 class LogFlagConverter(commands.Converter):
@@ -196,7 +197,7 @@ class Logging(commands.Cog):
         self.bot = bot
         self.log = logging.getLogger("support")
         self.fernet = Fernet(config.MESSAGE_LOG_KEY)
-        self.cache_all.start()
+        start_resilient_loop(self.cache_all)
 
     def encrypt(self, content: str) -> str:
         return self.fernet.encrypt(content.encode()).decode()

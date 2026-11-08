@@ -9,7 +9,7 @@ from discord.ext import commands, tasks
 from pymongo.errors import DuplicateKeyError
 
 from helpers.poketwo import format_pokemon, format_pokemon_details
-from helpers.utils import FakeUser, resolve_users
+from helpers.utils import FakeUser, resolve_users, start_resilient_loop
 
 
 MAX_PENDING_GIVEAWAYS = 5
@@ -349,7 +349,7 @@ class Giveaways(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.start_giveaways.start()
+        start_resilient_loop(self.start_giveaways)
         self._current: Optional[DispatchedGiveaway] = None
         self.bot.loop.create_task(self.update_current())
 

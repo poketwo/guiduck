@@ -5,6 +5,8 @@ from typing import List
 
 from discord.ext import commands, tasks
 
+from helpers.utils import start_resilient_loop
+
 
 class AutoPost:
     def __init__(self, channels: List[int], message: str, *, each: int = 1, delete_last: bool = False):
@@ -65,7 +67,7 @@ class PriceCheck(commands.Cog):
         self.bot = bot
         self.posts = POSTS
         self.updated = defaultdict(bool)
-        self.autopost.start()
+        start_resilient_loop(self.autopost)
 
     @commands.Cog.listener()
     async def on_message(self, message):
