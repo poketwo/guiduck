@@ -819,6 +819,7 @@ class Moderation(commands.Cog):
         self.bot = bot
         self.cls_dict = cls_dict
         self.reversing_action_ids = set()
+        self.reversing_lock_channel_ids = set()
         start_resilient_loop(self.check_actions)
         start_resilient_loop(self.check_expired_locks)
 
@@ -1838,7 +1839,11 @@ class Moderation(commands.Cog):
         await self.bot.wait_until_ready()
         query = {"locked": True, "lock_expires_at": {"$lt": datetime.now(timezone.utc)}}
         async for doc in self.bot.mongo.db.channel.find(query):
-            self.bot.loop.create_task(self.reverse_expired_lock(doc))
+            if doc["_id"] in self.reversing_lock_channel_ids:
+                continue
+            self.reversing_lock_channel_ids.add(doc["_id"])
+            task = self.bot.loop.create_task(self.reverse_expired_lock(doc))
+            task.add_done_callback(lambda _, id=doc["_id"]: self.reversing_lock_channel_ids.discard(id))
 
     async def cog_unload(self):
         self.check_actions.cancel()
