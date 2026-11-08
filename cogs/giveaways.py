@@ -513,6 +513,9 @@ class Giveaways(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def start_giveaways(self):
+        if self._current is None or self._current.task.done():
+            await self.update_current()
+
         async for giveaway in self.bot.mongo.db.giveaway.find({"approval_status": True, "ends_at": {"$exists": False}}):
             giveaway = await self.build_giveaway(giveaway)
             guild_data = await self.bot.mongo.db.guild.find_one({"_id": giveaway.guild_id})
