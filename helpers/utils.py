@@ -5,7 +5,8 @@ from textwrap import shorten
 from typing import Iterable, List, NamedTuple, Optional
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
+from pymongo.errors import ConnectionFailure
 
 from . import constants, time
 
@@ -27,6 +28,12 @@ async def log_staff_action(ctx, title, *, fields=(), files=()):
 
     files = [discord.File(io.BytesIO(content.encode()), filename=filename) for filename, content in files]
     await channel.send(embed=embed, files=files, view=view, allowed_mentions=discord.AllowedMentions.none())
+
+
+def start_resilient_loop(loop: tasks.Loop) -> None:
+    """Starts a loop that retries on Mongo connection errors instead of stopping for good."""
+    loop.add_exception_type(ConnectionFailure)
+    loop.start()
 
 
 class FakeAvatar(NamedTuple):

@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands, tasks
 
 from helpers import checks, constants
-from helpers.utils import as_line_chunks_by_len
+from helpers.utils import as_line_chunks_by_len, start_resilient_loop
 
 # Roles that put someone on poketwo.net/people. The site maps these IDs to titles.
 STAFF_ROLE_IDS = [
@@ -40,7 +40,7 @@ class StaffRoster(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.refresh_task.start()
+        start_resilient_loop(self.refresh_task)
 
     async def cog_unload(self):
         self.refresh_task.cancel()

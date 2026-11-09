@@ -9,7 +9,7 @@ from discord.ext import commands, tasks
 from pymongo.errors import DuplicateKeyError
 
 from helpers.poketwo import format_pokemon, format_pokemon_details
-from helpers.utils import FakeUser, resolve_users
+from helpers.utils import FakeUser, resolve_users, start_resilient_loop
 
 
 MAX_PENDING_GIVEAWAYS = 5
@@ -349,7 +349,7 @@ class Giveaways(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.start_giveaways.start()
+        start_resilient_loop(self.start_giveaways)
         self._current: Optional[DispatchedGiveaway] = None
         self.bot.loop.create_task(self.update_current())
 
@@ -492,7 +492,7 @@ class Giveaways(commands.Cog):
                 return
 
         if self._current is not None and not self._current.task.done():
-            if giveaway.ends_at > self._current.giveaway.ends_at:
+            if giveaway.ends_at >= self._current.giveaway.ends_at:
                 return
             self.clear_current()
 
@@ -513,6 +513,9 @@ class Giveaways(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def start_giveaways(self):
+        if self._current is None or self._current.task.done():
+            await self.update_current()
+
         async for giveaway in self.bot.mongo.db.giveaway.find({"approval_status": True, "ends_at": {"$exists": False}}):
             giveaway = await self.build_giveaway(giveaway)
             guild_data = await self.bot.mongo.db.guild.find_one({"_id": giveaway.guild_id})
