@@ -5,7 +5,7 @@ from enum import Enum
 
 import discord
 from discord.ext import commands
-from helpers.utils import FakeUser
+from helpers.utils import FakeUser, resolve_users
 
 
 class SubmissionStatus(Enum):
@@ -51,14 +51,6 @@ class Forms(commands.Cog):
     async def cog_unload(self):
         self._task.cancel()
 
-    async def fetch_reviewer_name(self, reviewer_id):
-        if user := self.bot.get_user(reviewer_id):
-            return str(user)
-        try:
-            return str(await self.bot.fetch_user(reviewer_id))
-        except discord.HTTPException:
-            return str(reviewer_id)
-
     async def send_submission(self, channel, submission):
         status = submission.get("status", 0)
         user = self.bot.get_user(submission["user_id"]) or FakeUser(submission["user_id"])
@@ -72,7 +64,10 @@ class Forms(commands.Cog):
         embed.set_footer(text=f"User ID • {user.id}")
 
         if reviewer_id := submission.get("reviewer_id"):
-            reviewer = submission.get("reviewer_tag") or await self.fetch_reviewer_name(reviewer_id)
+            reviewer = submission.get("reviewer_tag")
+            if not reviewer:
+                users = await resolve_users(self.bot, channel.guild.id, [reviewer_id], fetch=True)
+                reviewer = users[reviewer_id]
             embed.set_footer(text=embed.footer.text + f"\nReviewed by • {reviewer}")
 
         if embedded_id := submission.get("embedded_id"):
