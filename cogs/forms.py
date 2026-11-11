@@ -5,7 +5,7 @@ from enum import Enum
 
 import discord
 from discord.ext import commands
-from helpers.utils import FakeUser
+from helpers.utils import FakeUser, resolve_users
 
 
 class SubmissionStatus(Enum):
@@ -64,7 +64,10 @@ class Forms(commands.Cog):
         embed.set_footer(text=f"User ID • {user.id}")
 
         if reviewer_id := submission.get("reviewer_id"):
-            reviewer = self.bot.get_user(reviewer_id) or FakeUser(reviewer_id)
+            reviewer = submission.get("reviewer_tag")
+            if not reviewer:
+                users = await resolve_users(self.bot, channel.guild.id, [reviewer_id], fetch=True)
+                reviewer = users[reviewer_id]
             embed.set_footer(text=embed.footer.text + f"\nReviewed by • {reviewer}")
 
         if embedded_id := submission.get("embedded_id"):
