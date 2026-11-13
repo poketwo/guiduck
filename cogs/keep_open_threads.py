@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import discord
 from discord.ext import commands
@@ -10,6 +10,17 @@ from helpers.pagination import EmbedListPageSource
 MAX_AUTO_ARCHIVE_MINUTES = 10080
 
 KeepOpenTarget = discord.Thread | discord.TextChannel | discord.ForumChannel
+
+
+def archived_from_inactivity(thread: discord.Thread, active_since: datetime | None = None) -> bool:
+    """Whether the thread archived by itself after going quiet for its whole timer, rather than someone archiving it.
+
+    *active_since* is a time it was last active besides its last message, like when it was last unarchived."""
+
+    last_activity = discord.utils.snowflake_time(thread.last_message_id or thread.id)
+    if active_since is not None:
+        last_activity = max(last_activity, active_since)
+    return thread.archive_timestamp - last_activity >= timedelta(minutes=thread.auto_archive_duration)
 
 
 class KeepOpenThreads(commands.Cog):
@@ -40,14 +51,14 @@ class KeepOpenThreads(commands.Cog):
         }
         return next((settings[i] for i in ids if i in settings), False)
 
-    async def reopen(self, thread: discord.Thread):
-        if thread.archived and not thread.locked:
+    async def reopen(self, thread: discord.Thread, active_since: datetime | None = None):
+        if thread.archived and not thread.locked and archived_from_inactivity(thread, active_since):
             await thread.edit(archived=False)
 
     @commands.Cog.listener()
     async def on_thread_update(self, before: discord.Thread, after: discord.Thread):
         if not before.archived and after.archived and await self.is_kept_open(after):
-            await self.reopen(after)
+            await self.reopen(after, before.archive_timestamp)
 
     @commands.Cog.listener()
     async def on_ready(self):
