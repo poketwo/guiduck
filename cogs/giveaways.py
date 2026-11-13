@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import NamedTuple, Optional
@@ -9,7 +10,7 @@ from discord.ext import commands, tasks
 from pymongo.errors import DuplicateKeyError
 
 from helpers.poketwo import format_pokemon, format_pokemon_details
-from helpers.utils import FakeUser, resolve_users
+from helpers.utils import FakeUser, resolve_users, start_resilient_loop
 
 
 MAX_PENDING_GIVEAWAYS = 5
@@ -218,7 +219,13 @@ class Giveaway:
             ],
             allowDiskUse=True,
         ).to_list(1):
-            self.winner = self.guild.get_member(winner[0]["user_id"]) or FakeUser(winner[0]["user_id"])
+            winner_id = winner[0]["user_id"]
+            self.winner = self.guild.get_member(winner_id)
+            if self.winner is None:
+                with suppress(discord.HTTPException):
+                    self.winner = await self.bot.fetch_user(winner_id)
+            if self.winner is None:
+                self.winner = FakeUser(winner_id)
             await self.bot.mongo.db.giveaway.update_one({"_id": self._id}, {"$set": {"winner_id": self.winner.id}})
             await self.send_pokemon_to_user(self.winner)
             await self.channel.send(
@@ -227,9 +234,11 @@ class Giveaway:
 
             embed = await self.approval_embed()
             embed.title = "Giveaway Won!"
-            return await self.winner.send(
-                f"Congratulations! You have won **{self.user}'s {await self.title()}**!", embed=embed
-            )
+            with suppress(discord.HTTPException):
+                await self.winner.send(
+                    f"Congratulations! You have won **{self.user}'s {await self.title()}**!", embed=embed
+                )
+            return
 
         await self.send_pokemon_to_user(self.user)
         await self.bot.mongo.db.giveaway.update_one({"_id": self._id}, {"$set": {"winner_id": None}})
@@ -349,7 +358,7 @@ class Giveaways(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.start_giveaways.start()
+        start_resilient_loop(self.start_giveaways)
         self._current: Optional[DispatchedGiveaway] = None
         self.bot.loop.create_task(self.update_current())
 
@@ -492,7 +501,7 @@ class Giveaways(commands.Cog):
                 return
 
         if self._current is not None and not self._current.task.done():
-            if giveaway.ends_at > self._current.giveaway.ends_at:
+            if giveaway.ends_at >= self._current.giveaway.ends_at:
                 return
             self.clear_current()
 
@@ -513,6 +522,9 @@ class Giveaways(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def start_giveaways(self):
+        if self._current is None or self._current.task.done():
+            await self.update_current()
+
         async for giveaway in self.bot.mongo.db.giveaway.find({"approval_status": True, "ends_at": {"$exists": False}}):
             giveaway = await self.build_giveaway(giveaway)
             guild_data = await self.bot.mongo.db.guild.find_one({"_id": giveaway.guild_id})

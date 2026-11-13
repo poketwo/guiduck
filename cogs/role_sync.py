@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands, tasks
 
 from helpers import checks, constants
-from helpers.utils import get_or_fetch_member
+from helpers.utils import get_or_fetch_member, start_resilient_loop
 
 ROLE_MAPPING_COMMUNITY_TO_SUPPORT = {
     974942298301431809: 930346838589063208,
@@ -26,7 +26,7 @@ class RoleSync(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.sync_all_task.start()
+        start_resilient_loop(self.sync_all_task)
         self.locks = defaultdict(asyncio.Lock)
 
     @tasks.loop(minutes=20)

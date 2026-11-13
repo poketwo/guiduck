@@ -54,7 +54,8 @@ class Forms(commands.Cog):
     async def send_submission(self, channel, submission):
         status = submission.get("status", 0)
         reviewer_id = submission.get("reviewer_id")
-        user_ids = [x for x in (submission["user_id"], reviewer_id) if x is not None]
+        unresolved_reviewer = None if submission.get("reviewer_tag") else reviewer_id
+        user_ids = [x for x in (submission["user_id"], unresolved_reviewer) if x is not None]
         users = await resolve_users(self.bot, channel.guild.id, user_ids, fetch=True)
         user = users[submission["user_id"]]
 
@@ -67,7 +68,8 @@ class Forms(commands.Cog):
         embed.set_footer(text=f"User ID • {user.id}")
 
         if reviewer_id is not None:
-            embed.set_footer(text=embed.footer.text + f"\nReviewed by • {users[reviewer_id]}")
+            reviewer = submission.get("reviewer_tag") or users[reviewer_id]
+            embed.set_footer(text=embed.footer.text + f"\nReviewed by • {reviewer}")
 
         if embedded_id := submission.get("embedded_id"):
             message = await channel.fetch_message(embedded_id)

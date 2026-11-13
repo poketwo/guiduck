@@ -17,7 +17,14 @@ from discord.ui import button
 
 from helpers import checks, constants, time
 from helpers.pagination import EmbedListPageSource, PageNavigation
-from helpers.utils import FakeUser, FetchUserConverter, get_or_fetch_member, resolve_users, with_attachment_urls
+from helpers.utils import (
+    FakeUser,
+    FetchUserConverter,
+    get_or_fetch_member,
+    resolve_users,
+    start_resilient_loop,
+    with_attachment_urls,
+)
 
 
 BOT_ID = 753657623739629739
@@ -812,8 +819,9 @@ class Moderation(commands.Cog):
         self.bot = bot
         self.cls_dict = cls_dict
         self.reversing_action_ids = set()
-        self.check_actions.start()
-        self.check_expired_locks.start()
+        self.reversing_lock_channel_ids = set()
+        start_resilient_loop(self.check_actions)
+        start_resilient_loop(self.check_expired_locks)
 
     async def build_actions(self, docs):
         """Builds actions from documents of one guild, resolving their users in one batch."""
@@ -1831,7 +1839,11 @@ class Moderation(commands.Cog):
         await self.bot.wait_until_ready()
         query = {"locked": True, "lock_expires_at": {"$lt": datetime.now(timezone.utc)}}
         async for doc in self.bot.mongo.db.channel.find(query):
-            self.bot.loop.create_task(self.reverse_expired_lock(doc))
+            if doc["_id"] in self.reversing_lock_channel_ids:
+                continue
+            self.reversing_lock_channel_ids.add(doc["_id"])
+            task = self.bot.loop.create_task(self.reverse_expired_lock(doc))
+            task.add_done_callback(lambda _, id=doc["_id"]: self.reversing_lock_channel_ids.discard(id))
 
     async def cog_unload(self):
         self.check_actions.cancel()

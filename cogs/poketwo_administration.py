@@ -15,7 +15,7 @@ from helpers import checks, constants
 from helpers.converters import SpeciesConverter
 from helpers.converters import ActivityArgs
 from helpers.outline.decorators import with_typing
-from helpers.poketwo import format_pokemon_details
+from helpers.poketwo import computed_fields, format_pokemon_details
 from helpers.utils import FetchUserConverter, as_line_chunks_by_len, fetch_role_members
 
 REFUND_CHANNEL_ID = 973239955784614008
@@ -404,8 +404,9 @@ class PoketwoAdministration(commands.Cog):
             "iv_total": flags.iv_total,
             "moves": [],
             "shiny": flags.shiny,
-            "idx": await self.bot.mongo.fetch_next_idx(ctx.author),
+            "idx": await self.bot.mongo.fetch_next_idx(member),
         }
+        pokemon["computed"] = computed_fields([pokemon[x] for x in IV_FLAGS])
 
         refund = Refund(
             user=ctx.author,
