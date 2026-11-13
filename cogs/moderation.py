@@ -1616,6 +1616,16 @@ class Moderation(commands.Cog):
             return await ctx.send("Could not find an entry with that ID.", ephemeral=True)
         await ctx.send(embed=embed)
 
+    async def send_lock_results(self, ctx, results):
+        try:
+            if results:
+                await ctx.send("\n".join(results))
+            else:
+                await ctx.message.add_reaction("\N{WHITE HEAVY CHECK MARK}")
+        except discord.Forbidden:
+            with suppress(discord.HTTPException):
+                await ctx.message.add_reaction("\N{CROSS MARK}")
+
     @commands.group(invoke_without_command=True)
     @commands.guild_only()
     @checks.is_moderator()
@@ -1630,7 +1640,6 @@ class Moderation(commands.Cog):
         channels = channels or [ctx.channel]
 
         results = []
-        to_lock = []
         for channel in channels:
             channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
             if channel_data and channel_data.get("locked", False):
@@ -1642,25 +1651,6 @@ class Moderation(commands.Cog):
                 results.append(f"{channel.mention} cannot be locked because it was manually restricted.")
                 continue
 
-            announce = f"\N{LOCK} This channel and its threads have been locked."
-            if flags.duration:
-                announce += f"\n**Expires**: {discord.utils.format_dt(flags.duration.dt, 'R')}"
-            if flags.reason:
-                announce += f"\n**Reason**:\n>>> {flags.reason}"
-            try:
-                await channel.send(announce)
-            except discord.Forbidden:
-                pass
-
-            extra = announce.splitlines()[1:]
-            msg = f"\N{LOCK} Locked {channel.mention}."
-            if extra:
-                msg += "\n" + "\n".join(extra)
-            results.append(msg)
-            to_lock.append(channel)
-
-        for channel in to_lock:
-            overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = False
             overwrites.send_messages_in_threads = False
 
@@ -1680,14 +1670,23 @@ class Moderation(commands.Cog):
                 update_fields["lock_expires_at"] = flags.duration.dt
             await ctx.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update_fields}, upsert=True)
 
-            msg = f"\N{LOCK} Locked {channel.mention} and its threads."
+            announce = f"\N{LOCK} This channel and its threads have been locked."
             if flags.duration:
-                msg += f" Expires {discord.utils.format_dt(flags.duration.dt, 'R')}."
+                announce += f"\n**Expires**: {discord.utils.format_dt(flags.duration.dt, 'R')}"
             if flags.reason:
-                msg += f"\n**Reason**:\n>>> {flags.reason}"
-            results.append(msg)
+                announce += f"\n**Reason**:\n>>> {flags.reason}"
+            with suppress(discord.Forbidden):
+                await channel.send(announce)
 
-        await ctx.send("\n".join(results), ephemeral=True)
+            if channel != ctx.channel:
+                msg = f"\N{LOCK} Locked {channel.mention} and its threads."
+                if flags.duration:
+                    msg += f" Expires {discord.utils.format_dt(flags.duration.dt, 'R')}."
+                if flags.reason:
+                    msg += f"\n**Reason**:\n>>> {flags.reason}"
+                results.append(msg)
+
+        await self.send_lock_results(ctx, results)
 
     @lock.command(name="list")
     @commands.guild_only()
