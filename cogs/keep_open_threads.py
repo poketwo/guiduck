@@ -43,7 +43,10 @@ class KeepOpenThreads(commands.Cog):
                 continue
             except discord.Forbidden:
                 continue
-            await self.reopen(thread)
+            try:
+                await self.reopen(thread)
+            except discord.HTTPException:
+                continue
 
     @commands.hybrid_group(fallback="on", invoke_without_command=True)
     @checks.is_trial_moderator()
