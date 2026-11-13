@@ -28,6 +28,7 @@ COGS = [
     "forms",
     "giveaways",
     "help_desk",
+    "keep_open_threads",
     "levels",
     "member_seen",
     "moderation",
