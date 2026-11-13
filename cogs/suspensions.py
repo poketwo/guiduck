@@ -1,5 +1,6 @@
 import asyncio
 from collections import defaultdict
+from contextlib import suppress
 from datetime import datetime, timezone
 from typing import Optional, Union
 
@@ -7,10 +8,13 @@ import discord
 from discord.ext import commands, tasks
 
 from helpers import checks
+from helpers.pagination import PageNavigation
 from helpers.utils import FetchUserConverter, start_resilient_loop
 
 RECONCILE_INTERVAL_MINUTES = 10
 ID_BATCH_SIZE = 20000
+OVERVIEW_PAGE_CHARS = 3000
+OVERVIEW_PAGE_LINES = 25
 
 # Mirrors NETWORK_SUSPENSIONS_PAUSED_KEY in poketwo's helpers/constants.py.
 NETWORK_SUSPENSIONS_PAUSED_KEY = "network_suspensions:paused"
@@ -54,6 +58,82 @@ def is_poketwo_suspended(doc: dict, now: datetime, network_paused: bool) -> bool
 def batched(items: list, size: int = ID_BATCH_SIZE):
     for i in range(0, len(items), size):
         yield items[i : i + size]
+
+
+def paginate_lines(lines: list[str]) -> list[str]:
+    """Splits lines into page bodies that fit a TextDisplay."""
+
+    pages, current = [], []
+    for line in lines:
+        if len(line) > OVERVIEW_PAGE_CHARS:
+            line = line[: OVERVIEW_PAGE_CHARS - 1] + "…"
+        if current and (
+            len(current) >= OVERVIEW_PAGE_LINES or sum(len(x) + 1 for x in current) + len(line) > OVERVIEW_PAGE_CHARS
+        ):
+            pages.append("\n".join(current))
+            current = []
+        current.append(line)
+    if current:
+        pages.append("\n".join(current))
+    return pages
+
+
+class SuspensionOverviewView(discord.ui.LayoutView):
+    """Components V2 pages for ?suspension: (title, body) pairs with first/previous/stop/next/last buttons."""
+
+    def __init__(self, ctx, pages: list[tuple[str, str]], timeout=300):
+        super().__init__(timeout=timeout)
+        self.ctx = ctx
+        self.pages = pages
+        self.page = 0
+        self.num_pages = len(pages)
+        self.message = None
+        self.build()
+
+    def build(self):
+        self.clear_items()
+        title, body = self.pages[self.page]
+        container = discord.ui.Container(accent_colour=discord.Colour.blurple())
+        container.add_item(discord.ui.TextDisplay(f"### Pokétwo suspensions: {title}"))
+        container.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        container.add_item(discord.ui.TextDisplay(body))
+        container.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        container.add_item(discord.ui.TextDisplay(f"-# Page {self.page + 1}/{self.num_pages}"))
+
+        self.nav = PageNavigation()
+        self.nav.first.disabled = self.nav.previous.disabled = self.page == 0
+        self.nav.next.disabled = self.nav.last.disabled = self.page + 1 >= self.num_pages
+        if self.num_pages > 1:
+            container.add_item(self.nav)
+        self.add_item(container)
+
+    async def start(self):
+        self.message = await self.ctx.reply(view=self, allowed_mentions=discord.AllowedMentions.none())
+
+    async def show_page(self, interaction, page):
+        if page == self.page or not 0 <= page < self.num_pages:
+            return await interaction.response.defer()
+        self.page = page
+        self.build()
+        try:
+            await interaction.response.edit_message(view=self)
+        except (discord.NotFound, discord.InteractionResponded):
+            if self.message:
+                await self.message.edit(view=self)
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("You can't use this!", ephemeral=True)
+            return False
+        return True
+
+    async def on_timeout(self):
+        if self.message is None:
+            return
+        for item in self.nav.children:
+            item.disabled = True
+        with suppress(discord.HTTPException):
+            await self.message.edit(view=self)
 
 
 class Suspensions(commands.Cog):
@@ -397,6 +477,46 @@ class Suspensions(commands.Cog):
     async def update_config(self, ctx, update: dict):
         await self.bot.mongo.db.guild.update_one({"_id": ctx.guild.id}, update, upsert=True)
 
+    async def set_config_role(self, ctx, field: str, role: discord.Role) -> bool:
+        """Sets a role config field, returning False if it was already that role."""
+
+        if (await self.get_config(ctx.guild.id)).get(field) == role.id:
+            return False
+        await self.update_config(ctx, {"$set": {field: role.id}})
+        return True
+
+    async def edit_role_list(
+        self, ctx, field: str, roles: list[discord.Role], add: bool
+    ) -> tuple[list[discord.Role], list[discord.Role]]:
+        """Adds or removes roles from a role list config field, returning (changed, already in that state)."""
+
+        current = set((await self.get_config(ctx.guild.id)).get(field, []))
+        roles = list(dict.fromkeys(roles))
+        changed = [r for r in roles if (r.id in current) != add]
+        unchanged = [r for r in roles if (r.id in current) == add]
+        if changed:
+            ids = [r.id for r in changed]
+            await self.update_config(ctx, {"$addToSet": {field: {"$each": ids}}} if add else {"$pullAll": {field: ids}})
+        return changed, unchanged
+
+    async def send_role_list_result(
+        self,
+        ctx,
+        changed: list[discord.Role],
+        unchanged: list[discord.Role],
+        changed_message: str,
+        unchanged_message: str,
+    ):
+        def names(roles):
+            return ", ".join(f"**{r}**" for r in roles)
+
+        lines = []
+        if changed:
+            lines.append(changed_message.format(names(changed)))
+        if unchanged:
+            lines.append(unchanged_message.format(names(unchanged)))
+        await ctx.send("\n".join(lines))
+
     def format_role(self, guild: discord.Guild, role_id: Optional[int]) -> str:
         role = guild.get_role(role_id) if role_id is not None else None
         return role.mention if role is not None else "*not set*"
@@ -404,33 +524,154 @@ class Suspensions(commands.Cog):
     def format_roles(self, guild: discord.Guild, role_ids: list[int]) -> str:
         return ", ".join(self.format_role(guild, role_id) for role_id in role_ids) or "*none*"
 
+    def channel_label(self, channel) -> str:
+        if isinstance(channel, discord.CategoryChannel):
+            return f"**{discord.utils.escape_markdown(channel.name)}**"
+        return channel.mention
+
+    async def flagged_role_counts(self, guild_id: int) -> dict[int, int]:
+        """How many flagged members hold each role, from guiduck's cached member roles."""
+
+        pipeline = [
+            {"$match": {"_id.guild_id": guild_id, "poketwo_suspended": True}},
+            {"$unwind": "$roles"},
+            {"$group": {"_id": "$roles", "count": {"$sum": 1}}},
+        ]
+        return {doc["_id"]: doc["count"] async for doc in self.bot.mongo.db.member.aggregate(pipeline)}
+
+    def channel_access(
+        self, guild: discord.Guild, config: dict, flagged_role_counts: dict[int, int], flagged_ids: set[int]
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Lines for channels the suspended role is denied in, channels gated by stripped roles, and leaks.
+
+        A leak is a channel where the suspended role is denied View Channel but another role allows it. Role allows
+        beat role denies, so suspended members holding that role still see the channel. Only roles a flagged member
+        holds count; stripped and booster access roles don't, since suspended members lose them. Member allows beat
+        role denies too, so flagged members with their own View Channel allow are leaks in hidden and gated channels.
+        """
+
+        suspended_role = guild.get_role(config.get("suspended_role_id"))
+        withheld = set(config.get("suspension_stripped_role_ids", []))
+        if config.get("booster_access_role_id") is not None:
+            withheld.add(config["booster_access_role_id"])
+        everyone_views = guild.default_role.permissions.view_channel
+
+        hidden, gated, leaks = [], [], []
+        for category, channels in guild.by_category():
+            for channel in ([category] if category else []) + channels:
+                overwrites = channel.overwrites
+                allowed = [
+                    target
+                    for target, overwrite in overwrites.items()
+                    if isinstance(target, discord.Role)
+                    and target not in (suspended_role, guild.default_role)
+                    and overwrite.view_channel is True
+                ]
+                member_allows = sum(
+                    1
+                    for target, overwrite in overwrites.items()
+                    if not isinstance(target, discord.Role)
+                    and target.id in flagged_ids
+                    and overwrite.view_channel is True
+                )
+                member_leak = [f"{member_allows:,} flagged member overwrite(s)"] if member_allows else []
+                label = self.channel_label(channel)
+                if category and channel is not category:
+                    label = f"- {label}"
+                denied = suspended_role is not None and channel.overwrites_for(suspended_role).view_channel is False
+
+                if denied:
+                    inherited = (
+                        category is not None
+                        and channel is not category
+                        and channel.permissions_synced
+                        and category.overwrites_for(suspended_role).view_channel is False
+                    )
+                    hidden.append(label + (" (synced)" if inherited else ""))
+                    leaking = [
+                        f"{role.mention} ({flagged_role_counts[role.id]:,} flagged)"
+                        for role in allowed
+                        if role.id not in withheld and flagged_role_counts.get(role.id)
+                    ] + member_leak
+                    if leaking:
+                        leaks.append(f"{label}: {', '.join(leaking)}")
+                    continue
+
+                everyone_view = channel.overwrites_for(guild.default_role).view_channel
+                everyone_can_view = everyone_view is True or (everyone_view is None and everyone_views)
+                gating = [role for role in allowed if role.id in withheld]
+                if not everyone_can_view and gating and len(gating) == len(allowed):
+                    gated.append(f"{label}: {', '.join(role.mention for role in gating)}")
+                    if member_leak:
+                        leaks.append(f"{label}: {member_leak[0]}")
+
+        return hidden, gated, leaks
+
+    async def overview_pages(self, guild: discord.Guild) -> list[tuple[str, str]]:
+        config = await self.get_config(guild.id)
+        flagged = await self.flagged_ids(guild.id)
+
+        counts = {}
+        with suppress(discord.HTTPException):
+            counts = await guild.role_member_counts()
+
+        def with_count(role_id):
+            role = guild.get_role(role_id) if role_id is not None else None
+            if role is None or role not in counts:
+                return self.format_role(guild, role_id)
+            return f"{role.mention} ({counts[role]:,} members)"
+
+        next_sync = self.reconcile_task.next_iteration
+        overview = [
+            f"**Suspended role:** {with_count(config.get('suspended_role_id'))}",
+            f"**Flagged as suspended:** {len(flagged):,} (includes members who left)",
+            f"**Stripped while suspended:** {self.format_roles(guild, config.get('suspension_stripped_role_ids', []))}",
+            f"**Booster access role:** {with_count(config.get('booster_access_role_id'))}",
+            "**Booster access given to:** "
+            + self.format_roles(guild, config.get("booster_access_source_role_ids", [])),
+            f"**Network suspensions:** {'paused' if await self.network_suspensions_paused() else 'active'}",
+            "**Pokétwo indexes:** "
+            + ("present" if await self.has_suspension_indexes() else "missing, so new suspensions aren't picked up"),
+            f"**Next sync:** {discord.utils.format_dt(next_sync, 'R') if next_sync else 'not scheduled'}",
+        ]
+        pages = [("Overview", "\n".join(overview))]
+
+        hidden, gated, leaks = self.channel_access(guild, config, await self.flagged_role_counts(guild.id), flagged)
+        sections = [
+            (
+                "Hidden channels",
+                f"Channels where {self.format_role(guild, config.get('suspended_role_id'))} is denied View Channel.",
+                hidden,
+            ),
+            (
+                "Gated channels",
+                "Channels only stripped or booster access roles can see, so suspended members lose them with the role.",
+                gated,
+            ),
+            (
+                "Leaks",
+                "Channels with the deny where a role some flagged members hold allows View Channel and wins, so they "
+                "still see them. Counts come from guiduck's cached roles.",
+                leaks,
+            ),
+        ]
+        for title, description, lines in sections:
+            for body in paginate_lines(lines or ["*None.*"]):
+                pages.append((title, f"-# {description}\n{body}"))
+        return pages
+
     @commands.group(invoke_without_command=True, aliases=("suspensions",))
     @commands.guild_only()
     @checks.is_trial_manager()
     async def suspension(self, ctx):
-        """Shows the Pokétwo suspension role settings.
+        """Shows the Pokétwo suspension settings, hidden and gated channels, and any channels the deny doesn't cover.
 
         You must have the Trial Manager role or higher to use this.
         """
 
-        config = await self.get_config(ctx.guild.id)
-        embed = discord.Embed(title="Pokétwo suspension role", color=discord.Color.blurple())
-        embed.add_field(name="Suspended role", value=self.format_role(ctx.guild, config.get("suspended_role_id")))
-        embed.add_field(
-            name="Stripped while suspended",
-            value=self.format_roles(ctx.guild, config.get("suspension_stripped_role_ids", [])),
-            inline=False,
-        )
-        embed.add_field(
-            name="Booster access role", value=self.format_role(ctx.guild, config.get("booster_access_role_id"))
-        )
-        embed.add_field(
-            name="Booster access given to",
-            value=self.format_roles(ctx.guild, config.get("booster_access_source_role_ids", [])),
-            inline=False,
-        )
-        embed.set_footer(text=f"Members flagged as suspended: {len(await self.flagged_ids(ctx.guild.id)):,}")
-        await ctx.send(embed=embed)
+        async with ctx.typing():
+            pages = await self.overview_pages(ctx.guild)
+        await SuspensionOverviewView(ctx, pages).start()
 
     @suspension.command(name="role")
     @commands.guild_only()
@@ -441,7 +682,8 @@ class Suspensions(commands.Cog):
         You must have the Trial Manager role or higher to use this.
         """
 
-        await self.update_config(ctx, {"$set": {"suspended_role_id": role.id}})
+        if not await self.set_config_role(ctx, "suspended_role_id", role):
+            return await ctx.send(f"**{role}** is already the suspended role.")
         await ctx.send(f"Set the suspended role to **{role}**.")
 
     @suspension.group(name="strip", invoke_without_command=True)
@@ -466,8 +708,10 @@ class Suspensions(commands.Cog):
 
         if not roles:
             return await ctx.send("Please specify one or more roles.", ephemeral=True)
-        await self.update_config(ctx, {"$addToSet": {"suspension_stripped_role_ids": {"$each": [r.id for r in roles]}}})
-        await ctx.send(f"Suspended members will lose {', '.join(f'**{r}**' for r in roles)}.")
+        changed, unchanged = await self.edit_role_list(ctx, "suspension_stripped_role_ids", roles, True)
+        await self.send_role_list_result(
+            ctx, changed, unchanged, "Suspended members will lose {}.", "Already removed from suspended members: {}."
+        )
 
     @suspension_strip.command(name="remove")
     @commands.guild_only()
@@ -480,8 +724,10 @@ class Suspensions(commands.Cog):
 
         if not roles:
             return await ctx.send("Please specify one or more roles.", ephemeral=True)
-        await self.update_config(ctx, {"$pullAll": {"suspension_stripped_role_ids": [r.id for r in roles]}})
-        await ctx.send(f"Suspended members will keep {', '.join(f'**{r}**' for r in roles)}.")
+        changed, unchanged = await self.edit_role_list(ctx, "suspension_stripped_role_ids", roles, False)
+        await self.send_role_list_result(
+            ctx, changed, unchanged, "Suspended members will keep {}.", "Already kept by suspended members: {}."
+        )
 
     @suspension.group(name="booster", invoke_without_command=True)
     @commands.guild_only()
@@ -503,7 +749,8 @@ class Suspensions(commands.Cog):
         You must have the Trial Manager role or higher to use this.
         """
 
-        await self.update_config(ctx, {"$set": {"booster_access_role_id": role.id}})
+        if not await self.set_config_role(ctx, "booster_access_role_id", role):
+            return await ctx.send(f"**{role}** is already the booster access role.")
         await ctx.send(f"Set the booster access role to **{role}**.")
 
     @suspension_booster.command(name="add")
@@ -517,10 +764,10 @@ class Suspensions(commands.Cog):
 
         if not roles:
             return await ctx.send("Please specify one or more roles.", ephemeral=True)
-        await self.update_config(
-            ctx, {"$addToSet": {"booster_access_source_role_ids": {"$each": [r.id for r in roles]}}}
+        changed, unchanged = await self.edit_role_list(ctx, "booster_access_source_role_ids", roles, True)
+        await self.send_role_list_result(
+            ctx, changed, unchanged, "Members with {} will get booster access.", "Already giving booster access: {}."
         )
-        await ctx.send(f"Members with {', '.join(f'**{r}**' for r in roles)} will get booster access.")
 
     @suspension_booster.command(name="remove")
     @commands.guild_only()
@@ -533,8 +780,14 @@ class Suspensions(commands.Cog):
 
         if not roles:
             return await ctx.send("Please specify one or more roles.", ephemeral=True)
-        await self.update_config(ctx, {"$pullAll": {"booster_access_source_role_ids": [r.id for r in roles]}})
-        await ctx.send(f"Members with {', '.join(f'**{r}**' for r in roles)} no longer get booster access.")
+        changed, unchanged = await self.edit_role_list(ctx, "booster_access_source_role_ids", roles, False)
+        await self.send_role_list_result(
+            ctx,
+            changed,
+            unchanged,
+            "Members with {} no longer get booster access.",
+            "Already not giving booster access: {}.",
+        )
 
     async def set_view_deny(self, ctx, channels: list[HideableChannel], hidden: bool):
         config = await self.get_config(ctx.guild.id)
@@ -555,14 +808,26 @@ class Suspensions(commands.Cog):
                 targets += [c for c in channel.channels if c.permissions_synced]
                 unsynced = [c for c in channel.channels if not c.permissions_synced]
 
-            for target in targets:
+            desired = False if hidden else None
+            changed = [t for t in targets if t.overwrites_for(role).view_channel is not desired]
+            for target in changed:
                 overwrite = target.overwrites_for(role)
-                overwrite.view_channel = False if hidden else None
+                overwrite.view_channel = desired
                 await target.set_permissions(role, overwrite=None if overwrite.is_empty() else overwrite, reason=reason)
 
-            line = f"{verb} {channel.mention}"
-            if len(targets) > 1:
-                line += f" and {len(targets) - 1} synced channel(s)"
+            synced_changed = len(changed) - (channel in changed)
+            if not changed:
+                line = f"{channel.mention} is already {verb.lower()}"
+                if len(targets) > 1:
+                    line += ", along with its synced channels"
+            elif channel in changed:
+                line = f"{verb} {channel.mention}"
+                if synced_changed:
+                    line += f" and {synced_changed} synced channel(s)"
+            else:
+                line = (
+                    f"{channel.mention} was already {verb.lower()}; {verb.lower()} {synced_changed} synced channel(s)"
+                )
             if unsynced:
                 line += f". Not synced, so unchanged: {', '.join(c.mention for c in unsynced)}"
             lines.append(line)
