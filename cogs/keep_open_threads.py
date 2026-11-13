@@ -50,19 +50,40 @@ class KeepOpenThreads(commands.Cog):
     async def on_ready(self):
         """Reopens kept threads that were archived while the bot was offline."""
 
-        async for doc in self.bot.mongo.db.channel.find({"keep_open": True}, {"_id": 1}):
+        async for doc in self.bot.mongo.db.channel.find({"keep_open": True}, {"_id": 1, "keep_open_since": 1}):
             try:
-                thread = await self.bot.fetch_channel(doc["_id"])
+                channel = await self.bot.fetch_channel(doc["_id"])
             except discord.NotFound:
                 await self.bot.mongo.db.channel.delete_one({"_id": doc["_id"]})
                 continue
             except discord.Forbidden:
                 continue
-            if not isinstance(thread, discord.Thread):
-                continue
+            if isinstance(channel, discord.Thread):
+                await self.try_reopen(channel)
+            elif isinstance(channel, KeepOpenTarget) and "keep_open_since" in doc:
+                await self.reopen_archived_since(channel, doc["keep_open_since"])
+
+    async def try_reopen(self, thread: discord.Thread):
+        try:
+            await self.reopen(thread)
+        except discord.HTTPException:
+            pass
+
+    async def reopen_archived_since(self, channel: discord.TextChannel | discord.ForumChannel, since: datetime):
+        """Reopens the channel's kept threads archived after *since*, going newest-archived first."""
+
+        listings = [channel.archived_threads(limit=None)]
+        if isinstance(channel, discord.TextChannel):
+            listings.append(channel.archived_threads(limit=None, private=True))
+
+        for listing in listings:
             try:
-                await self.reopen(thread)
-            except discord.HTTPException:
+                async for thread in listing:
+                    if thread.archive_timestamp < since:
+                        break
+                    if await self.is_kept_open(thread):
+                        await self.try_reopen(thread)
+            except discord.Forbidden:
                 continue
 
     @commands.hybrid_group(fallback="on", invoke_without_command=True)
