@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from discord.ext import commands, tasks
 
 from helpers import constants
+from helpers.utils import start_resilient_loop
 
 
 class AutoLockThreads(commands.Cog):
@@ -11,7 +12,7 @@ class AutoLockThreads(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.lock_threads.start()
+        start_resilient_loop(self.lock_threads)
         self.warned_thread_ids = defaultdict(set)
 
     async def send_warning(self, thread, time):

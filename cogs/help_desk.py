@@ -908,6 +908,18 @@ class HelpDesk(commands.Cog):
                 await after.edit(archived=False)
 
     @commands.Cog.listener()
+    async def on_ready(self):
+        """Reopens open tickets' threads that were archived while the bot was offline."""
+
+        async for ticket in self.bot.mongo.db.ticket.find({"closed_at": None}, {"thread_id": 1}):
+            try:
+                thread = await self.bot.fetch_channel(ticket["thread_id"])
+                if thread.archived and not thread.locked:
+                    await thread.edit(archived=False)
+            except discord.HTTPException:
+                continue
+
+    @commands.Cog.listener()
     async def on_raw_message_edit(self, payload):
         if (
             payload.guild_id != constants.SUPPORT_SERVER_ID

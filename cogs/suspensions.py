@@ -9,7 +9,7 @@ from discord.ext import commands, tasks
 
 from helpers import checks
 from helpers.pagination import PageNavigation
-from helpers.utils import FetchUserConverter
+from helpers.utils import FetchUserConverter, start_resilient_loop
 
 RECONCILE_INTERVAL_MINUTES = 10
 ID_BATCH_SIZE = 20000
@@ -150,7 +150,7 @@ class Suspensions(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.locks = defaultdict(asyncio.Lock)
-        self.reconcile_task.start()
+        start_resilient_loop(self.reconcile_task)
 
     async def cog_load(self):
         # Don't await: index builds scan the whole collection and would block startup.
