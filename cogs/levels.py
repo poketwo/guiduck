@@ -11,7 +11,7 @@ from pymongo import ReturnDocument
 
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers import checks
-from helpers.utils import log_staff_action
+from helpers.utils import format_tag, log_staff_action
 
 SILENT = False
 
@@ -355,7 +355,7 @@ class Levels(commands.Cog):
         count = await self.bot.mongo.db.member.count_documents({})
 
         def format_item(i, x):
-            name = f"{i + 1}. {x.get('name', x['_id']['id'])}#{x.get('discriminator', '0')}"
+            name = f"{i + 1}. {format_tag(x.get('name', x['_id']['id']), x.get('discriminator'))}"
             if x.get("nick") is not None:
                 name = f"{name} ({x['nick']})"
             return {
