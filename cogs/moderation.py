@@ -1749,7 +1749,6 @@ class Moderation(commands.Cog):
         channels = channels or [ctx.channel]
 
         results = []
-        to_unlock = []
         for channel in channels:
             channel_data = await ctx.bot.mongo.db.channel.find_one({"_id": channel.id})
             is_locked_in_db = channel_data and channel_data.get("locked", False)
@@ -1762,15 +1761,6 @@ class Moderation(commands.Cog):
                     results.append(f"{channel.mention} is not locked.")
                 continue
 
-            msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
-            if flags.reason:
-                msg += f"\n**Reason**:\n>>> {flags.reason}"
-            results.append(msg)
-            to_unlock.append(channel)
-
-        await ctx.send("\n".join(results), ephemeral=True)
-
-        for channel in to_unlock:
             overwrites = channel.overwrites_for(ctx.guild.default_role)
             overwrites.send_messages = None
             overwrites.send_messages_in_threads = None
@@ -1796,17 +1786,16 @@ class Moderation(commands.Cog):
             announce = f"\N{OPEN LOCK} This channel has been unlocked."
             if flags.reason:
                 announce += f"\n**Reason**:\n>>> {flags.reason}"
-            try:
+            with suppress(discord.Forbidden):
                 await channel.send(announce)
-            except discord.Forbidden:
-                pass
 
-            msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
-            if flags.reason:
-                msg += f" Reason: {flags.reason}"
-            results.append(msg)
+            if channel != ctx.channel:
+                msg = f"\N{OPEN LOCK} Unlocked {channel.mention}."
+                if flags.reason:
+                    msg += f"\n**Reason**:\n>>> {flags.reason}"
+                results.append(msg)
 
-        await ctx.send("\n".join(results), ephemeral=True)
+        await self.send_lock_results(ctx, results)
 
     async def reverse_expired_lock(self, doc):
         guild = self.bot.get_guild(doc.get("guild_id"))
