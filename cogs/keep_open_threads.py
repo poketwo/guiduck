@@ -26,16 +26,19 @@ class KeepOpenThreads(commands.Cog):
             update["keep_open_since"] = datetime.now(timezone.utc)
         await self.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update}, upsert=True)
 
-    async def is_kept_open(self, thread: discord.Thread) -> bool:
-        """Whether the thread is kept open, by its own setting if it has one, or else by its channel's."""
+    async def is_kept_open(self, channel: KeepOpenTarget) -> bool:
+        """Whether the thread or channel is kept open. A thread goes by its own setting if it has one, or else by its channel's."""
 
+        ids = [channel.id]
+        if isinstance(channel, discord.Thread):
+            ids.append(channel.parent_id)
         settings = {
             doc["_id"]: doc["keep_open"]
             async for doc in self.bot.mongo.db.channel.find(
-                {"_id": {"$in": [thread.id, thread.parent_id]}, "keep_open": {"$exists": True}}, {"keep_open": 1}
+                {"_id": {"$in": ids}, "keep_open": {"$exists": True}}, {"keep_open": 1}
             )
         }
-        return settings.get(thread.id, settings.get(thread.parent_id, False))
+        return next((settings[i] for i in ids if i in settings), False)
 
     async def reopen(self, thread: discord.Thread):
         if thread.archived and not thread.locked:
@@ -86,40 +89,24 @@ class KeepOpenThreads(commands.Cog):
             except discord.Forbidden:
                 continue
 
-    @commands.hybrid_group(fallback="on", invoke_without_command=True)
+    @commands.hybrid_group(fallback="toggle", invoke_without_command=True)
     @checks.is_trial_moderator()
     @commands.guild_only()
     async def keepopen(self, ctx, channel: KeepOpenTarget = commands.CurrentChannel):
-        """Keeps a thread, or every thread in a channel, from being archived after inactivity.
+        """Toggles keeping a thread, or every thread in a channel, from being archived after inactivity.
 
         You must have the Trial Moderator role or higher to use this."""
 
         if not isinstance(channel, KeepOpenTarget):
             return await ctx.send("That's not a thread or a channel with threads.")
 
-        await self.set_keep_open(channel, True)
-        if isinstance(channel, discord.Thread):
+        keep_open = not await self.is_kept_open(channel)
+        await self.set_keep_open(channel, keep_open)
+        if keep_open and isinstance(channel, discord.Thread):
             await channel.edit(archived=False, auto_archive_duration=MAX_AUTO_ARCHIVE_MINUTES)
-            await ctx.send(f"**{channel}** will be kept open.")
-        else:
-            await ctx.send(f"Threads in **{channel}** will be kept open.")
 
-    @keepopen.command(name="off")
-    @checks.is_trial_moderator()
-    @commands.guild_only()
-    async def keepopen_off(self, ctx, channel: KeepOpenTarget = commands.CurrentChannel):
-        """Lets a thread, or the threads in a channel, be archived after inactivity again.
-
-        You must have the Trial Moderator role or higher to use this."""
-
-        if not isinstance(channel, KeepOpenTarget):
-            return await ctx.send("That's not a thread or a channel with threads.")
-
-        await self.set_keep_open(channel, False)
-        if isinstance(channel, discord.Thread):
-            await ctx.send(f"**{channel}** will no longer be kept open.")
-        else:
-            await ctx.send(f"Threads in **{channel}** will no longer be kept open.")
+        name = f"**{channel}**" if isinstance(channel, discord.Thread) else f"Threads in **{channel}**"
+        await ctx.send(f"{name} will be kept open." if keep_open else f"{name} will no longer be kept open.")
 
     @keepopen.command(name="list")
     @checks.is_trial_moderator()
