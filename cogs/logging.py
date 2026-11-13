@@ -18,6 +18,7 @@ from helpers import checks, constants
 from helpers.context import GuiduckContext
 from helpers.converters import FetchChannelOrThreadConverter
 from helpers.pagination import PageNavigation
+from helpers.utils import start_resilient_loop
 
 
 class LogFlagConverter(commands.Converter):
@@ -196,7 +197,7 @@ class Logging(commands.Cog):
         self.bot = bot
         self.log = logging.getLogger("support")
         self.fernet = Fernet(config.MESSAGE_LOG_KEY)
-        self.cache_all.start()
+        start_resilient_loop(self.cache_all)
 
     def encrypt(self, content: str) -> str:
         return self.fernet.encrypt(content.encode()).decode()
@@ -571,7 +572,7 @@ class Logging(commands.Cog):
 
     @logs.command()
     @commands.guild_only()
-    @checks.is_manager_or_admin()
+    @checks.is_trial_manager()
     async def restrict(
         self,
         ctx,
@@ -582,7 +583,7 @@ class Logging(commands.Cog):
     ):
         """Restricts the logs of a channel, or every channel in a category, to admins.
 
-        You must be a Manager or admin to use this."""
+        You must have the Trial Manager role or higher to use this."""
 
         await self.set_restricted(channel, True)
         await ctx.send(f"Restricted logs for **{channel}** to admins.")

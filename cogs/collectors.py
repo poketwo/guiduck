@@ -5,6 +5,9 @@ from discord.ext.menus.views import ViewMenuPages
 from helpers import checks
 from helpers.converters import SpeciesConverter
 from helpers.pagination import AsyncEmbedListPageSource
+from helpers.utils import FakeUser, resolve_users
+
+COLLECTOR_BATCH_SIZE = 100
 
 
 class Collectors(commands.Cog):
@@ -84,12 +87,15 @@ class Collectors(commands.Cog):
         await self.bot.mongo.db.collector.delete_one({"_id": ctx.author.id})
         await ctx.send("Cleared your collecting list.")
 
-    async def query_collectors(self, species):
-        async for x in self.bot.mongo.db.collector.find({str(species.id): True}):
-            user = self.bot.get_user(x["_id"])
-            if user is None:
-                continue
-            yield user
+    async def query_collectors(self, guild_id, species):
+        cursor = self.bot.mongo.db.collector.find({str(species.id): True}, {"_id": 1})
+        while batch := await cursor.to_list(COLLECTOR_BATCH_SIZE):
+            users = await resolve_users(self.bot, guild_id, [x["_id"] for x in batch])
+            for x in batch:
+                user = users[x["_id"]]
+                if type(user) is FakeUser:
+                    continue
+                yield user
 
     @collect.command(aliases=("s",))
     @checks.community_server_only()
@@ -101,7 +107,7 @@ class Collectors(commands.Cog):
 
         pages = ViewMenuPages(
             source=AsyncEmbedListPageSource(
-                self.query_collectors(species),
+                self.query_collectors(ctx.guild.id, species),
                 title=str(species),
                 format_item=format_item,
             )

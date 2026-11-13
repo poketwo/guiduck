@@ -4,6 +4,8 @@ import discord
 import pymongo.errors
 from discord.ext import commands, tasks
 
+from helpers.utils import start_resilient_loop
+
 
 class EnterGiveawayView(discord.ui.View):
     def __init__(self, bot):
@@ -28,7 +30,7 @@ class OneMilGiveaway(commands.Cog):
         self.view = EnterGiveawayView(self.bot)
         self.message = None
         self.bot.add_view(self.view)
-        self.edit_entrants.start()
+        start_resilient_loop(self.edit_entrants)
 
     @commands.command()
     @commands.is_owner()

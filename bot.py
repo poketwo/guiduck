@@ -28,6 +28,7 @@ COGS = [
     "forms",
     "giveaways",
     "help_desk",
+    "keep_open_threads",
     "levels",
     "member_seen",
     "moderation",
@@ -39,6 +40,7 @@ COGS = [
     "reputation",
     "role_sync",
     "staff_roster",
+    "suspensions",
     "tags",
     "outline",
 ]
