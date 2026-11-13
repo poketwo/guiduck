@@ -1,7 +1,9 @@
 import discord
 from discord.ext import commands
+from discord.ext.menus.views import ViewMenuPages
 
 from helpers import checks
+from helpers.pagination import EmbedListPageSource
 
 MAX_AUTO_ARCHIVE_MINUTES = 10080
 
@@ -90,7 +92,14 @@ class KeepOpenThreads(commands.Cog):
         )
         if not docs:
             return await ctx.send("No threads are being kept open.")
-        await ctx.send("\n".join(f"- <#{doc['_id']}>" for doc in docs))
+
+        pages = ViewMenuPages(
+            source=EmbedListPageSource(
+                [f"<#{doc['_id']}>" for doc in docs],
+                title=f"Threads Kept Open ({len(docs)})",
+            )
+        )
+        await pages.start(ctx)
 
 
 async def setup(bot):
