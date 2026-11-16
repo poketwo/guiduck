@@ -11,6 +11,7 @@ from pymongo import ReturnDocument
 
 from helpers.pagination import AsyncEmbedFieldsPageSource
 from helpers import checks
+from helpers.formats import human_join
 from helpers.utils import format_tag, log_staff_action
 
 SILENT = False
@@ -190,7 +191,7 @@ class Levels(commands.Cog):
             new_level = user.get("level", 0) + 1
 
             withheld = await self.withheld_role_ids(message.guild, user)
-            roles = [message.guild.get_role(x) for x in ROLES[new_level] if x not in withheld]
+            roles = [role for x in ROLES[new_level] if x not in withheld and (role := message.guild.get_role(x))]
             await message.author.add_roles(*roles)
             u = await self.bot.mongo.db.member.update_one(
                 {"_id": {"id": message.author.id, "guild_id": message.guild.id}, "level": user.get("level", None)},
@@ -200,8 +201,9 @@ class Levels(commands.Cog):
                 return
 
             msg = f"Congratulations {message.author.mention}, you are now level **{new_level}**!"
-            for role in roles:
-                msg += f" You have received the **{role.mention}** role."
+            if roles:
+                mentions = human_join([role.mention for role in roles], final="and")
+                msg += f" You have received the {mentions} {'role' if len(roles) == 1 else 'roles'}."
 
             if not SILENT:
                 await message.channel.send(msg)
