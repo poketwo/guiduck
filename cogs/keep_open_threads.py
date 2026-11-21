@@ -8,6 +8,10 @@ from helpers import checks
 from helpers.pagination import EmbedListPageSource
 
 MAX_AUTO_ARCHIVE_MINUTES = 10080
+REOPENED_THREAD_TEXT = "-# Reopened since this thread is kept open. Use `?keepopen` here to stop."
+REOPENED_CHANNEL_THREAD_TEXT = (
+    "-# Reopened since threads in <#{channel_id}> are kept open. Use `?keepopen` here to stop for just this thread."
+)
 
 KeepOpenTarget = discord.Thread | discord.TextChannel | discord.ForumChannel
 
@@ -37,8 +41,9 @@ class KeepOpenThreads(commands.Cog):
             update["keep_open_since"] = datetime.now(timezone.utc)
         await self.bot.mongo.db.channel.update_one({"_id": channel.id}, {"$set": update}, upsert=True)
 
-    async def is_kept_open(self, channel: KeepOpenTarget) -> bool:
-        """Whether the thread or channel is kept open. A thread goes by its own setting if it has one, or else by its channel's."""
+    async def kept_open_by(self, channel: KeepOpenTarget) -> int | None:
+        """The ID of the thread or channel whose setting keeps it open, if it's kept open. A thread goes by its own
+        setting if it has one, or else by its channel's."""
 
         ids = [channel.id]
         if isinstance(channel, discord.Thread):
@@ -49,15 +54,31 @@ class KeepOpenThreads(commands.Cog):
                 {"_id": {"$in": ids}, "keep_open": {"$exists": True}}, {"keep_open": 1}
             )
         }
-        return next((settings[i] for i in ids if i in settings), False)
+        setting_id = next((i for i in ids if i in settings), None)
+        return setting_id if setting_id is not None and settings[setting_id] else None
+
+    async def is_kept_open(self, channel: KeepOpenTarget) -> bool:
+        return await self.kept_open_by(channel) is not None
 
     async def reopen(self, thread: discord.Thread, active_since: datetime | None = None):
-        if thread.archived and not thread.locked and archived_from_inactivity(thread, active_since):
-            await thread.edit(archived=False)
+        """Reopens the thread if it's kept open and archived from inactivity, with a message saying why. The message
+        also brings it back to the channel list, which hides threads whose last message is older than their timer."""
+
+        if not thread.archived or thread.locked or not archived_from_inactivity(thread, active_since):
+            return
+        kept_open_by = await self.kept_open_by(thread)
+        if kept_open_by is None:
+            return
+
+        await thread.edit(archived=False)
+        if kept_open_by == thread.id:
+            await thread.send(REOPENED_THREAD_TEXT, silent=True)
+        else:
+            await thread.send(REOPENED_CHANNEL_THREAD_TEXT.format(channel_id=kept_open_by), silent=True)
 
     @commands.Cog.listener()
     async def on_thread_update(self, before: discord.Thread, after: discord.Thread):
-        if not before.archived and after.archived and await self.is_kept_open(after):
+        if not before.archived and after.archived:
             await self.reopen(after, before.archive_timestamp)
 
     @commands.Cog.listener()
@@ -95,8 +116,7 @@ class KeepOpenThreads(commands.Cog):
                 async for thread in listing:
                     if thread.archive_timestamp < since:
                         break
-                    if await self.is_kept_open(thread):
-                        await self.try_reopen(thread)
+                    await self.try_reopen(thread)
             except discord.Forbidden:
                 continue
 
