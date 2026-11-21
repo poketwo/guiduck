@@ -8,9 +8,9 @@ from helpers import checks
 from helpers.pagination import EmbedListPageSource
 
 MAX_AUTO_ARCHIVE_MINUTES = 10080
-REOPENED_THREAD_TEXT = "-# Reopened this thread since it's marked to keep open. Use `?keepopen` here to stop."
+REOPENED_THREAD_TEXT = "-# Reopened this thread since it's marked to be kept open. Use `?keepopen` here to stop."
 REOPENED_CHANNEL_THREAD_TEXT = (
-    "-# Reopened this thread since threads in <#{channel_id}> are marked to keep open. Use `?keepopen` here to stop "
+    "-# Reopened this thread since threads in <#{channel_id}> are marked to be kept open. Use `?keepopen` here to stop "
     "for just this thread."
 )
 
