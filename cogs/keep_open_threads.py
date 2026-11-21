@@ -8,9 +8,10 @@ from helpers import checks
 from helpers.pagination import EmbedListPageSource
 
 MAX_AUTO_ARCHIVE_MINUTES = 10080
-REOPENED_THREAD_TEXT = "-# Reopened this thread since it's marked to be kept open. Use `?keepopen` here to stop."
+REOPENED_TEXT_PREFIX = "-# Reopened this thread since"
+REOPENED_THREAD_TEXT = f"{REOPENED_TEXT_PREFIX} it's marked to be kept open. Use `?keepopen` here to stop."
 REOPENED_CHANNEL_THREAD_TEXT = (
-    "-# Reopened this thread since threads in <#{channel_id}> are marked to be kept open. Use `?keepopen` here to stop "
+    f"{REOPENED_TEXT_PREFIX} threads in <#{{channel_id}}> are marked to be kept open. Use `?keepopen` here to stop "
     "for just this thread."
 )
 
@@ -72,10 +73,23 @@ class KeepOpenThreads(commands.Cog):
             return
 
         await thread.edit(archived=False)
+        await self.delete_last_reopen_message(thread)
         if kept_open_by == thread.id:
             await thread.send(REOPENED_THREAD_TEXT, silent=True)
         else:
             await thread.send(REOPENED_CHANNEL_THREAD_TEXT.format(channel_id=kept_open_by), silent=True)
+
+    async def delete_last_reopen_message(self, thread: discord.Thread):
+        """Deletes the thread's last message if it's an earlier reopen message, so a quiet thread doesn't pile them up."""
+
+        if thread.last_message_id is None:
+            return
+        try:
+            message = await thread.fetch_message(thread.last_message_id)
+        except discord.NotFound:
+            return
+        if message.author == self.bot.user and message.content.startswith(REOPENED_TEXT_PREFIX):
+            await message.delete()
 
     @commands.Cog.listener()
     async def on_thread_update(self, before: discord.Thread, after: discord.Thread):
