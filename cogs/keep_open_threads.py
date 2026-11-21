@@ -8,9 +8,10 @@ from helpers import checks
 from helpers.pagination import EmbedListPageSource
 
 MAX_AUTO_ARCHIVE_MINUTES = 10080
-REOPENED_THREAD_TEXT = "-# Reopened since this thread is kept open. Use `?keepopen` here to stop."
+REOPENED_THREAD_TEXT = "-# Reopened this thread since it's marked to keep open. Use `?keepopen` here to stop."
 REOPENED_CHANNEL_THREAD_TEXT = (
-    "-# Reopened since threads in <#{channel_id}> are kept open. Use `?keepopen` here to stop for just this thread."
+    "-# Reopened this thread since threads in <#{channel_id}> are marked to keep open. Use `?keepopen` here to stop "
+    "for just this thread."
 )
 
 KeepOpenTarget = discord.Thread | discord.TextChannel | discord.ForumChannel
