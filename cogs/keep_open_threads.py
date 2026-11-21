@@ -86,7 +86,7 @@ class KeepOpenThreads(commands.Cog):
             return
         try:
             message = await thread.fetch_message(thread.last_message_id)
-        except discord.NotFound:
+        except (discord.NotFound, discord.Forbidden):
             return
         if message.author == self.bot.user and message.content.startswith(REOPENED_TEXT_PREFIX):
             await message.delete()
