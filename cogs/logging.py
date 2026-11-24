@@ -16,7 +16,7 @@ import parsedatetime as pdt
 import config
 from helpers import checks, constants
 from helpers.context import GuiduckContext
-from helpers.converters import FetchChannelOrThreadConverter, GreedyMemberOrUserConverter
+from helpers.converters import FetchChannelOrThreadConverter, UsersConverter
 from helpers.pagination import PageNavigation
 from helpers.utils import start_resilient_loop
 
@@ -57,7 +57,7 @@ class LogFlags(commands.FlagConverter, case_insensitive=True):
     )
     ephemeral: bool = commands.flag(description="Hide the message shown (default True)", default=True)
 
-    users: GreedyMemberOrUserConverter = commands.flag(
+    users: UsersConverter = commands.flag(
         name="user",
         description="Show logs of specific users (space-separated, or repeat the flag)",
         default=None,
@@ -481,8 +481,6 @@ class Logging(commands.Cog):
         filter_texts = {}
 
         if flags.users:
-            if not all(flags.user_groups):
-                raise commands.BadArgument("Couldn't find one of the users given.")
             users = list({user.id: user for group in flags.user_groups for user in group}.values())
             params["user"] = [user.id for user in users]
             filter_texts["User" if len(users) == 1 else "Users"] = ", ".join(user.mention for user in users)
