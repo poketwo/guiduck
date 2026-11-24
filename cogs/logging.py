@@ -16,7 +16,7 @@ import parsedatetime as pdt
 import config
 from helpers import checks, constants
 from helpers.context import GuiduckContext
-from helpers.converters import FetchChannelOrThreadConverter
+from helpers.converters import FetchChannelOrThreadConverter, GreedyMemberOrUserConverter
 from helpers.pagination import PageNavigation
 from helpers.utils import start_resilient_loop
 
@@ -57,13 +57,24 @@ class LogFlags(commands.FlagConverter, case_insensitive=True):
     )
     ephemeral: bool = commands.flag(description="Hide the message shown (default True)", default=True)
 
-    user: discord.Member | discord.User = commands.flag(
-        description="Show logs of a specific user", default=None, aliases=("from",)
+    users: GreedyMemberOrUserConverter = commands.flag(
+        name="user",
+        description="Show logs of specific users (space-separated, or repeat the flag)",
+        default=None,
+        max_args=-1,
+        aliases=("from",),
     )
     before: LogFlagConverter = commands.flag(description="Filter logs before a specific message/time", default=None)
     after: LogFlagConverter = commands.flag(description="Filter logs after a specific message/time", default=None)
     limit: int = commands.flag(description="Limit how many logs to show (50 by default)", default=None)
     deleted: bool = commands.flag(description="Whether to show deleted messages only", default=None)
+
+    @property
+    def user_groups(self) -> list[list[discord.Member | discord.User]]:
+        """The users from each `user` flag: text commands give one list per flag, slash commands a single list."""
+        if not self.users:
+            return []
+        return self.users if isinstance(self.users[0], list) else [self.users]
 
 
 PARAM_OFFSETS = {"before": 1, "after": -1}
@@ -446,7 +457,7 @@ class Logging(commands.Cog):
         - `no-embed`: Don't embed the logs directly in the channel. Default False.
         - `ephemeral`: Hide the shown message (default True)
 
-        - `user`: Show logs of a specific user
+        - `user`: Show logs of specific users (space-separated, or repeat the flag)
         - `before`: Filter logs before a specific message/time
         > This flag accepts:
         > - Message Link
@@ -469,9 +480,12 @@ class Logging(commands.Cog):
         params = {}
         filter_texts = {}
 
-        if flags.user:
-            params["user"] = flags.user.id
-            filter_texts["User"] = flags.user.mention
+        if flags.users:
+            if not all(flags.user_groups):
+                raise commands.BadArgument("Couldn't find one of the users given.")
+            users = list({user.id: user for group in flags.user_groups for user in group}.values())
+            params["user"] = [user.id for user in users]
+            filter_texts["User" if len(users) == 1 else "Users"] = ", ".join(user.mention for user in users)
 
         if flags.before or flags.after:
             if flags.before and flags.after:
@@ -507,7 +521,7 @@ class Logging(commands.Cog):
             filter_texts["Deleted Only"] = flags.deleted
 
         if params:
-            url += f"?{urlencode(params)}"
+            url += f"?{urlencode(params, doseq=True)}"
 
         lines = [f"### Message Logs of {channel.mention}", f"-# Channel ID: {channel.id}"]
         if filter_texts:
@@ -520,7 +534,7 @@ class Logging(commands.Cog):
 
         filt = {"channel_id": channel.id}
         if params.get("user"):
-            filt["user_id"] = params.get("user")
+            filt["user_id"] = {"$in": params["user"]}
         if params.get("deleted"):
             filt["deleted_at"] = {"$ne": None}
 
