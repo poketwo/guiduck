@@ -6,6 +6,7 @@ from discord.ext import commands
 
 from helpers import constants
 from helpers.context import GuiduckContext
+from helpers.utils import MemberOrFetchUserConverter
 
 
 class SpeciesConverter(commands.Converter):
@@ -94,6 +95,19 @@ class GreedyMemberOrUserConverter(commands.Converter):
                     end += 1
 
         return results
+
+
+class UsersConverter(commands.Converter):
+    """Converts one user, or several space-separated ones, failing if any of them can't be found."""
+
+    async def convert(self, ctx: GuiduckContext, argument: str) -> List[discord.User | discord.Member]:
+        with contextlib.suppress(commands.UserNotFound):
+            return [await MemberOrFetchUserConverter().convert(ctx, argument)]
+
+        words = argument.split()
+        if not words:
+            raise commands.UserNotFound(argument)
+        return [await MemberOrFetchUserConverter().convert(ctx, word) for word in words]
 
 
 class ActivityArgs(commands.FlagConverter):
