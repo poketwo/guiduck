@@ -1,3 +1,4 @@
+import contextlib
 from datetime import datetime, timedelta, timezone
 
 import discord
@@ -149,11 +150,17 @@ class KeepOpenThreads(commands.Cog):
             if kept_open_by is None:
                 continue
             try:
-                if thread.auto_archive_duration < MAX_AUTO_ARCHIVE_MINUTES:
-                    await thread.edit(auto_archive_duration=MAX_AUTO_ARCHIVE_MINUTES)
-                await self.send_kept_open_notice(thread, BUMPED_TEXT_PREFIX, kept_open_by)
+                await self.bump(thread, kept_open_by)
             except discord.HTTPException:
                 continue
+
+    async def bump(self, thread: discord.Thread, kept_open_by: int):
+        """Posts a kept-open notice in the thread, raising its timer to the max first where allowed."""
+
+        if thread.auto_archive_duration < MAX_AUTO_ARCHIVE_MINUTES:
+            with contextlib.suppress(discord.Forbidden):
+                await thread.edit(auto_archive_duration=MAX_AUTO_ARCHIVE_MINUTES)
+        await self.send_kept_open_notice(thread, BUMPED_TEXT_PREFIX, kept_open_by)
 
     @bump_quiet_threads.before_loop
     async def before_bump_quiet_threads(self):
