@@ -147,7 +147,8 @@ class KeepOpenThreads(commands.Cog):
         settings = await self.keep_open_settings(list({i for t in threads for i in (t.id, t.parent_id)}))
         for thread in threads:
             kept_open_by = self.resolve_kept_open_by([thread.id, thread.parent_id], settings)
-            if kept_open_by is None:
+            # Checked again since earlier bumps take a while, and posting in a thread someone archived would reopen it.
+            if kept_open_by is None or thread.archived or thread.locked:
                 continue
             try:
                 await self.bump(thread, kept_open_by)
