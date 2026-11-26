@@ -1,15 +1,18 @@
 from datetime import datetime, timedelta, timezone
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord.ext.menus.views import ViewMenuPages
 
 from helpers import checks
 from helpers.pagination import EmbedListPageSource
+from helpers.utils import start_resilient_loop
 
 MAX_AUTO_ARCHIVE_MINUTES = 10080
+BUMP_MARGIN = timedelta(hours=1)
 REOPENED_TEXT_PREFIX = "-# Reopened this thread since"
-KEPT_OPEN_NOTICE_PREFIXES = (REOPENED_TEXT_PREFIX,)
+BUMPED_TEXT_PREFIX = "-# Bumped this thread since"
+KEPT_OPEN_NOTICE_PREFIXES = (REOPENED_TEXT_PREFIX, BUMPED_TEXT_PREFIX)
 THREAD_KEPT_OPEN_REASON = "it's marked to be kept open. Use `?keepopen` here to stop."
 CHANNEL_KEPT_OPEN_REASON = (
     "threads in <#{channel_id}> are marked to be kept open. Use `?keepopen` here to stop for just this thread."
@@ -29,11 +32,23 @@ def archived_from_inactivity(thread: discord.Thread, active_since: datetime | No
     return thread.archive_timestamp - last_activity >= timedelta(minutes=thread.auto_archive_duration)
 
 
+def goes_quiet_by(thread: discord.Thread, deadline: datetime) -> bool:
+    """Whether the thread's last message will be older than its timer by *deadline*. The channel list hides such
+    threads even when Discord hasn't archived them."""
+
+    last_message_at = discord.utils.snowflake_time(thread.last_message_id or thread.id)
+    return last_message_at + timedelta(minutes=thread.auto_archive_duration) <= deadline
+
+
 class KeepOpenThreads(commands.Cog):
     """For keeping threads from being archived after inactivity."""
 
     def __init__(self, bot):
         self.bot = bot
+        start_resilient_loop(self.bump_quiet_threads)
+
+    async def cog_unload(self):
+        self.bump_quiet_threads.cancel()
 
     async def set_keep_open(self, channel: KeepOpenTarget, keep_open: bool):
         update = {"keep_open": keep_open, "guild_id": channel.guild.id}
@@ -50,12 +65,22 @@ class KeepOpenThreads(commands.Cog):
         ids = [channel.id]
         if isinstance(channel, discord.Thread):
             ids.append(channel.parent_id)
-        settings = {
+        return self.resolve_kept_open_by(ids, await self.keep_open_settings(ids))
+
+    async def keep_open_settings(self, ids: list[int]) -> dict[int, bool]:
+        """The keep-open settings of whichever of the threads and channels have one."""
+
+        return {
             doc["_id"]: doc["keep_open"]
             async for doc in self.bot.mongo.db.channel.find(
                 {"_id": {"$in": ids}, "keep_open": {"$exists": True}}, {"keep_open": 1}
             )
         }
+
+    @staticmethod
+    def resolve_kept_open_by(ids: list[int], settings: dict[int, bool]) -> int | None:
+        """The first of *ids* that has a setting, if that setting keeps it open."""
+
         setting_id = next((i for i in ids if i in settings), None)
         return setting_id if setting_id is not None and settings[setting_id] else None
 
@@ -102,6 +127,37 @@ class KeepOpenThreads(commands.Cog):
     async def on_thread_update(self, before: discord.Thread, after: discord.Thread):
         if not before.archived and after.archived:
             await self.reopen(after, before.archive_timestamp)
+
+    @tasks.loop(minutes=30)
+    async def bump_quiet_threads(self):
+        """Posts in kept threads about to go quiet for their whole timer. Discord often never archives these, so
+        there's nothing to reopen, but the channel list hides them all the same."""
+
+        deadline = datetime.now(timezone.utc) + BUMP_MARGIN
+        threads = [
+            thread
+            for guild in self.bot.guilds
+            for thread in guild.threads
+            if not thread.archived and not thread.locked and goes_quiet_by(thread, deadline)
+        ]
+        if not threads:
+            return
+
+        settings = await self.keep_open_settings(list({i for t in threads for i in (t.id, t.parent_id)}))
+        for thread in threads:
+            kept_open_by = self.resolve_kept_open_by([thread.id, thread.parent_id], settings)
+            if kept_open_by is None:
+                continue
+            try:
+                if thread.auto_archive_duration < MAX_AUTO_ARCHIVE_MINUTES:
+                    await thread.edit(auto_archive_duration=MAX_AUTO_ARCHIVE_MINUTES)
+                await self.send_kept_open_notice(thread, BUMPED_TEXT_PREFIX, kept_open_by)
+            except discord.HTTPException:
+                continue
+
+    @bump_quiet_threads.before_loop
+    async def before_bump_quiet_threads(self):
+        await self.bot.wait_until_ready()
 
     @commands.Cog.listener()
     async def on_ready(self):
