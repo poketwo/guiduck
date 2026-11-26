@@ -24,6 +24,7 @@ COGS = [
     "autopost",
     "auto_lock_threads",
     "boosts",
+    "calculator",
     "collectors",
     "forms",
     "giveaways",
