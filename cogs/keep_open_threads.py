@@ -9,10 +9,10 @@ from helpers.pagination import EmbedListPageSource
 
 MAX_AUTO_ARCHIVE_MINUTES = 10080
 REOPENED_TEXT_PREFIX = "-# Reopened this thread since"
-REOPENED_THREAD_TEXT = f"{REOPENED_TEXT_PREFIX} it's marked to be kept open. Use `?keepopen` here to stop."
-REOPENED_CHANNEL_THREAD_TEXT = (
-    f"{REOPENED_TEXT_PREFIX} threads in <#{{channel_id}}> are marked to be kept open. Use `?keepopen` here to stop "
-    "for just this thread."
+KEPT_OPEN_NOTICE_PREFIXES = (REOPENED_TEXT_PREFIX,)
+THREAD_KEPT_OPEN_REASON = "it's marked to be kept open. Use `?keepopen` here to stop."
+CHANNEL_KEPT_OPEN_REASON = (
+    "threads in <#{channel_id}> are marked to be kept open. Use `?keepopen` here to stop for just this thread."
 )
 
 KeepOpenTarget = discord.Thread | discord.TextChannel | discord.ForumChannel
@@ -73,14 +73,21 @@ class KeepOpenThreads(commands.Cog):
             return
 
         await thread.edit(archived=False)
-        await self.delete_last_reopen_message(thread)
-        if kept_open_by == thread.id:
-            await thread.send(REOPENED_THREAD_TEXT, silent=True)
-        else:
-            await thread.send(REOPENED_CHANNEL_THREAD_TEXT.format(channel_id=kept_open_by), silent=True)
+        await self.send_kept_open_notice(thread, REOPENED_TEXT_PREFIX, kept_open_by)
 
-    async def delete_last_reopen_message(self, thread: discord.Thread):
-        """Deletes the thread's last message if it's an earlier reopen message, so a quiet thread doesn't pile them up."""
+    async def send_kept_open_notice(self, thread: discord.Thread, prefix: str, kept_open_by: int):
+        """Replaces the thread's last kept-open notice with a new one saying what keeps it open."""
+
+        await self.delete_last_kept_open_notice(thread)
+        if kept_open_by == thread.id:
+            reason = THREAD_KEPT_OPEN_REASON
+        else:
+            reason = CHANNEL_KEPT_OPEN_REASON.format(channel_id=kept_open_by)
+        await thread.send(f"{prefix} {reason}", silent=True)
+
+    async def delete_last_kept_open_notice(self, thread: discord.Thread):
+        """Deletes the thread's last message if it's an earlier kept-open notice, so a quiet thread doesn't pile them
+        up."""
 
         if thread.last_message_id is None:
             return
@@ -88,7 +95,7 @@ class KeepOpenThreads(commands.Cog):
             message = await thread.fetch_message(thread.last_message_id)
         except (discord.NotFound, discord.Forbidden):
             return
-        if message.author == self.bot.user and message.content.startswith(REOPENED_TEXT_PREFIX):
+        if message.author == self.bot.user and message.content.startswith(KEPT_OPEN_NOTICE_PREFIXES):
             await message.delete()
 
     @commands.Cog.listener()
