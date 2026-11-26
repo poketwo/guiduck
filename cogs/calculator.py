@@ -324,7 +324,7 @@ class Calculator(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(aliases=("calculate", "math"), help=CALC_HELP)
+    @commands.command(aliases=("c", "calculate", "math"), help=CALC_HELP)
     async def calc(self, ctx, *, expression: str):
         try:
             result = f"`{calculate(expression)}`"
