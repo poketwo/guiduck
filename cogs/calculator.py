@@ -24,8 +24,23 @@ def log(value, function):
     return function(value)
 
 
+def sqrt(value):
+    if not isinstance(value, Fraction):
+        return math.sqrt(value)
+    if value < 0:
+        raise ValueError
+    root = Fraction(math.isqrt(value.numerator), math.isqrt(value.denominator))
+    if root * root == value:
+        return root
+    with localcontext() as context:
+        context.prec = SIGNIFICANT_DIGITS + 5
+        context.Emax = MAX_DIGITS * 2
+        context.Emin = -MAX_DIGITS * 2
+        return float(Decimal(value.numerator).sqrt() / Decimal(value.denominator).sqrt())
+
+
 FUNCTIONS = {
-    "sqrt": lambda x: math.sqrt(x),
+    "sqrt": sqrt,
     "log": lambda x: log(x, math.log10),
     "ln": lambda x: log(x, math.log),
     "sin": lambda x: math.sin(x),
