@@ -1,6 +1,6 @@
 import math
 import re
-from decimal import Decimal, localcontext
+from decimal import Decimal, Overflow, localcontext
 from fractions import Fraction
 
 import discord
@@ -170,6 +170,13 @@ def exact_root(value, degree):
     return None
 
 
+def approximate_power(base, exponent):
+    with localcontext() as context:
+        context.prec = SIGNIFICANT_DIGITS + 10
+        context.traps[Overflow] = False
+        return float((Decimal(base.numerator) / Decimal(base.denominator)) ** Decimal(exponent.numerator))
+
+
 def power(base, exponent):
     if isinstance(base, Fraction) and isinstance(exponent, Fraction) and base < 0 and exponent.denominator % 2:
         if exponent.denominator != 1:
@@ -187,7 +194,7 @@ def power(base, exponent):
     ):
         bits = max(base.numerator.bit_length(), base.denominator.bit_length())
         if abs(exponent) * (bits - 1) > MAX_BITS:
-            return float(base) ** float(exponent)
+            return approximate_power(base, exponent)
     return base**exponent
 
 
