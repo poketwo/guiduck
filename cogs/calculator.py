@@ -187,7 +187,7 @@ def power(base, exponent):
     ):
         bits = max(base.numerator.bit_length(), base.denominator.bit_length())
         if abs(exponent) * (bits - 1) > MAX_BITS:
-            raise CalculationError("Result is too big.")
+            return float(base) ** float(exponent)
     return base**exponent
 
 
