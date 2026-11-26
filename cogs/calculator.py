@@ -149,11 +149,36 @@ def tokenize(text):
     return tokens
 
 
+def integer_root(value, degree):
+    if value < 2:
+        return value
+    root = 1 << -(-value.bit_length() // degree)
+    while True:
+        smaller = ((degree - 1) * root + value // root ** (degree - 1)) // degree
+        if smaller >= root:
+            return root
+        root = smaller
+
+
+def exact_root(value, degree):
+    if degree > max(value.numerator.bit_length(), value.denominator.bit_length()):
+        return None
+    numerator = integer_root(value.numerator, degree)
+    denominator = integer_root(value.denominator, degree)
+    if numerator**degree == value.numerator and denominator**degree == value.denominator:
+        return Fraction(numerator, denominator)
+    return None
+
+
 def power(base, exponent):
     if isinstance(base, Fraction) and isinstance(exponent, Fraction) and base < 0 and exponent.denominator % 2:
         if exponent.denominator != 1:
             result = power(-base, exponent)
             return -result if exponent.numerator % 2 else result
+    if isinstance(base, Fraction) and isinstance(exponent, Fraction) and base > 0 and exponent.denominator != 1:
+        root = exact_root(base, exponent.denominator)
+        if root is not None:
+            return power(root, Fraction(exponent.numerator))
     if (
         isinstance(base, Fraction)
         and isinstance(exponent, Fraction)
