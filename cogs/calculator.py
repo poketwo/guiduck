@@ -150,6 +150,10 @@ def tokenize(text):
 
 
 def power(base, exponent):
+    if isinstance(base, Fraction) and isinstance(exponent, Fraction) and base < 0 and exponent.denominator % 2:
+        if exponent.denominator != 1:
+            result = power(-base, exponent)
+            return -result if exponent.numerator % 2 else result
     if (
         isinstance(base, Fraction)
         and isinstance(exponent, Fraction)
