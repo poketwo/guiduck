@@ -271,6 +271,15 @@ class Parser:
                 value = self.apply("/", value, Fraction(100))
         return value
 
+    def argument(self):
+        if self.peek()[1] not in ("+", "-"):
+            return self.primary()
+        op = self.next()[1]
+        self.enter()
+        value = self.argument()
+        self.depth -= 1
+        return self.apply("-", 0, value) if op == "-" else value
+
     def primary(self):
         kind, token = self.next()
         if kind == "number":
@@ -279,7 +288,7 @@ class Parser:
             return CONSTANTS[token]
         if token in FUNCTIONS:
             self.enter()
-            value = self.apply(FUNCTIONS[token], self.primary())
+            value = self.apply(FUNCTIONS[token], self.argument())
             self.depth -= 1
             return value
         if token == "(":
