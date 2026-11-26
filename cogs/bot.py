@@ -47,7 +47,7 @@ class Bot(commands.Cog):
                 f"You're on cooldown! Try again in **{time.human_timedelta(timedelta(seconds=error.retry_after))}**.",
                 ephemeral=True,
             )
-        if isinstance(error, commands.CommandInvokeError) and "private_variable" in str(error.original):
+        elif isinstance(error, commands.CommandInvokeError) and "private_variable" in str(error.original):
             await ctx.send(error.original, ephemeral=True)
         elif isinstance(error, commands.BadFlagArgument):
             if isinstance(error.original, commands.ConversionError):
