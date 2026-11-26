@@ -384,7 +384,10 @@ class Calculator(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(aliases=("c", "calculate", "math"), help=CALC_HELP)
+    @commands.hybrid_command(
+        aliases=("c", "calculate", "math"), help=CALC_HELP, description="Calculate a math expression."
+    )
+    @discord.app_commands.describe(expression="The math to do, e.g. 20% x 1.5m")
     async def calc(self, ctx, *, expression: str):
         try:
             result = f"`{calculate(expression)}`"
